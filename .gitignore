@@ -1,0 +1,10 @@
+node_modules
+dist
+out
+*.log
+.DS_Store
+.idea
+release
+shot-*.png
+smoke-report.txt
+smoke-out.txt

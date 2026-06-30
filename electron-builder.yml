@@ -1,0 +1,22 @@
+appId: com.studydesk.app
+productName: 学习桌面
+copyright: Copyright © 2026 StudyDesk
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**/*
+  - package.json
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 学习桌面
+publish:
+  - provider: github

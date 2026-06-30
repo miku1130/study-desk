@@ -1,0 +1,38 @@
+{
+  "name": "study-desk",
+  "version": "0.1.0",
+  "description": "学习桌面 - macOS 风格学习辅助工具（课表/铃声/番茄钟/锁屏专注/轻音乐）",
+  "main": "./out/main/index.js",
+  "author": "StudyDesk",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run",
+    "smoke": "electron scripts/smoke.cjs",
+    "build:win": "electron-vite build && electron-builder --win",
+    "build:dir": "electron-vite build && electron-builder --dir"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.12",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^2.1.10"
+  }
+}

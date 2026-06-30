@@ -1,0 +1,217 @@
+<script setup lang="ts">
+import { useMusicStore } from '@/stores/music'
+import type { LoopMode } from '@/types'
+
+const music = useMusicStore()
+
+const loops: { v: LoopMode; l: string }[] = [
+  { v: 'all', l: '列表循环' },
+  { v: 'one', l: '单曲循环' },
+  { v: 'none', l: '不循环' }
+]
+
+function onVolume(e: Event): void {
+  music.setVolume((e.target as HTMLInputElement).valueAsNumber)
+}
+</script>
+
+<template>
+  <div class="page narrow">
+    <div class="player card">
+      <div class="np">
+        <div class="np-art" :class="{ spin: music.playing }">♫</div>
+        <div class="np-info">
+          <p class="np-name">{{ music.current ? music.current.name : '未播放' }}</p>
+          <p class="np-sub">{{ music.tracks.length }} 首曲目</p>
+        </div>
+      </div>
+      <div class="np-controls">
+        <button class="btn-icon lg" aria-label="上一首" @click="music.prev()">⏮</button>
+        <button class="btn play" @click="music.toggle()">
+          {{ music.playing ? '暂停' : '播放' }}
+        </button>
+        <button class="btn-icon lg" aria-label="下一首" @click="music.next()">⏭</button>
+      </div>
+      <div class="np-extra">
+        <div class="vol">
+          <span>音量</span>
+          <input type="range" min="0" max="1" step="0.01" :value="music.volume" @input="onVolume" />
+        </div>
+        <div class="seg">
+          <button
+            v-for="o in loops"
+            :key="o.v"
+            class="seg-btn"
+            :class="{ active: music.loop === o.v }"
+            @click="music.setLoop(o.v)"
+          >
+            {{ o.l }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="list-head">
+      <h3 class="section-title">曲库</h3>
+      <button class="btn btn-secondary btn-sm" @click="music.importTracks()">导入音乐</button>
+    </div>
+
+    <div v-if="music.tracks.length" class="card list">
+      <div
+        v-for="t in music.tracks"
+        :key="t.id"
+        class="track"
+        :class="{ active: t.id === music.currentId }"
+        @click="music.play(t.id)"
+      >
+        <span class="t-ico">{{ t.id === music.currentId && music.playing ? '▶' : '♪' }}</span>
+        <span class="t-name">{{ t.name }}</span>
+        <button class="del" aria-label="删除" @click.stop="music.remove(t.id)">✕</button>
+      </div>
+    </div>
+
+    <div v-else class="card">
+      <div class="empty-state">
+        <div class="emoji">🎧</div>
+        <h2>曲库为空</h2>
+        <p>导入本地轻音乐或白噪音（mp3 / wav / ogg 等），即可在专注时播放。</p>
+        <button class="btn" @click="music.importTracks()">导入音乐</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.narrow {
+  max-width: 600px;
+}
+.player {
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.np {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.np-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
+  color: #fff;
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.np-art.spin {
+  animation: spin 4s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.np-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+.np-sub {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+.np-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 22px 0;
+}
+.btn-icon.lg {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+  border-radius: 50%;
+}
+.btn.play {
+  width: 120px;
+  height: 44px;
+  border-radius: 100px;
+  font-size: 15px;
+}
+.np-extra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.vol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.vol span {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.vol input {
+  flex: 1;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.list {
+  padding: 8px;
+}
+.track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.track:hover {
+  background: var(--hover);
+}
+.track:hover .del {
+  opacity: 1;
+}
+.track.active {
+  background: var(--accent-soft);
+}
+.track.active .t-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+.t-ico {
+  width: 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+.t-name {
+  flex: 1;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.del {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.del:hover {
+  color: #ff453a;
+}
+</style>
