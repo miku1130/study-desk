@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import TrafficLights from './TrafficLights.vue'
-
 interface NavItem {
   to: string
   label: string
@@ -58,7 +56,7 @@ const items: NavItem[] = [
 <template>
   <aside class="sidebar">
     <div class="sidebar-top">
-      <TrafficLights />
+      <span class="brand">学习桌面</span>
     </div>
     <nav class="sidebar-nav">
       <RouterLink

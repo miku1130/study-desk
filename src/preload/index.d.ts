@@ -33,6 +33,7 @@ export interface StudyDeskApi {
   }
   media: {
     url: (filePath: string) => string
+    download: (url: string) => Promise<string>
   }
   pomodoro: {
     start: () => Promise<void>

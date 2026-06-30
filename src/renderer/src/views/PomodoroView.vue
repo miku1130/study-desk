@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
+import UrlPromptModal from '@/components/UrlPromptModal.vue'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
+
+const showUrl = ref(false)
+const urlTarget = ref<'wallpaper' | 'sound'>('wallpaper')
 
 const C = 2 * Math.PI * 100
 
@@ -44,6 +48,29 @@ async function pickSound(): Promise<void> {
     settings.s.pomodoro.sound = p
     settings.save()
   }
+}
+async function pickWallpaperOnline(): Promise<void> {
+  const p = await window.api.media.download(`https://picsum.photos/1920/1080?random=${Date.now()}`)
+  if (p) {
+    settings.s.pomodoro.wallpaper = p
+    settings.save()
+  }
+}
+function clearWallpaper(): void {
+  settings.s.pomodoro.wallpaper = ''
+  settings.save()
+}
+function openUrl(target: 'wallpaper' | 'sound'): void {
+  urlTarget.value = target
+  showUrl.value = true
+}
+async function onUrlConfirm(url: string): Promise<void> {
+  const p = await window.api.media.download(url)
+  showUrl.value = false
+  if (!p) return
+  if (urlTarget.value === 'wallpaper') settings.s.pomodoro.wallpaper = p
+  else settings.s.pomodoro.sound = p
+  settings.save()
 }
 </script>
 
@@ -169,18 +196,41 @@ async function pickSound(): Promise<void> {
           <p class="s-title">专注壁纸</p>
           <p class="s-sub">{{ fileName(settings.s.pomodoro.wallpaper) }}</p>
         </div>
-        <button class="btn btn-secondary btn-sm" @click="pickWallpaper">选择图片</button>
+        <div class="row wrap">
+          <button class="btn btn-secondary btn-sm" @click="pickWallpaperOnline">随机在线</button>
+          <button class="btn btn-secondary btn-sm" @click="openUrl('wallpaper')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickWallpaper">本地</button>
+          <button class="btn btn-secondary btn-sm" @click="clearWallpaper">默认</button>
+        </div>
       </div>
       <div class="setting-row">
         <div>
           <p class="s-title">完成提示音</p>
           <p class="s-sub">{{ fileName(settings.s.pomodoro.sound) }}（留空用默认提示音）</p>
         </div>
-        <button class="btn btn-secondary btn-sm" @click="pickSound">选择音频</button>
+        <div class="row wrap">
+          <button class="btn btn-secondary btn-sm" @click="openUrl('sound')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickSound">本地</button>
+        </div>
       </div>
     </div>
+
+    <UrlPromptModal
+      v-if="showUrl"
+      :title="urlTarget === 'wallpaper' ? '在线壁纸链接' : '在线提示音链接'"
+      :placeholder="urlTarget === 'wallpaper' ? '图片直链 (jpg/png/webp)…' : '音频直链 (mp3/ogg/wav)…'"
+      @confirm="onUrlConfirm"
+      @close="showUrl = false"
+    />
   </div>
 </template>
+
+<style scoped>
+.row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+</style>
 
 <style scoped>
 .narrow {

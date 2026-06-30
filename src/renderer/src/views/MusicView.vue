@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useMusicStore } from '@/stores/music'
+import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import type { LoopMode } from '@/types'
 
 const music = useMusicStore()
+const showUrl = ref(false)
+const msg = ref('')
 
 const loops: { v: LoopMode; l: string }[] = [
   { v: 'all', l: '列表循环' },
@@ -12,6 +16,13 @@ const loops: { v: LoopMode; l: string }[] = [
 
 function onVolume(e: Event): void {
   music.setVolume((e.target as HTMLInputElement).valueAsNumber)
+}
+
+async function onAddUrl(url: string): Promise<void> {
+  const ok = await music.addByUrl(url)
+  showUrl.value = false
+  msg.value = ok ? '已添加在线音乐' : '添加失败，请检查链接'
+  window.setTimeout(() => (msg.value = ''), 2600)
 }
 </script>
 
@@ -53,8 +64,12 @@ function onVolume(e: Event): void {
 
     <div class="list-head">
       <h3 class="section-title">曲库</h3>
-      <button class="btn btn-secondary btn-sm" @click="music.importTracks()">导入音乐</button>
+      <div class="row">
+        <button class="btn btn-secondary btn-sm" @click="showUrl = true">在线添加</button>
+        <button class="btn btn-secondary btn-sm" @click="music.importTracks()">导入音乐</button>
+      </div>
     </div>
+    <p v-if="msg" class="s-sub" style="margin: 0 4px 8px">{{ msg }}</p>
 
     <div v-if="music.tracks.length" class="card list">
       <div
@@ -66,9 +81,26 @@ function onVolume(e: Event): void {
       >
         <span class="t-ico">{{ t.id === music.currentId && music.playing ? '▶' : '♪' }}</span>
         <span class="t-name">{{ t.name }}</span>
-        <button class="del" aria-label="删除" @click.stop="music.remove(t.id)">✕</button>
+        <span v-if="music.isBuiltin(t.path)" class="t-tag">内置</span>
+        <button
+          v-else
+          class="del"
+          aria-label="删除"
+          @click.stop="music.remove(t.id)"
+        >
+          ✕
+        </button>
       </div>
     </div>
+
+    <UrlPromptModal
+      v-if="showUrl"
+      title="在线添加音乐"
+      placeholder="粘贴音频直链 (mp3 / ogg / wav)…"
+      hint="可用 Pixabay、archive.org 等免费资源站的音频直链，下载到本地后离线播放。"
+      @confirm="onAddUrl"
+      @close="showUrl = false"
+    />
 
     <div v-else class="card">
       <div class="empty-state">
@@ -202,6 +234,13 @@ function onVolume(e: Event): void {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.t-tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border: 1px solid var(--separator);
+  padding: 1px 8px;
+  border-radius: 100px;
 }
 .del {
   border: none;

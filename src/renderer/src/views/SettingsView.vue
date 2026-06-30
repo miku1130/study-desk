@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
+import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import type { ThemeMode, TimetableData } from '@/types'
 
 const settings = useSettingsStore()
@@ -64,6 +65,21 @@ async function pickBellSound(which: 'onSound' | 'offSound'): Promise<void> {
   ])
   if (p) {
     settings.s.bell[which] = p
+    settings.save()
+  }
+}
+
+const showBellUrl = ref(false)
+const bellTarget = ref<'onSound' | 'offSound'>('onSound')
+function openBellUrl(which: 'onSound' | 'offSound'): void {
+  bellTarget.value = which
+  showBellUrl.value = true
+}
+async function onBellUrl(url: string): Promise<void> {
+  const p = await window.api.media.download(url)
+  showBellUrl.value = false
+  if (p) {
+    settings.s.bell[bellTarget.value] = p
     settings.save()
   }
 }
@@ -138,14 +154,20 @@ async function importTimetable(): Promise<void> {
           <p class="s-title">上课铃</p>
           <p class="s-sub">{{ fileName(settings.s.bell.onSound) }}</p>
         </div>
-        <button class="btn btn-secondary btn-sm" @click="pickBellSound('onSound')">选择音频</button>
+        <div class="row">
+          <button class="btn btn-secondary btn-sm" @click="openBellUrl('onSound')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickBellSound('onSound')">本地</button>
+        </div>
       </div>
       <div class="setting-row">
         <div>
           <p class="s-title">下课铃</p>
           <p class="s-sub">{{ fileName(settings.s.bell.offSound) }}</p>
         </div>
-        <button class="btn btn-secondary btn-sm" @click="pickBellSound('offSound')">选择音频</button>
+        <div class="row">
+          <button class="btn btn-secondary btn-sm" @click="openBellUrl('offSound')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickBellSound('offSound')">本地</button>
+        </div>
       </div>
       <div class="setting-row">
         <div>
@@ -246,6 +268,14 @@ async function importTimetable(): Promise<void> {
         <button v-else class="btn btn-sm" @click="installUpdate">立即重启更新</button>
       </div>
     </div>
+
+    <UrlPromptModal
+      v-if="showBellUrl"
+      title="在线铃声链接"
+      placeholder="音频直链 (mp3 / ogg / wav)…"
+      @confirm="onBellUrl"
+      @close="showBellUrl = false"
+    />
   </div>
 </template>
 

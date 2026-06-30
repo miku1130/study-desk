@@ -32,7 +32,8 @@ const api = {
   },
   media: {
     url: (filePath: string): string =>
-      filePath ? `studymedia://media/?p=${encodeURIComponent(filePath)}` : ''
+      filePath ? `studymedia://media/?p=${encodeURIComponent(filePath)}` : '',
+    download: (url: string): Promise<string> => ipcRenderer.invoke('media:download', url)
   },
   pomodoro: {
     start: (): Promise<void> => ipcRenderer.invoke('pomodoro:start'),

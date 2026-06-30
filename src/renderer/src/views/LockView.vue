@@ -15,12 +15,16 @@ const bgStyle = computed(() => {
   return wp ? { backgroundImage: `url("${window.api.media.url(wp)}")` } : {}
 })
 
-function exit(): void {
-  window.api.lockscreen.close()
+// 暂停 / 结束都会让计时停止，主进程随即关闭锁屏窗口（不再被每秒重新弹出）
+function pause(): void {
+  window.api.pomodoro.pause()
+}
+function end(): void {
+  window.api.pomodoro.reset()
 }
 
 function onKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape') exit()
+  if (e.key === 'Escape') pause()
 }
 
 onMounted(() => {
@@ -37,7 +41,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <p class="lock-phase">{{ pomodoro.phaseLabel }}</p>
       <p class="lock-time">{{ mmss }}</p>
       <p class="lock-meta">今日已完成 {{ pomodoro.completed }} 个番茄 · 专注，别分心</p>
-      <button class="lock-exit" @click="exit">退出专注（Esc）</button>
+      <div class="lock-actions">
+        <button class="lock-btn" @click="pause">暂停</button>
+        <button class="lock-btn primary" @click="end">结束专注</button>
+      </div>
+      <p class="lock-hint">按 Esc 暂停并退出</p>
     </div>
   </div>
 </template>
@@ -84,17 +92,35 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   font-size: 15px;
   opacity: 0.7;
 }
-.lock-exit {
-  margin-top: 36px;
-  padding: 10px 22px;
+.lock-actions {
+  margin-top: 30px;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.lock-btn {
+  padding: 11px 26px;
   border-radius: 100px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 13.5px;
+  font-size: 14px;
+  font-weight: 600;
   transition: background 0.15s ease;
 }
-.lock-exit:hover {
+.lock-btn:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+.lock-btn.primary {
+  background: #ff453a;
+  border-color: transparent;
+}
+.lock-btn.primary:hover {
+  filter: brightness(1.1);
+}
+.lock-hint {
+  margin-top: 16px;
+  font-size: 12.5px;
+  opacity: 0.5;
 }
 </style>

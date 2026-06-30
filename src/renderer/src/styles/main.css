@@ -162,7 +162,7 @@ a {
   height: var(--titlebar-h);
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 6px 0 24px;
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--separator);
 }
@@ -171,6 +171,17 @@ a {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.sidebar-top .brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
 }
 
 .view-scroll {

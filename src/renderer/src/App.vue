@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
+import WindowControls from '@/components/WindowControls.vue'
 import LockView from '@/views/LockView.vue'
 import WidgetView from '@/views/WidgetView.vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -42,6 +43,8 @@ onMounted(async () => {
     <main class="content">
       <header class="toolbar">
         <h1 class="toolbar-title">{{ route.meta.title ?? '学习桌面' }}</h1>
+        <div class="toolbar-spacer" />
+        <WindowControls />
       </header>
       <div class="view-scroll">
         <RouterView v-slot="{ Component }">

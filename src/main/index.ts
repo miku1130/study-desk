@@ -12,7 +12,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createStores, type AppStores } from './store'
 import { PomodoroEngine } from './pomodoro'
 import { BellScheduler } from './scheduler'
@@ -37,6 +37,19 @@ function sendToAll(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send(channel, ...args)
   }
+}
+
+function guessExt(url: string, contentType: string): string {
+  const m = url.split('?')[0].match(/\.([a-zA-Z0-9]{2,5})$/)
+  if (m) return '.' + m[1].toLowerCase()
+  if (contentType.includes('jpeg')) return '.jpg'
+  if (contentType.includes('png')) return '.png'
+  if (contentType.includes('webp')) return '.webp'
+  if (contentType.includes('gif')) return '.gif'
+  if (contentType.includes('mpeg')) return '.mp3'
+  if (contentType.includes('wav')) return '.wav'
+  if (contentType.includes('ogg')) return '.ogg'
+  return '.bin'
 }
 
 function createWindow(): void {
@@ -160,6 +173,22 @@ function registerIpc(): void {
       filters: filters || []
     })
     return res.canceled ? [] : res.filePaths
+  })
+
+  ipcMain.handle('media:download', async (_e, url: string) => {
+    try {
+      const res = await net.fetch(url)
+      if (!res.ok) return ''
+      const buf = Buffer.from(await res.arrayBuffer())
+      const dir = join(app.getPath('userData'), 'media')
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      const ext = guessExt(url, res.headers.get('content-type') || '')
+      const fp = join(dir, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`)
+      writeFileSync(fp, buf)
+      return fp
+    } catch {
+      return ''
+    }
   })
 
   ipcMain.handle('pomodoro:start', () => engine.start())
