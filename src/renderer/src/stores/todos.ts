@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { TodoData, TodoItem } from '@/types'
+import type { Priority, TodoData, TodoItem } from '@/types'
 import { uid } from '@/types'
 import { loadStore, saveStore } from '@/lib/persist'
 
@@ -12,7 +12,19 @@ export const useTodoStore = defineStore('todos', () => {
 
   async function load(): Promise<void> {
     const data = await loadStore<TodoData>('todos')
-    items.value = data.items ?? []
+    // 迁移旧数据：逐字段补齐，缺失则用默认值
+    const raw = (data.items ?? []) as unknown as Array<Record<string, unknown>>
+    items.value = raw.map((i) => ({
+      id: typeof i.id === 'string' ? i.id : uid(),
+      text: typeof i.text === 'string' ? i.text : '',
+      done: Boolean(i.done),
+      pomodoros: typeof i.pomodoros === 'number' ? i.pomodoros : 0,
+      createdAt: typeof i.createdAt === 'number' ? i.createdAt : Date.now(),
+      priority: (typeof i.priority === 'number' ? i.priority : 0) as Priority,
+      due: typeof i.due === 'string' ? i.due : '',
+      note: typeof i.note === 'string' ? i.note : '',
+      completedAt: typeof i.completedAt === 'number' ? i.completedAt : undefined
+    }))
     loaded.value = true
   }
 
@@ -20,10 +32,25 @@ export const useTodoStore = defineStore('todos', () => {
     await saveStore('todos', { items: items.value })
   }
 
-  function add(text: string): void {
+  function add(text: string, priority: Priority = 0, due = ''): void {
     const t = text.trim()
     if (!t) return
-    items.value.unshift({ id: uid(), text: t, done: false, pomodoros: 0, createdAt: Date.now() })
+    items.value.unshift({
+      id: uid(),
+      text: t,
+      done: false,
+      pomodoros: 0,
+      createdAt: Date.now(),
+      priority,
+      due,
+      note: ''
+    })
+    save()
+  }
+
+  function update(patch: TodoItem): void {
+    const i = items.value.findIndex((x) => x.id === patch.id)
+    if (i >= 0) items.value[i] = { ...patch }
     save()
   }
 
@@ -31,6 +58,7 @@ export const useTodoStore = defineStore('todos', () => {
     const it = items.value.find((i) => i.id === id)
     if (it) {
       it.done = !it.done
+      it.completedAt = it.done ? Date.now() : undefined
       save()
     }
   }
@@ -45,5 +73,5 @@ export const useTodoStore = defineStore('todos', () => {
     save()
   }
 
-  return { items, loaded, remaining, load, add, toggle, remove, clearDone }
+  return { items, loaded, remaining, load, add, update, toggle, remove, clearDone }
 })

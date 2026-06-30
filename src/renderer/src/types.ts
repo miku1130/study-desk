@@ -90,12 +90,31 @@ export interface MusicData {
   loop: LoopMode
 }
 
+export type Priority = 0 | 1 | 2 | 3
+
+export interface PriorityMeta {
+  value: Priority
+  label: string
+  color: string
+}
+
+export const PRIORITIES: PriorityMeta[] = [
+  { value: 3, label: '高', color: '#ff453a' },
+  { value: 2, label: '中', color: '#ff9f0a' },
+  { value: 1, label: '低', color: '#0a84ff' },
+  { value: 0, label: '无', color: '#8e8e93' }
+]
+
 export interface TodoItem {
   id: string
   text: string
   done: boolean
   pomodoros: number
   createdAt: number
+  priority: Priority
+  due: string
+  note: string
+  completedAt?: number
 }
 
 export interface TodoData {

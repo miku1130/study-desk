@@ -53,9 +53,10 @@ const sample = {
   },
   todos: {
     items: [
-      { id: '1', text: '完成高数第三章习题', done: false, pomodoros: 2, createdAt: Date.now() },
-      { id: '2', text: '背 30 个英语单词', done: false, pomodoros: 0, createdAt: Date.now() },
-      { id: '3', text: '复习数据结构', done: true, pomodoros: 3, createdAt: Date.now() }
+      { id: '1', text: '完成高数第三章习题', done: false, pomodoros: 2, createdAt: Date.now(), priority: 3, due: dkey(0), note: '' },
+      { id: '2', text: '背 30 个英语单词', done: false, pomodoros: 0, createdAt: Date.now(), priority: 2, due: dkey(0), note: '重点章节' },
+      { id: '3', text: '复习数据结构', done: false, pomodoros: 0, createdAt: Date.now(), priority: 1, due: dkey(-1), note: '' },
+      { id: '4', text: '整理错题本', done: true, pomodoros: 3, createdAt: Date.now(), priority: 0, due: '', completedAt: Date.now() }
     ]
   },
   stats: {

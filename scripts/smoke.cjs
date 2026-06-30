@@ -57,7 +57,7 @@ const routes = [
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
-  { hash: '/todo', name: '待办', sel: ['.add-row'] },
+  { hash: '/todo', name: '待办', sel: ['.todo-tabs', '.add-bar'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },
