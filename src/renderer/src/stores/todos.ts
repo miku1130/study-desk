@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { Priority, TodoData, TodoItem } from '@/types'
+import type { Priority, RepeatMode, TodoData, TodoItem } from '@/types'
 import { uid } from '@/types'
 import { loadStore, saveStore } from '@/lib/persist'
 
@@ -23,6 +23,7 @@ export const useTodoStore = defineStore('todos', () => {
       priority: (typeof i.priority === 'number' ? i.priority : 0) as Priority,
       due: typeof i.due === 'string' ? i.due : '',
       note: typeof i.note === 'string' ? i.note : '',
+      repeat: (i.repeat === 'daily' || i.repeat === 'weekly' ? i.repeat : 'none') as RepeatMode,
       completedAt: typeof i.completedAt === 'number' ? i.completedAt : undefined
     }))
     loaded.value = true
@@ -43,7 +44,8 @@ export const useTodoStore = defineStore('todos', () => {
       createdAt: Date.now(),
       priority,
       due,
-      note: ''
+      note: '',
+      repeat: 'none'
     })
     save()
   }
@@ -56,11 +58,28 @@ export const useTodoStore = defineStore('todos', () => {
 
   function toggle(id: string): void {
     const it = items.value.find((i) => i.id === id)
-    if (it) {
-      it.done = !it.done
-      it.completedAt = it.done ? Date.now() : undefined
-      save()
+    if (!it) return
+    it.done = !it.done
+    it.completedAt = it.done ? Date.now() : undefined
+    // 重复任务：完成时生成下一次
+    if (it.done && it.repeat !== 'none') {
+      const base = it.due ? new Date(`${it.due}T00:00:00`) : new Date()
+      base.setDate(base.getDate() + (it.repeat === 'weekly' ? 7 : 1))
+      const p = (n: number): string => String(n).padStart(2, '0')
+      const nextDue = `${base.getFullYear()}-${p(base.getMonth() + 1)}-${p(base.getDate())}`
+      items.value.unshift({
+        id: uid(),
+        text: it.text,
+        done: false,
+        pomodoros: 0,
+        createdAt: Date.now(),
+        priority: it.priority,
+        due: nextDue,
+        note: it.note,
+        repeat: it.repeat
+      })
     }
+    save()
   }
 
   function remove(id: string): void {

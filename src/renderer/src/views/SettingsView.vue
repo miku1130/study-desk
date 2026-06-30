@@ -74,6 +74,40 @@ async function doBackupImport(): Promise<void> {
   await window.api.backup.import()
 }
 
+const showAppBgUrl = ref(false)
+async function pickAppBgLocal(): Promise<void> {
+  const p = await window.api.dialog.openFile([
+    { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }
+  ])
+  if (p) {
+    settings.s.appBg = p
+    settings.save()
+  }
+}
+async function pickAppBgOnline(): Promise<void> {
+  const p = await window.api.media.download(`https://picsum.photos/1920/1080?random=${Date.now()}`)
+  if (p) {
+    settings.s.appBg = p
+    settings.save()
+  }
+}
+async function onAppBgUrl(url: string): Promise<void> {
+  const p = await window.api.media.download(url)
+  showAppBgUrl.value = false
+  if (p) {
+    settings.s.appBg = p
+    settings.save()
+  }
+}
+function clearAppBg(): void {
+  settings.s.appBg = ''
+  settings.save()
+}
+function onAppBgOpacity(e: Event): void {
+  settings.s.appBgOpacity = (e.target as HTMLInputElement).valueAsNumber
+  settings.save()
+}
+
 function fileName(p: string): string {
   return p ? (p.split(/[\\/]/).pop() ?? p) : '未选择'
 }
@@ -152,6 +186,32 @@ async function importTimetable(): Promise<void> {
             @click="setAccent(c)"
           />
         </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">应用背景图</p>
+          <p class="s-sub">{{ settings.s.appBg ? '已设置（半透明叠加于界面）' : '未设置' }}</p>
+        </div>
+        <div class="row wrap">
+          <button class="btn btn-secondary btn-sm" @click="pickAppBgOnline">随机在线</button>
+          <button class="btn btn-secondary btn-sm" @click="showAppBgUrl = true">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickAppBgLocal">本地</button>
+          <button class="btn btn-secondary btn-sm" @click="clearAppBg">清除</button>
+        </div>
+      </div>
+      <div v-if="settings.s.appBg" class="setting-row">
+        <div>
+          <p class="s-title">背景不透明度</p>
+          <p class="s-sub">{{ Math.round(settings.s.appBgOpacity * 100) }}%</p>
+        </div>
+        <input
+          type="range"
+          min="0.03"
+          max="0.6"
+          step="0.01"
+          :value="settings.s.appBgOpacity"
+          @input="onAppBgOpacity"
+        />
       </div>
     </div>
 
@@ -410,6 +470,13 @@ async function importTimetable(): Promise<void> {
       @confirm="onBellUrl"
       @close="showBellUrl = false"
     />
+    <UrlPromptModal
+      v-if="showAppBgUrl"
+      title="应用背景图链接"
+      placeholder="图片直链 (jpg / png / webp)…"
+      @confirm="onAppBgUrl"
+      @close="showAppBgUrl = false"
+    />
   </div>
 </template>
 
@@ -443,5 +510,9 @@ async function importTimetable(): Promise<void> {
 .unit {
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+.row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 </style>

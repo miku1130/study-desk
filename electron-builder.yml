@@ -8,6 +8,7 @@ files:
   - out/**/*
   - package.json
 win:
+  icon: build/icon.png
   target:
     - nsis
   artifactName: ${productName}-${version}-setup.${ext}

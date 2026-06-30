@@ -40,6 +40,8 @@ export interface HealthConfig {
 export interface AppSettings {
   theme: ThemeMode
   accent: string
+  appBg: string
+  appBgOpacity: number
   bell: BellConfig
   pomodoro: PomodoroConfig
   water: WaterConfig
@@ -52,6 +54,8 @@ export interface AppSettings {
 export const defaultSettings: AppSettings = {
   theme: 'system',
   accent: '#0a84ff',
+  appBg: '',
+  appBgOpacity: 0.18,
   bell: { enabled: false, onSound: '', offSound: '', volume: 0.8 },
   pomodoro: {
     workMin: 25,
@@ -107,6 +111,14 @@ export interface MusicData {
   loop: LoopMode
 }
 
+export type RepeatMode = 'none' | 'daily' | 'weekly'
+
+export const REPEATS: { value: RepeatMode; label: string }[] = [
+  { value: 'none', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' }
+]
+
 export type Priority = 0 | 1 | 2 | 3
 
 export interface PriorityMeta {
@@ -131,6 +143,7 @@ export interface TodoItem {
   priority: Priority
   due: string
   note: string
+  repeat: RepeatMode
   completedAt?: number
 }
 
@@ -168,6 +181,7 @@ export interface Countdown {
   title: string
   date: string
   color: string
+  bg: string
 }
 
 export interface CountdownData {

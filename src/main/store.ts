@@ -64,6 +64,8 @@ export const DEFAULT_PERIODS = [
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
   theme: 'system',
   accent: '#0a84ff',
+  appBg: '',
+  appBgOpacity: 0.18,
   bell: { enabled: false, onSound: '', offSound: '', volume: 0.8 },
   pomodoro: {
     workMin: 25,

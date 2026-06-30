@@ -37,6 +37,16 @@ a {
   display: flex;
   height: 100vh;
   width: 100vw;
+  position: relative;
+}
+
+.app-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
 }
 
 /* ===== 侧边栏 ===== */
@@ -49,6 +59,8 @@ a {
   border-right: 1px solid var(--separator);
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
 }
 
 .sidebar-top {
@@ -156,6 +168,8 @@ a {
   display: flex;
   flex-direction: column;
   background: var(--bg-content);
+  position: relative;
+  z-index: 1;
 }
 
 .toolbar {

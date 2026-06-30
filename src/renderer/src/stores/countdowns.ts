@@ -34,9 +34,9 @@ export const useCountdownStore = defineStore('countdowns', () => {
     await saveStore('countdowns', { items: items.value })
   }
 
-  function add(title: string, date: string, color: string): void {
+  function add(title: string, date: string, color: string, bg = ''): void {
     if (!title.trim() || !date) return
-    items.value.push({ id: uid(), title: title.trim(), date, color })
+    items.value.push({ id: uid(), title: title.trim(), date, color, bg })
     save()
   }
 

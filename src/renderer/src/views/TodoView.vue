@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import AppModal from '@/components/AppModal.vue'
 import { useTodoStore } from '@/stores/todos'
-import { PRIORITIES, type Priority, type TodoItem } from '@/types'
+import { PRIORITIES, REPEATS, type Priority, type TodoItem } from '@/types'
 
 const todos = useTodoStore()
 
@@ -76,7 +76,8 @@ const editing = reactive<TodoItem>({
   createdAt: 0,
   priority: 0,
   due: '',
-  note: ''
+  note: '',
+  repeat: 'none'
 })
 function openEdit(it: TodoItem): void {
   Object.assign(editing, it)
@@ -192,6 +193,12 @@ function dueLabel(due: string): string {
             <input v-model="editing.due" type="date" class="input" />
           </label>
         </div>
+        <label class="fld">
+          <span>重复</span>
+          <select v-model="editing.repeat" class="input select">
+            <option v-for="r in REPEATS" :key="r.value" :value="r.value">{{ r.label }}</option>
+          </select>
+        </label>
       </div>
       <template #footer>
         <button class="btn btn-danger btn-sm" @click="delEdit">删除</button>
