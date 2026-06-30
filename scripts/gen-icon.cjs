@@ -19,7 +19,13 @@ x.beginPath();x.moveTo(128,132);x.lineTo(128,86);x.moveTo(128,132);x.lineTo(164,
 </script></body>`)
 
 app.whenReady().then(async () => {
-  const win = new BrowserWindow({ width: 256, height: 256, show: false })
+  const win = new BrowserWindow({
+    width: 256,
+    height: 256,
+    useContentSize: true,
+    frame: false,
+    show: false
+  })
   await win.loadURL(html)
   await new Promise((r) => setTimeout(r, 500))
   const img = await win.webContents.capturePage()
