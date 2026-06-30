@@ -2,6 +2,7 @@ import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useStatsStore } from '@/stores/stats'
 import { makeTrayIcon } from '@/lib/trayIcon'
+import { playChime } from '@/lib/audio'
 
 /** 主窗口专用：铃声 / 番茄完成音效、统计刷新、托盘图标。 */
 export function useGlobalEffects(): void {
@@ -9,33 +10,18 @@ export function useGlobalEffects(): void {
   const stats = useStatsStore()
   const cleanups: Array<() => void> = []
 
-  function beep(): void {
-    try {
-      const ctx = new AudioContext()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.value = 880
-      gain.gain.value = 0.05
-      osc.start()
-      window.setTimeout(() => {
-        osc.stop()
-        void ctx.close()
-      }, 350)
-    } catch {
-      /* 忽略音频上下文异常 */
-    }
-  }
-
   function playSound(path: string, volume: number): void {
+    if (path && path.startsWith('chime:')) {
+      playChime(path.slice('chime:'.length), volume)
+      return
+    }
     if (!path) {
-      beep()
+      playChime('ding', volume)
       return
     }
     const audio = new Audio(window.api.media.url(path))
     audio.volume = volume
-    audio.play().catch(() => beep())
+    audio.play().catch(() => playChime('ding', volume))
   }
 
   function updateTray(): void {

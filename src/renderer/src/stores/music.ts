@@ -3,54 +3,17 @@ import { computed, ref } from 'vue'
 import type { LoopMode, MusicData, MusicTrack } from '@/types'
 import { uid } from '@/types'
 import { loadStore, saveStore } from '@/lib/persist'
+import { softMusic } from '@/lib/audio'
 
-type NoiseType = 'white' | 'pink' | 'brown'
-
-// 内置离线默认：WebAudio 生成的噪音，无需任何文件 / 网络
+// 内置离线轻音乐（WebAudio 生成，舒缓不刺耳）
 const BUILTIN_TRACKS: MusicTrack[] = [
-  { id: 'noise-white', name: '白噪音（内置）', path: 'builtin:white' },
-  { id: 'noise-pink', name: '粉噪音（内置）', path: 'builtin:pink' },
-  { id: 'noise-brown', name: '棕噪音（内置）', path: 'builtin:brown' }
+  { id: 'soft-piano', name: '轻柔钢琴（内置）', path: 'soft:calm-piano' },
+  { id: 'soft-pad', name: '温柔氛围（内置）', path: 'soft:warm-pad' },
+  { id: 'soft-lofi', name: '慵懒键盘（内置）', path: 'soft:lofi' }
 ]
 
 function isBuiltin(path: string): boolean {
-  return path.startsWith('builtin:')
-}
-
-function makeNoiseBuffer(ctx: AudioContext, type: NoiseType): AudioBuffer {
-  const len = ctx.sampleRate * 2
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-  const d = buf.getChannelData(0)
-  if (type === 'white') {
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1
-  } else if (type === 'pink') {
-    let b0 = 0
-    let b1 = 0
-    let b2 = 0
-    let b3 = 0
-    let b4 = 0
-    let b5 = 0
-    let b6 = 0
-    for (let i = 0; i < len; i++) {
-      const w = Math.random() * 2 - 1
-      b0 = 0.99886 * b0 + w * 0.0555179
-      b1 = 0.99332 * b1 + w * 0.0750759
-      b2 = 0.969 * b2 + w * 0.153852
-      b3 = 0.8665 * b3 + w * 0.3104856
-      b4 = 0.55 * b4 + w * 0.5329522
-      b5 = -0.7616 * b5 - w * 0.016898
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11
-      b6 = w * 0.115926
-    }
-  } else {
-    let last = 0
-    for (let i = 0; i < len; i++) {
-      const w = Math.random() * 2 - 1
-      last = (last + 0.02 * w) / 1.02
-      d[i] = last * 3.5
-    }
-  }
-  return buf
+  return path.startsWith('soft:')
 }
 
 export const useMusicStore = defineStore('music', () => {
@@ -62,9 +25,6 @@ export const useMusicStore = defineStore('music', () => {
   const loaded = ref(false)
 
   let audio: HTMLAudioElement | null = null
-  let noiseCtx: AudioContext | null = null
-  let noiseSrc: AudioBufferSourceNode | null = null
-  let noiseGain: GainNode | null = null
 
   const current = computed(() => tracks.value.find((t) => t.id === currentId.value) ?? null)
 
@@ -73,44 +33,10 @@ export const useMusicStore = defineStore('music', () => {
       audio = new Audio()
       audio.addEventListener('ended', handleEnded)
       audio.addEventListener('play', () => (playing.value = true))
-      audio.addEventListener('pause', () => {
-        if (!noiseSrc) playing.value = false
-      })
+      audio.addEventListener('pause', () => (playing.value = false))
     }
     audio.volume = volume.value
     return audio
-  }
-
-  function stopNoise(): void {
-    if (noiseSrc) {
-      try {
-        noiseSrc.stop()
-      } catch {
-        /* 已停止 */
-      }
-      noiseSrc.disconnect()
-      noiseSrc = null
-    }
-    if (noiseGain) {
-      noiseGain.disconnect()
-      noiseGain = null
-    }
-  }
-
-  function startNoise(type: NoiseType): void {
-    stopNoise()
-    if (!noiseCtx) noiseCtx = new AudioContext()
-    const ctx = noiseCtx
-    void ctx.resume()
-    noiseGain = ctx.createGain()
-    noiseGain.gain.value = volume.value
-    noiseSrc = ctx.createBufferSource()
-    noiseSrc.buffer = makeNoiseBuffer(ctx, type)
-    noiseSrc.loop = true
-    noiseSrc.connect(noiseGain)
-    noiseGain.connect(ctx.destination)
-    noiseSrc.start()
-    playing.value = true
   }
 
   async function load(): Promise<void> {
@@ -139,9 +65,10 @@ export const useMusicStore = defineStore('music', () => {
 
     if (isBuiltin(track.path)) {
       audio?.pause()
-      startNoise(track.path.slice('builtin:'.length) as NoiseType)
+      softMusic.start(track.path.slice('soft:'.length), volume.value)
+      playing.value = true
     } else {
-      stopNoise()
+      softMusic.stop()
       const a = ensureAudio()
       if (changed) a.src = window.api.media.url(track.path)
       void a.play().catch(() => undefined)
@@ -150,7 +77,7 @@ export const useMusicStore = defineStore('music', () => {
 
   function pause(): void {
     audio?.pause()
-    stopNoise()
+    softMusic.stop()
     playing.value = false
   }
 
@@ -184,7 +111,7 @@ export const useMusicStore = defineStore('music', () => {
   function setVolume(v: number): void {
     volume.value = v
     if (audio) audio.volume = v
-    if (noiseGain) noiseGain.gain.value = v
+    softMusic.setVolume(v)
     void persist()
   }
 

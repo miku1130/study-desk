@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
+import { CHIME_PRESETS, playChime } from '@/lib/audio'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
@@ -71,6 +72,33 @@ async function onUrlConfirm(url: string): Promise<void> {
   if (urlTarget.value === 'wallpaper') settings.s.pomodoro.wallpaper = p
   else settings.s.pomodoro.sound = p
   settings.save()
+}
+
+function soundLabel(v: string): string {
+  if (v.startsWith('chime:')) {
+    return '预设 · ' + (CHIME_PRESETS.find((p) => 'chime:' + p.id === v)?.label ?? '')
+  }
+  if (v) return v.split(/[\\/]/).pop() ?? v
+  return '默认（清脆双音）'
+}
+function presetVal(): string {
+  const v = settings.s.pomodoro.sound
+  return v.startsWith('chime:') ? v.slice(6) : v ? '__file__' : ''
+}
+function onPreset(e: Event): void {
+  const id = (e.target as HTMLSelectElement).value
+  if (id === '__file__') return
+  settings.s.pomodoro.sound = id ? `chime:${id}` : ''
+  settings.save()
+}
+function testSound(): void {
+  const v = settings.s.pomodoro.sound
+  if (v.startsWith('chime:')) playChime(v.slice(6), settings.s.pomodoro.volume)
+  else if (v) {
+    const a = new Audio(window.api.media.url(v))
+    a.volume = settings.s.pomodoro.volume
+    void a.play().catch(() => playChime('ding', settings.s.pomodoro.volume))
+  } else playChime('ding', settings.s.pomodoro.volume)
 }
 </script>
 
@@ -206,10 +234,16 @@ async function onUrlConfirm(url: string): Promise<void> {
       <div class="setting-row">
         <div>
           <p class="s-title">完成提示音</p>
-          <p class="s-sub">{{ fileName(settings.s.pomodoro.sound) }}（留空用默认提示音）</p>
+          <p class="s-sub">{{ soundLabel(settings.s.pomodoro.sound) }}</p>
         </div>
         <div class="row wrap">
-          <button class="btn btn-secondary btn-sm" @click="openUrl('sound')">从链接</button>
+          <select class="input input-sm select" :value="presetVal()" @change="onPreset($event)">
+            <option value="">默认</option>
+            <option v-for="p in CHIME_PRESETS" :key="p.id" :value="p.id">{{ p.label }}</option>
+            <option value="__file__" disabled>自定义文件</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" @click="testSound">试听</button>
+          <button class="btn btn-secondary btn-sm" @click="openUrl('sound')">链接</button>
           <button class="btn btn-secondary btn-sm" @click="pickSound">本地</button>
         </div>
       </div>

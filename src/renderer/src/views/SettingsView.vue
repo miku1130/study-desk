@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
+import { CHIME_PRESETS, playChime } from '@/lib/audio'
 import type { ThemeMode, TimetableData } from '@/types'
 
 const settings = useSettingsStore()
@@ -135,6 +136,31 @@ async function onBellUrl(url: string): Promise<void> {
     settings.save()
   }
 }
+function soundLabel(v: string): string {
+  if (v.startsWith('chime:')) {
+    return '预设 · ' + (CHIME_PRESETS.find((p) => 'chime:' + p.id === v)?.label ?? '')
+  }
+  if (v) return v.split(/[\\/]/).pop() ?? v
+  return '默认（清脆双音）'
+}
+function bellPresetVal(which: 'onSound' | 'offSound'): string {
+  const v = settings.s.bell[which]
+  return v.startsWith('chime:') ? v.slice(6) : v ? '__file__' : ''
+}
+function onBellPreset(which: 'onSound' | 'offSound', e: Event): void {
+  const id = (e.target as HTMLSelectElement).value
+  if (id === '__file__') return
+  settings.s.bell[which] = id ? `chime:${id}` : ''
+  settings.save()
+}
+function testSound(v: string): void {
+  if (v.startsWith('chime:')) playChime(v.slice(6), settings.s.bell.volume)
+  else if (v) {
+    const a = new Audio(window.api.media.url(v))
+    a.volume = settings.s.bell.volume
+    void a.play().catch(() => playChime('ding', settings.s.bell.volume))
+  } else playChime('ding', settings.s.bell.volume)
+}
 function onBellVolume(e: Event): void {
   settings.s.bell.volume = (e.target as HTMLInputElement).valueAsNumber
   settings.save()
@@ -230,20 +256,40 @@ async function importTimetable(): Promise<void> {
       <div class="setting-row">
         <div>
           <p class="s-title">上课铃</p>
-          <p class="s-sub">{{ fileName(settings.s.bell.onSound) }}</p>
+          <p class="s-sub">{{ soundLabel(settings.s.bell.onSound) }}</p>
         </div>
-        <div class="row">
-          <button class="btn btn-secondary btn-sm" @click="openBellUrl('onSound')">从链接</button>
+        <div class="row wrap">
+          <select
+            class="input input-sm select"
+            :value="bellPresetVal('onSound')"
+            @change="onBellPreset('onSound', $event)"
+          >
+            <option value="">默认</option>
+            <option v-for="p in CHIME_PRESETS" :key="p.id" :value="p.id">{{ p.label }}</option>
+            <option value="__file__" disabled>自定义文件</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" @click="testSound(settings.s.bell.onSound)">试听</button>
+          <button class="btn btn-secondary btn-sm" @click="openBellUrl('onSound')">链接</button>
           <button class="btn btn-secondary btn-sm" @click="pickBellSound('onSound')">本地</button>
         </div>
       </div>
       <div class="setting-row">
         <div>
           <p class="s-title">下课铃</p>
-          <p class="s-sub">{{ fileName(settings.s.bell.offSound) }}</p>
+          <p class="s-sub">{{ soundLabel(settings.s.bell.offSound) }}</p>
         </div>
-        <div class="row">
-          <button class="btn btn-secondary btn-sm" @click="openBellUrl('offSound')">从链接</button>
+        <div class="row wrap">
+          <select
+            class="input input-sm select"
+            :value="bellPresetVal('offSound')"
+            @change="onBellPreset('offSound', $event)"
+          >
+            <option value="">默认</option>
+            <option v-for="p in CHIME_PRESETS" :key="p.id" :value="p.id">{{ p.label }}</option>
+            <option value="__file__" disabled>自定义文件</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" @click="testSound(settings.s.bell.offSound)">试听</button>
+          <button class="btn btn-secondary btn-sm" @click="openBellUrl('offSound')">链接</button>
           <button class="btn btn-secondary btn-sm" @click="pickBellSound('offSound')">本地</button>
         </div>
       </div>
