@@ -35,6 +35,9 @@ export interface StudyDeskApi {
     url: (filePath: string) => string
     download: (url: string) => Promise<string>
   }
+  shell: {
+    openPath: (p: string) => Promise<string>
+  }
   pomodoro: {
     start: () => Promise<void>
     pause: () => Promise<void>

@@ -78,6 +78,16 @@ const sample = {
     ],
     volume: 0.6,
     loop: 'all'
+  },
+  water: { days: { [dkey(0)]: 4 } },
+  books: {
+    items: [
+      { id: 'b1', name: '高等数学（同济第七版）.pdf', path: 'C:/fake/math.pdf', category: '数学', addedAt: Date.now() },
+      { id: 'b2', name: '新概念英语 3.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now() },
+      { id: 'b3', name: '算法导论.epub', path: 'C:/fake/algo.epub', category: '计算机', addedAt: Date.now() },
+      { id: 'b4', name: '考研政治大纲.pdf', path: 'C:/fake/politics.pdf', category: '政治', addedAt: Date.now() },
+      { id: 'b5', name: '英语真题.pptx', path: 'C:/fake/exam.pptx', category: '英语', addedAt: Date.now() }
+    ]
   }
 }
 

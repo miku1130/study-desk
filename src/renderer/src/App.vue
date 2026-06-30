@@ -11,6 +11,8 @@ import { useTodoStore } from '@/stores/todos'
 import { useStatsStore } from '@/stores/stats'
 import { useMusicStore } from '@/stores/music'
 import { usePomodoroStore } from '@/stores/pomodoro'
+import { useWaterStore } from '@/stores/water'
+import { useBooksStore } from '@/stores/books'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
 
 const route = useRoute()
@@ -23,6 +25,8 @@ const todos = useTodoStore()
 const stats = useStatsStore()
 const music = useMusicStore()
 const pomodoro = usePomodoroStore()
+const water = useWaterStore()
+const books = useBooksStore()
 
 // 锁屏 / 浮窗子窗口跳过全局音效/托盘，避免重复发声
 if (!window.location.hash.includes('/lock') && !window.location.hash.includes('/widget')) {
@@ -31,7 +35,15 @@ if (!window.location.hash.includes('/lock') && !window.location.hash.includes('/
 
 onMounted(async () => {
   await settings.load()
-  await Promise.all([timetable.load(), todos.load(), stats.load(), music.load(), pomodoro.init()])
+  await Promise.all([
+    timetable.load(),
+    todos.load(),
+    stats.load(),
+    music.load(),
+    water.load(),
+    books.load(),
+    pomodoro.init()
+  ])
 })
 </script>
 

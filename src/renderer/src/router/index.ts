@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '待办清单' }
   },
   {
+    path: '/bookshelf',
+    name: 'bookshelf',
+    component: () => import('@/views/BookshelfView.vue'),
+    meta: { title: '书架' }
+  },
+  {
     path: '/stats',
     name: 'stats',
     component: () => import('@/views/StatsView.vue'),

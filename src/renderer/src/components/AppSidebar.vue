@@ -39,6 +39,13 @@ const items: NavItem[] = [
     )
   },
   {
+    to: '/bookshelf',
+    label: '书架',
+    icon: svg(
+      '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'
+    )
+  },
+  {
     to: '/stats',
     label: '专注统计',
     icon: svg('<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-9"/>')

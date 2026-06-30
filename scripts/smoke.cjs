@@ -38,7 +38,14 @@ const sample = {
   },
   todos: { items: [{ id: '1', text: '测试任务', done: false, pomodoros: 0, createdAt: Date.now() }] },
   stats: { days: { [dkey(1)]: { pomodoros: 3, focusMinutes: 75 }, [dkey(0)]: { pomodoros: 2, focusMinutes: 50 } } },
-  music: { tracks: [{ id: 'm1', name: '雨声', path: 'C:/fake/rain.mp3' }], volume: 0.6, loop: 'all' }
+  music: { tracks: [{ id: 'm1', name: '雨声', path: 'C:/fake/rain.mp3' }], volume: 0.6, loop: 'all' },
+  water: { days: { [dkey(0)]: 3 } },
+  books: {
+    items: [
+      { id: 'b1', name: '高等数学.pdf', path: 'C:/fake/math.pdf', category: '数学', addedAt: Date.now() },
+      { id: 'b2', name: '英语语法.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now() }
+    ]
+  }
 }
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
@@ -58,6 +65,7 @@ const routes = [
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
   { hash: '/todo', name: '待办', sel: ['.todo-tabs', '.add-bar'] },
+  { hash: '/bookshelf', name: '书架', sel: ['.bs-toolbar'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },

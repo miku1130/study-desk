@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createStores, type AppStores } from './store'
 import { PomodoroEngine } from './pomodoro'
 import { BellScheduler } from './scheduler'
+import { WaterReminder } from './water'
 import { openLock, closeLock } from './lockscreen'
 import { openWidget, closeWidget, toggleWidget } from './widget'
 import { setupTray } from './tray'
@@ -32,6 +33,7 @@ let mainWindow: BrowserWindow | null = null
 let stores: AppStores
 let engine: PomodoroEngine
 let scheduler: BellScheduler
+let waterReminder: WaterReminder
 
 function sendToAll(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -152,6 +154,7 @@ function registerIpc(): void {
     if (name === 'settings') {
       nativeTheme.themeSource = (value.theme as 'system' | 'light' | 'dark') ?? 'system'
       scheduler.reload()
+      waterReminder.reload()
       registerShortcuts()
       app.setLoginItemSettings({ openAtLogin: Boolean(value.autostart) })
       const pcfg = value.pomodoro as { lockscreen?: boolean } | undefined
@@ -235,6 +238,7 @@ function registerIpc(): void {
   ipcMain.handle('shortcuts:update', () => registerShortcuts())
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('notify:show', (_e, title: string, body: string) => notify(title, body))
+  ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
 
   ipcMain.handle('update:check', async () => {
     if (!app.isPackaged) return { state: 'dev' }
@@ -307,6 +311,9 @@ app.whenReady().then(() => {
 
   scheduler = new BellScheduler(stores.settings, stores.timetable, sendToAll, notify)
   scheduler.start()
+
+  waterReminder = new WaterReminder(stores.settings, notify, sendToAll)
+  waterReminder.start()
 
   registerIpc()
   registerShortcuts()

@@ -35,6 +35,9 @@ const api = {
       filePath ? `studymedia://media/?p=${encodeURIComponent(filePath)}` : '',
     download: (url: string): Promise<string> => ipcRenderer.invoke('media:download', url)
   },
+  shell: {
+    openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:openPath', p)
+  },
   pomodoro: {
     start: (): Promise<void> => ipcRenderer.invoke('pomodoro:start'),
     pause: (): Promise<void> => ipcRenderer.invoke('pomodoro:pause'),

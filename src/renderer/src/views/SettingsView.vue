@@ -55,6 +55,12 @@ function setAccent(c: string): void {
 function save(): void {
   settings.save()
 }
+function saveWater(): void {
+  const w = settings.s.water
+  w.intervalMin = Math.max(5, Math.floor(w.intervalMin || 60))
+  w.goalCups = Math.max(1, Math.floor(w.goalCups || 8))
+  settings.save()
+}
 
 function fileName(p: string): string {
   return p ? (p.split(/[\\/]/).pop() ?? p) : '未选择'
@@ -185,6 +191,52 @@ async function importTimetable(): Promise<void> {
       </div>
     </div>
 
+    <h3 class="section-title" style="margin-top: 22px">喝水提醒</h3>
+    <div class="card">
+      <div class="setting-row">
+        <div>
+          <p class="s-title">启用提醒</p>
+          <p class="s-sub">按间隔弹出系统通知，记得补水</p>
+        </div>
+        <label class="switch">
+          <input v-model="settings.s.water.enabled" type="checkbox" @change="save" />
+          <span class="slider" />
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">提醒间隔</p>
+          <p class="s-sub">每隔多少分钟提醒一次</p>
+        </div>
+        <div class="row">
+          <input
+            v-model.number="settings.s.water.intervalMin"
+            class="input input-sm num"
+            type="number"
+            min="5"
+            @change="saveWater"
+          />
+          <span class="unit">分</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">每日目标</p>
+          <p class="s-sub">仪表盘据此计算饮水进度</p>
+        </div>
+        <div class="row">
+          <input
+            v-model.number="settings.s.water.goalCups"
+            class="input input-sm num"
+            type="number"
+            min="1"
+            @change="saveWater"
+          />
+          <span class="unit">杯</span>
+        </div>
+      </div>
+    </div>
+
     <h3 class="section-title" style="margin-top: 22px">通用</h3>
     <div class="card">
       <div class="setting-row">
@@ -301,5 +353,13 @@ async function importTimetable(): Promise<void> {
 .hk {
   width: 240px;
   text-align: center;
+}
+.num {
+  width: 64px;
+  text-align: center;
+}
+.unit {
+  font-size: 12.5px;
+  color: var(--text-secondary);
 }
 </style>

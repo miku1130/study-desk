@@ -7,6 +7,8 @@ import { useStatsStore } from '@/stores/stats'
 import { useMusicStore } from '@/stores/music'
 import { useTodoStore } from '@/stores/todos'
 import { usePomodoroStore } from '@/stores/pomodoro'
+import { useWaterStore } from '@/stores/water'
+import { useSettingsStore } from '@/stores/settings'
 import { WEEKDAYS } from '@/types'
 
 const router = useRouter()
@@ -16,6 +18,11 @@ const stats = useStatsStore()
 const music = useMusicStore()
 const todos = useTodoStore()
 const pomodoro = usePomodoroStore()
+const water = useWaterStore()
+const settings = useSettingsStore()
+
+const waterGoal = computed(() => settings.s.water.goalCups || 8)
+const waterPct = computed(() => Math.min(100, Math.round((water.cupsToday / waterGoal.value) * 100)))
 
 const timeText = computed(() =>
   now.value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -115,6 +122,13 @@ function go(path: string): void {
         <div v-else class="muted pad-sm">暂无待办</div>
         <button class="btn-link" @click="go('/todo')">管理待办 →</button>
       </section>
+
+      <section class="card water-card">
+        <p class="mini-label">今日饮水</p>
+        <p class="big">{{ water.cupsToday }}<small> / {{ waterGoal }} 杯</small></p>
+        <div class="water-bar"><div class="water-fill" :style="{ width: waterPct + '%' }" /></div>
+        <button class="btn block" @click="water.addCup()">喝一杯 💧</button>
+      </section>
     </div>
 
     <div class="dash-foot card">
@@ -171,7 +185,7 @@ function go(path: string): void {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 16px;
-  grid-template-areas: 'classes focus' 'classes todo';
+  grid-template-areas: 'classes focus' 'classes todo' 'classes water';
 }
 .classes-card {
   grid-area: classes;
@@ -181,6 +195,22 @@ function go(path: string): void {
 }
 .todo-card {
   grid-area: todo;
+}
+.water-card {
+  grid-area: water;
+}
+.water-bar {
+  height: 8px;
+  background: var(--active);
+  border-radius: 100px;
+  overflow: hidden;
+  margin: 8px 0 14px;
+}
+.water-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0a84ff, #5ac8fa);
+  border-radius: 100px;
+  transition: width 0.3s var(--ease);
 }
 
 .ch {
@@ -242,12 +272,12 @@ function go(path: string): void {
   color: var(--text-tertiary);
   font-weight: 600;
 }
-.focus-card .big {
+.big {
   font-size: 40px;
   font-weight: 700;
   margin: 10px 0 2px;
 }
-.focus-card .big small {
+.big small {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);

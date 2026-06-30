@@ -24,11 +24,18 @@ export interface HotkeyConfig {
   toggleWindow: string
 }
 
+export interface WaterConfig {
+  enabled: boolean
+  intervalMin: number
+  goalCups: number
+}
+
 export interface AppSettings {
   theme: ThemeMode
   accent: string
   bell: BellConfig
   pomodoro: PomodoroConfig
+  water: WaterConfig
   autostart: boolean
   widget: boolean
   hotkeys: HotkeyConfig
@@ -49,6 +56,7 @@ export const defaultSettings: AppSettings = {
     sound: '',
     volume: 0.8
   },
+  water: { enabled: false, intervalMin: 60, goalCups: 8 },
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
@@ -128,6 +136,22 @@ export interface DayStat {
 
 export interface StatsData {
   days: Record<string, DayStat>
+}
+
+export interface WaterData {
+  days: Record<string, number>
+}
+
+export interface Book {
+  id: string
+  name: string
+  path: string
+  category: string
+  addedAt: number
+}
+
+export interface BooksData {
+  items: Book[]
 }
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'

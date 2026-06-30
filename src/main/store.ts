@@ -76,6 +76,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     sound: '',
     volume: 0.8
   },
+  water: { enabled: false, intervalMin: 60, goalCups: 8 },
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
@@ -87,6 +88,8 @@ export interface AppStores {
   todos: JsonStore<Record<string, unknown>>
   stats: JsonStore<Record<string, unknown>>
   music: JsonStore<Record<string, unknown>>
+  water: JsonStore<Record<string, unknown>>
+  books: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -95,6 +98,8 @@ export function createStores(): AppStores {
     timetable: new JsonStore('timetable.json', { periods: DEFAULT_PERIODS, lessons: [] }),
     todos: new JsonStore('todos.json', { items: [] }),
     stats: new JsonStore('stats.json', { days: {} }),
-    music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' })
+    music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' }),
+    water: new JsonStore('water.json', { days: {} }),
+    books: new JsonStore('books.json', { items: [] })
   }
 }
