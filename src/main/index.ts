@@ -17,6 +17,8 @@ import { createStores, type AppStores } from './store'
 import { PomodoroEngine } from './pomodoro'
 import { BellScheduler } from './scheduler'
 import { WaterReminder } from './water'
+import { HealthReminder } from './health'
+import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
 import { openWidget, closeWidget, toggleWidget } from './widget'
 import { setupTray } from './tray'
@@ -34,6 +36,7 @@ let stores: AppStores
 let engine: PomodoroEngine
 let scheduler: BellScheduler
 let waterReminder: WaterReminder
+let healthReminder: HealthReminder
 
 function sendToAll(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -155,6 +158,7 @@ function registerIpc(): void {
       nativeTheme.themeSource = (value.theme as 'system' | 'light' | 'dark') ?? 'system'
       scheduler.reload()
       waterReminder.reload()
+      healthReminder.reload()
       registerShortcuts()
       app.setLoginItemSettings({ openAtLogin: Boolean(value.autostart) })
       const pcfg = value.pomodoro as { lockscreen?: boolean } | undefined
@@ -240,6 +244,42 @@ function registerIpc(): void {
   ipcMain.handle('notify:show', (_e, title: string, body: string) => notify(title, body))
   ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
 
+  ipcMain.handle('backup:export', async () => {
+    const res = await dialog.showSaveDialog({
+      defaultPath: `studydesk-backup-${localDateKey()}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (res.canceled || !res.filePath) return false
+    const all: Record<string, unknown> = {}
+    for (const k of Object.keys(stores) as (keyof AppStores)[]) all[k] = stores[k].all
+    writeFileSync(res.filePath, JSON.stringify(all, null, 2), 'utf-8')
+    return true
+  })
+  ipcMain.handle('backup:import', async () => {
+    const res = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (res.canceled || !res.filePaths[0]) return false
+    try {
+      const data = JSON.parse(readFileSync(res.filePaths[0], 'utf-8')) as Record<string, unknown>
+      for (const k of Object.keys(stores) as (keyof AppStores)[]) {
+        if (data[k]) stores[k].replace(data[k] as Record<string, unknown>)
+      }
+      const s = stores.settings.all
+      nativeTheme.themeSource = (s.theme as 'system' | 'light' | 'dark') ?? 'system'
+      scheduler.reload()
+      waterReminder.reload()
+      healthReminder.reload()
+      registerShortcuts()
+      app.setLoginItemSettings({ openAtLogin: Boolean(s.autostart) })
+      sendToAll('data:reloaded')
+      return true
+    } catch {
+      return false
+    }
+  })
+
   ipcMain.handle('update:check', async () => {
     if (!app.isPackaged) return { state: 'dev' }
     try {
@@ -314,6 +354,9 @@ app.whenReady().then(() => {
 
   waterReminder = new WaterReminder(stores.settings, notify, sendToAll)
   waterReminder.start()
+
+  healthReminder = new HealthReminder(stores.settings, notify)
+  healthReminder.start()
 
   registerIpc()
   registerShortcuts()

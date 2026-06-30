@@ -61,6 +61,18 @@ function saveWater(): void {
   w.goalCups = Math.max(1, Math.floor(w.goalCups || 8))
   settings.save()
 }
+function saveHealth(): void {
+  const h = settings.s.health
+  h.sitIntervalMin = Math.max(5, Math.floor(h.sitIntervalMin || 45))
+  h.eyeIntervalMin = Math.max(5, Math.floor(h.eyeIntervalMin || 30))
+  settings.save()
+}
+async function doBackupExport(): Promise<void> {
+  await window.api.backup.export()
+}
+async function doBackupImport(): Promise<void> {
+  await window.api.backup.import()
+}
 
 function fileName(p: string): string {
   return p ? (p.split(/[\\/]/).pop() ?? p) : '未选择'
@@ -237,6 +249,62 @@ async function importTimetable(): Promise<void> {
       </div>
     </div>
 
+    <h3 class="section-title" style="margin-top: 22px">健康提醒</h3>
+    <div class="card">
+      <div class="setting-row">
+        <div>
+          <p class="s-title">久坐提醒</p>
+          <p class="s-sub">久坐后提醒起身活动</p>
+        </div>
+        <label class="switch">
+          <input v-model="settings.s.health.sitEnabled" type="checkbox" @change="save" />
+          <span class="slider" />
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">久坐间隔</p>
+          <p class="s-sub">每隔多少分钟提醒</p>
+        </div>
+        <div class="row">
+          <input
+            v-model.number="settings.s.health.sitIntervalMin"
+            class="input input-sm num"
+            type="number"
+            min="5"
+            @change="saveHealth"
+          />
+          <span class="unit">分</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">护眼提醒</p>
+          <p class="s-sub">20-20-20，定时远眺放松眼睛</p>
+        </div>
+        <label class="switch">
+          <input v-model="settings.s.health.eyeEnabled" type="checkbox" @change="save" />
+          <span class="slider" />
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">护眼间隔</p>
+          <p class="s-sub">每隔多少分钟提醒</p>
+        </div>
+        <div class="row">
+          <input
+            v-model.number="settings.s.health.eyeIntervalMin"
+            class="input input-sm num"
+            type="number"
+            min="5"
+            @change="saveHealth"
+          />
+          <span class="unit">分</span>
+        </div>
+      </div>
+    </div>
+
     <h3 class="section-title" style="margin-top: 22px">通用</h3>
     <div class="card">
       <div class="setting-row">
@@ -293,6 +361,20 @@ async function importTimetable(): Promise<void> {
         <div class="row">
           <button class="btn btn-secondary btn-sm" @click="importTimetable">导入</button>
           <button class="btn btn-secondary btn-sm" @click="exportTimetable">导出</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="section-title" style="margin-top: 22px">数据备份</h3>
+    <div class="card">
+      <div class="setting-row">
+        <div>
+          <p class="s-title">备份 / 恢复全部数据</p>
+          <p class="s-sub">导出设置、课表、待办、统计、音乐、书架、倒数日等为单个 JSON</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-secondary btn-sm" @click="doBackupImport">导入恢复</button>
+          <button class="btn btn-secondary btn-sm" @click="doBackupExport">导出备份</button>
         </div>
       </div>
     </div>

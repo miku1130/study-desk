@@ -83,6 +83,13 @@ const api = {
     check: (): Promise<unknown> => ipcRenderer.invoke('update:check'),
     install: (): Promise<void> => ipcRenderer.invoke('update:install'),
     onStatus: (cb: (status: unknown) => void): (() => void) => on('update:status', (s) => cb(s))
+  },
+  backup: {
+    export: (): Promise<boolean> => ipcRenderer.invoke('backup:export'),
+    import: (): Promise<boolean> => ipcRenderer.invoke('backup:import')
+  },
+  system: {
+    onReload: (cb: () => void): (() => void) => on('data:reloaded', () => cb())
   }
 }
 

@@ -13,6 +13,7 @@ import { useMusicStore } from '@/stores/music'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useWaterStore } from '@/stores/water'
 import { useBooksStore } from '@/stores/books'
+import { useCountdownStore } from '@/stores/countdowns'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
 
 const route = useRoute()
@@ -27,13 +28,14 @@ const music = useMusicStore()
 const pomodoro = usePomodoroStore()
 const water = useWaterStore()
 const books = useBooksStore()
+const countdowns = useCountdownStore()
 
 // 锁屏 / 浮窗子窗口跳过全局音效/托盘，避免重复发声
 if (!window.location.hash.includes('/lock') && !window.location.hash.includes('/widget')) {
   useGlobalEffects()
 }
 
-onMounted(async () => {
+async function loadAll(): Promise<void> {
   await settings.load()
   await Promise.all([
     timetable.load(),
@@ -42,8 +44,14 @@ onMounted(async () => {
     music.load(),
     water.load(),
     books.load(),
+    countdowns.load(),
     pomodoro.init()
   ])
+}
+
+onMounted(() => {
+  void loadAll()
+  window.api.system.onReload(() => void loadAll())
 })
 </script>
 

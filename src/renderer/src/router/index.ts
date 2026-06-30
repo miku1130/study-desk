@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '书架' }
   },
   {
+    path: '/countdown',
+    name: 'countdown',
+    component: () => import('@/views/CountdownView.vue'),
+    meta: { title: '倒数日' }
+  },
+  {
     path: '/stats',
     name: 'stats',
     component: () => import('@/views/StatsView.vue'),

@@ -30,12 +30,20 @@ export interface WaterConfig {
   goalCups: number
 }
 
+export interface HealthConfig {
+  sitEnabled: boolean
+  sitIntervalMin: number
+  eyeEnabled: boolean
+  eyeIntervalMin: number
+}
+
 export interface AppSettings {
   theme: ThemeMode
   accent: string
   bell: BellConfig
   pomodoro: PomodoroConfig
   water: WaterConfig
+  health: HealthConfig
   autostart: boolean
   widget: boolean
   hotkeys: HotkeyConfig
@@ -57,6 +65,7 @@ export const defaultSettings: AppSettings = {
     volume: 0.8
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
+  health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
@@ -152,6 +161,17 @@ export interface Book {
 
 export interface BooksData {
   items: Book[]
+}
+
+export interface Countdown {
+  id: string
+  title: string
+  date: string
+  color: string
+}
+
+export interface CountdownData {
+  items: Countdown[]
 }
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'

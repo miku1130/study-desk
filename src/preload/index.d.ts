@@ -82,6 +82,13 @@ export interface StudyDeskApi {
     install: () => Promise<void>
     onStatus: (cb: (status: unknown) => void) => () => void
   }
+  backup: {
+    export: () => Promise<boolean>
+    import: () => Promise<boolean>
+  }
+  system: {
+    onReload: (cb: () => void) => () => void
+  }
 }
 
 declare global {

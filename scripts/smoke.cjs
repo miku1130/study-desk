@@ -45,7 +45,8 @@ const sample = {
       { id: 'b1', name: '高等数学.pdf', path: 'C:/fake/math.pdf', category: '数学', addedAt: Date.now() },
       { id: 'b2', name: '英语语法.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now() }
     ]
-  }
+  },
+  countdowns: { items: [{ id: 'c1', title: '期末考试', date: dkey(-30), color: '#ff453a' }] }
 }
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
@@ -66,6 +67,7 @@ const routes = [
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
   { hash: '/todo', name: '待办', sel: ['.todo-tabs', '.add-bar'] },
   { hash: '/bookshelf', name: '书架', sel: ['.bs-toolbar'] },
+  { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },

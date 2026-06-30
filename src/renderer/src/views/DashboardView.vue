@@ -9,6 +9,7 @@ import { useTodoStore } from '@/stores/todos'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useWaterStore } from '@/stores/water'
 import { useSettingsStore } from '@/stores/settings'
+import { useCountdownStore, daysLeft } from '@/stores/countdowns'
 import { WEEKDAYS } from '@/types'
 
 const router = useRouter()
@@ -20,6 +21,7 @@ const todos = useTodoStore()
 const pomodoro = usePomodoroStore()
 const water = useWaterStore()
 const settings = useSettingsStore()
+const cd = useCountdownStore()
 
 const waterGoal = computed(() => settings.s.water.goalCups || 8)
 const waterPct = computed(() => Math.min(100, Math.round((water.cupsToday / waterGoal.value) * 100)))
@@ -136,6 +138,9 @@ function go(path: string): void {
         下一节：{{
           next ? `${next.name} · ${next.period.start}（${nextCountdown}后）` : '今日无更多课程'
         }}
+      </span>
+      <span v-if="cd.nearest" class="foot-cd" @click="go('/countdown')">
+        距 {{ cd.nearest.title }} 还有 {{ daysLeft(cd.nearest.date) }} 天
       </span>
       <span class="foot-music" @click="go('/music')">
         {{ music.current ? `${music.playing ? '♫' : '⏸'} ${music.current.name}` : '🎵 未播放' }}
@@ -337,6 +342,11 @@ function go(path: string): void {
 }
 .foot-next {
   color: var(--text-secondary);
+}
+.foot-cd {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
 }
 .foot-music {
   color: var(--text-secondary);

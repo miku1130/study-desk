@@ -77,6 +77,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     volume: 0.8
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
+  health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
@@ -90,6 +91,7 @@ export interface AppStores {
   music: JsonStore<Record<string, unknown>>
   water: JsonStore<Record<string, unknown>>
   books: JsonStore<Record<string, unknown>>
+  countdowns: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -100,6 +102,7 @@ export function createStores(): AppStores {
     stats: new JsonStore('stats.json', { days: {} }),
     music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' }),
     water: new JsonStore('water.json', { days: {} }),
-    books: new JsonStore('books.json', { items: [] })
+    books: new JsonStore('books.json', { items: [] }),
+    countdowns: new JsonStore('countdowns.json', { items: [] })
   }
 }

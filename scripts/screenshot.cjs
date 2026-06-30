@@ -88,6 +88,13 @@ const sample = {
       { id: 'b4', name: '考研政治大纲.pdf', path: 'C:/fake/politics.pdf', category: '政治', addedAt: Date.now() },
       { id: 'b5', name: '英语真题.pptx', path: 'C:/fake/exam.pptx', category: '英语', addedAt: Date.now() }
     ]
+  },
+  countdowns: {
+    items: [
+      { id: 'c1', title: '期末考试', date: dkey(-12), color: '#ff453a' },
+      { id: 'c2', title: '英语六级', date: dkey(-30), color: '#0a84ff' },
+      { id: 'c3', title: '寒假', date: dkey(-45), color: '#30d158' }
+    ]
   }
 }
 
