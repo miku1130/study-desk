@@ -1,13 +1,15 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useStatsStore } from '@/stores/stats'
+import { useGardenStore } from '@/stores/garden'
 import { makeTrayIcon } from '@/lib/trayIcon'
 import { playChime } from '@/lib/audio'
 
-/** 主窗口专用：铃声 / 番茄完成音效、统计刷新、托盘图标。 */
+/** 主窗口专用：铃声 / 番茄完成音效、统计刷新、托盘图标、专注森林奖励。 */
 export function useGlobalEffects(): void {
   const settings = useSettingsStore()
   const stats = useStatsStore()
+  const garden = useGardenStore()
   const cleanups: Array<() => void> = []
 
   function playSound(path: string, volume: number): void {
@@ -38,7 +40,10 @@ export function useGlobalEffects(): void {
     )
     cleanups.push(
       window.api.pomodoro.onEvent((type) => {
-        if (type === 'workComplete') playSound(settings.s.pomodoro.sound, settings.s.pomodoro.volume)
+        if (type === 'workComplete') {
+          playSound(settings.s.pomodoro.sound, settings.s.pomodoro.volume)
+          garden.reward()
+        }
         void stats.load()
       })
     )

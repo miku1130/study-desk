@@ -69,6 +69,8 @@ const routes = [
   { hash: '/bookshelf', name: '书架', sel: ['.bs-toolbar'] },
   { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
+  { hash: '/garden', name: '专注森林', sel: ['.garden', '.shop'] },
+  { hash: '/breathe', name: '深呼吸', sel: ['.breathe', '.orb'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },
   { hash: '/widget', name: '桌面浮窗', sel: ['.widget', '.w-time'] }

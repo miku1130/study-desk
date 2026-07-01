@@ -66,7 +66,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   accent: '#0a84ff',
   appBg: '',
   appBgOpacity: 0.18,
-  bell: { enabled: false, onSound: '', offSound: '', volume: 0.8 },
+  bell: { enabled: false, onSound: 'chime:school-bell', offSound: 'chime:westminster', volume: 0.8 },
   pomodoro: {
     workMin: 25,
     shortBreakMin: 5,
@@ -74,6 +74,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     longBreakEvery: 4,
     autoStart: false,
     lockscreen: false,
+    lockStyle: 'minimal',
     wallpaper: '',
     sound: '',
     volume: 0.8
@@ -94,6 +95,7 @@ export interface AppStores {
   water: JsonStore<Record<string, unknown>>
   books: JsonStore<Record<string, unknown>>
   countdowns: JsonStore<Record<string, unknown>>
+  garden: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -105,6 +107,12 @@ export function createStores(): AppStores {
     music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' }),
     water: new JsonStore('water.json', { days: {} }),
     books: new JsonStore('books.json', { items: [] }),
-    countdowns: new JsonStore('countdowns.json', { items: [] })
+    countdowns: new JsonStore('countdowns.json', { items: [] }),
+    garden: new JsonStore('garden.json', {
+      coins: 0,
+      trees: [],
+      unlocked: ['evergreen'],
+      current: 'evergreen'
+    })
   }
 }

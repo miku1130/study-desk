@@ -15,6 +15,7 @@ import { usePomodoroStore } from '@/stores/pomodoro'
 import { useWaterStore } from '@/stores/water'
 import { useBooksStore } from '@/stores/books'
 import { useCountdownStore } from '@/stores/countdowns'
+import { useGardenStore } from '@/stores/garden'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
 
 const route = useRoute()
@@ -30,6 +31,7 @@ const pomodoro = usePomodoroStore()
 const water = useWaterStore()
 const books = useBooksStore()
 const countdowns = useCountdownStore()
+const garden = useGardenStore()
 
 const showSearch = ref(false)
 function media(p: string): string {
@@ -51,6 +53,7 @@ async function loadAll(): Promise<void> {
     water.load(),
     books.load(),
     countdowns.load(),
+    garden.load(),
     pomodoro.init()
   ])
 }

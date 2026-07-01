@@ -7,6 +7,8 @@ export interface BellConfig {
   volume: number
 }
 
+export type LockStyle = 'minimal' | 'flip' | 'pixel' | 'breathing'
+
 export interface PomodoroConfig {
   workMin: number
   shortBreakMin: number
@@ -14,6 +16,7 @@ export interface PomodoroConfig {
   longBreakEvery: number
   autoStart: boolean
   lockscreen: boolean
+  lockStyle: LockStyle
   wallpaper: string
   sound: string
   volume: number
@@ -64,6 +67,7 @@ export const defaultSettings: AppSettings = {
     longBreakEvery: 4,
     autoStart: false,
     lockscreen: false,
+    lockStyle: 'minimal',
     wallpaper: '',
     sound: '',
     volume: 0.8
@@ -193,6 +197,35 @@ export interface Countdown {
 
 export interface CountdownData {
   items: Countdown[]
+}
+
+export interface TreeSpecies {
+  id: string
+  name: string
+  emoji: string
+  cost: number
+}
+
+export const TREE_SPECIES: TreeSpecies[] = [
+  { id: 'evergreen', name: '常青树', emoji: '🌳', cost: 0 },
+  { id: 'pine', name: '松树', emoji: '🌲', cost: 30 },
+  { id: 'sakura', name: '樱花树', emoji: '🌸', cost: 40 },
+  { id: 'palm', name: '椰子树', emoji: '🌴', cost: 60 },
+  { id: 'maple', name: '枫树', emoji: '🍁', cost: 60 },
+  { id: 'xmas', name: '圣诞树', emoji: '🎄', cost: 90 }
+]
+
+export interface GardenTree {
+  id: string
+  species: string
+  at: number
+}
+
+export interface GardenData {
+  coins: number
+  trees: GardenTree[]
+  unlocked: string[]
+  current: string
 }
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'

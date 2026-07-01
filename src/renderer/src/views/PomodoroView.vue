@@ -221,6 +221,22 @@ function testSound(): void {
       </div>
       <div class="setting-row">
         <div>
+          <p class="s-title">锁屏时钟样式</p>
+          <p class="s-sub">全屏专注时的时钟外观</p>
+        </div>
+        <select
+          class="input input-sm select"
+          v-model="settings.s.pomodoro.lockStyle"
+          @change="save"
+        >
+          <option value="minimal">极简</option>
+          <option value="flip">翻页钟</option>
+          <option value="pixel">像素 LED</option>
+          <option value="breathing">呼吸光</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div>
           <p class="s-title">专注壁纸</p>
           <p class="s-sub">{{ fileName(settings.s.pomodoro.wallpaper) }}</p>
         </div>

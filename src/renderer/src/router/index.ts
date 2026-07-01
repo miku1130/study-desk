@@ -50,6 +50,18 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '专注统计' }
   },
   {
+    path: '/garden',
+    name: 'garden',
+    component: () => import('@/views/GardenView.vue'),
+    meta: { title: '专注森林' }
+  },
+  {
+    path: '/breathe',
+    name: 'breathe',
+    component: () => import('@/views/BreatheView.vue'),
+    meta: { title: '深呼吸' }
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('@/views/SettingsView.vue'),

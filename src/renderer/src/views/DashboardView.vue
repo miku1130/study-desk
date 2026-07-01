@@ -9,6 +9,7 @@ import { useTodoStore } from '@/stores/todos'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useWaterStore } from '@/stores/water'
 import { useSettingsStore } from '@/stores/settings'
+import { useGardenStore } from '@/stores/garden'
 import { useCountdownStore, daysLeft } from '@/stores/countdowns'
 import { WEEKDAYS } from '@/types'
 
@@ -21,6 +22,7 @@ const todos = useTodoStore()
 const pomodoro = usePomodoroStore()
 const water = useWaterStore()
 const settings = useSettingsStore()
+const garden = useGardenStore()
 const cd = useCountdownStore()
 
 const waterGoal = computed(() => settings.s.water.goalCups || 8)
@@ -111,6 +113,7 @@ function go(path: string): void {
         <p class="mini-label">今日专注</p>
         <p class="big">{{ todayStat.pomodoros }}<small> 个番茄</small></p>
         <p class="muted">{{ todayStat.focusMinutes }} 分钟 · {{ focusStatus }}</p>
+        <p class="garden-line" @click="go('/garden')">🪙 {{ garden.coins }} · 🌳 {{ garden.totalTrees }} 棵 →</p>
         <button class="btn block" @click="go('/pomodoro')">
           {{ pomodoro.running ? '查看计时' : '开始专注' }}
         </button>
@@ -290,6 +293,15 @@ function go(path: string): void {
 .btn.block {
   width: 100%;
   margin-top: 14px;
+}
+.garden-line {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.garden-line:hover {
+  color: var(--accent);
 }
 .muted {
   color: var(--text-secondary);

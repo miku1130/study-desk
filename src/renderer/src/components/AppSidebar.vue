@@ -58,6 +58,20 @@ const items: NavItem[] = [
     icon: svg('<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-9"/>')
   },
   {
+    to: '/garden',
+    label: '专注森林',
+    icon: svg(
+      '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/>'
+    )
+  },
+  {
+    to: '/breathe',
+    label: '深呼吸',
+    icon: svg(
+      '<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>'
+    )
+  },
+  {
     to: '/settings',
     label: '设置',
     icon: svg(
