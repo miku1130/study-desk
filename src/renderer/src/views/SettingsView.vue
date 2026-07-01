@@ -3,8 +3,9 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
+import OnlineSearchModal from '@/components/OnlineSearchModal.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
-import type { ThemeMode, TimetableData } from '@/types'
+import type { OnlineTrack, ThemeMode, TimetableData } from '@/types'
 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
@@ -123,6 +124,7 @@ async function pickBellSound(which: 'onSound' | 'offSound'): Promise<void> {
 }
 
 const showBellUrl = ref(false)
+const showBellSearch = ref(false)
 const bellTarget = ref<'onSound' | 'offSound'>('onSound')
 function openBellUrl(which: 'onSound' | 'offSound'): void {
   bellTarget.value = which
@@ -135,6 +137,17 @@ async function onBellUrl(url: string): Promise<void> {
     settings.s.bell[bellTarget.value] = p
     settings.save()
   }
+}
+function openBellSearch(which: 'onSound' | 'offSound'): void {
+  bellTarget.value = which
+  showBellSearch.value = true
+}
+async function onPickBell(t: OnlineTrack): Promise<boolean> {
+  const p = await window.api.media.download(t.url)
+  if (!p) return false
+  settings.s.bell[bellTarget.value] = p
+  settings.save()
+  return true
 }
 function soundLabel(v: string): string {
   if (v.startsWith('chime:')) {
@@ -233,7 +246,7 @@ async function importTimetable(): Promise<void> {
         <input
           type="range"
           min="0.03"
-          max="0.6"
+          max="1"
           step="0.01"
           :value="settings.s.appBgOpacity"
           @input="onAppBgOpacity"
@@ -269,6 +282,7 @@ async function importTimetable(): Promise<void> {
             <option value="__file__" disabled>自定义文件</option>
           </select>
           <button class="btn btn-secondary btn-sm" @click="testSound(settings.s.bell.onSound)">试听</button>
+          <button class="btn btn-secondary btn-sm" @click="openBellSearch('onSound')">在线</button>
           <button class="btn btn-secondary btn-sm" @click="openBellUrl('onSound')">链接</button>
           <button class="btn btn-secondary btn-sm" @click="pickBellSound('onSound')">本地</button>
         </div>
@@ -289,6 +303,7 @@ async function importTimetable(): Promise<void> {
             <option value="__file__" disabled>自定义文件</option>
           </select>
           <button class="btn btn-secondary btn-sm" @click="testSound(settings.s.bell.offSound)">试听</button>
+          <button class="btn btn-secondary btn-sm" @click="openBellSearch('offSound')">在线</button>
           <button class="btn btn-secondary btn-sm" @click="openBellUrl('offSound')">链接</button>
           <button class="btn btn-secondary btn-sm" @click="pickBellSound('offSound')">本地</button>
         </div>
@@ -515,6 +530,16 @@ async function importTimetable(): Promise<void> {
       placeholder="音频直链 (mp3 / ogg / wav)…"
       @confirm="onBellUrl"
       @close="showBellUrl = false"
+    />
+    <OnlineSearchModal
+      v-if="showBellSearch"
+      :title="bellTarget === 'onSound' ? '在线搜索上课铃' : '在线搜索下课铃'"
+      placeholder="输入关键词，如「上课铃」「下课铃」「校园铃声」…"
+      :default-keyword="bellTarget === 'onSound' ? '上课铃声' : '下课铃声'"
+      action-label="设为铃声"
+      :close-after-pick="true"
+      :on-pick="onPickBell"
+      @close="showBellSearch = false"
     />
     <UrlPromptModal
       v-if="showAppBgUrl"

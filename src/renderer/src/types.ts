@@ -56,7 +56,7 @@ export const defaultSettings: AppSettings = {
   accent: '#0a84ff',
   appBg: '',
   appBgOpacity: 0.18,
-  bell: { enabled: false, onSound: '', offSound: '', volume: 0.8 },
+  bell: { enabled: false, onSound: 'chime:school-bell', offSound: 'chime:westminster', volume: 0.8 },
   pomodoro: {
     workMin: 25,
     shortBreakMin: 5,
@@ -101,6 +101,13 @@ export interface MusicTrack {
   id: string
   name: string
   path: string
+}
+
+export interface OnlineTrack {
+  name: string
+  artist: string
+  url: string
+  duration: number
 }
 
 export type LoopMode = 'all' | 'one' | 'none'

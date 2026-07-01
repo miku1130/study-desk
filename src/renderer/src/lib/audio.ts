@@ -30,6 +30,65 @@ export function playChime(id: string, volume = 0.8): void {
   }
 
   switch (id) {
+    case 'school-bell': {
+      // 校园电铃：金属铃身共振 + 铃锤高频断续敲击，模拟真实上下课电铃「铃铃铃」
+      const dur = 2.4
+      const rate = 20
+      const step = 1 / rate
+      const partials: [number, number, OscillatorType][] = [
+        [640, 0.5, 'square'],
+        [1280, 0.3, 'sine'],
+        [1980, 0.18, 'sine'],
+        [3160, 0.09, 'sine']
+      ]
+      for (const [freq, amp, type] of partials) {
+        const o = c.createOscillator()
+        o.type = type
+        o.frequency.value = freq
+        const g = c.createGain()
+        g.gain.setValueAtTime(0.0001, t0)
+        for (let t = 0; t < dur; t += step) {
+          const decay = 1 - t / dur
+          const st = t0 + t
+          g.gain.setValueAtTime(0.02 * decay + 0.0001, st)
+          g.gain.exponentialRampToValueAtTime(Math.max(0.03, amp * decay), st + 0.003)
+          g.gain.exponentialRampToValueAtTime(0.02 * decay + 0.0001, st + step * 0.85)
+        }
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.1)
+        o.connect(g)
+        g.connect(master)
+        o.start(t0)
+        o.stop(t0 + dur + 0.15)
+      }
+      break
+    }
+    case 'westminster': {
+      // 威斯敏斯特音乐钟声：4 音下行旋律 + 金属泛音长衰减，常见校园上下课音乐铃
+      const seq = [659.25, 587.33, 523.25, 392.0]
+      seq.forEach((f, i) => {
+        const start = i * 0.6
+        const parts: [number, number][] = [
+          [f, 0.55],
+          [f * 2.01, 0.16],
+          [f * 3.0, 0.08],
+          [f * 4.16, 0.045]
+        ]
+        for (const [freq, amp] of parts) {
+          const o = c.createOscillator()
+          o.type = 'sine'
+          o.frequency.value = freq
+          const g = c.createGain()
+          g.gain.setValueAtTime(0.0001, t0 + start)
+          g.gain.exponentialRampToValueAtTime(amp, t0 + start + 0.008)
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + 1.7)
+          o.connect(g)
+          g.connect(master)
+          o.start(t0 + start)
+          o.stop(t0 + start + 1.8)
+        }
+      })
+      break
+    }
     case 'dingdong':
       note(987.77, 0, 0.7)
       note(659.25, 0.28, 0.9)
@@ -55,6 +114,8 @@ export function playChime(id: string, volume = 0.8): void {
 }
 
 export const CHIME_PRESETS: { id: string; label: string }[] = [
+  { id: 'school-bell', label: '校园电铃（上下课）' },
+  { id: 'westminster', label: '音乐钟声（上下课）' },
   { id: 'ding', label: '清脆双音' },
   { id: 'dingdong', label: '叮咚' },
   { id: 'bell', label: '清亮铃声' },

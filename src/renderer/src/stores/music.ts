@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { LoopMode, MusicData, MusicTrack } from '@/types'
+import type { LoopMode, MusicData, MusicTrack, OnlineTrack } from '@/types'
 import { uid } from '@/types'
 import { loadStore, saveStore } from '@/lib/persist'
 import { softMusic } from '@/lib/audio'
@@ -140,6 +140,19 @@ export const useMusicStore = defineStore('music', () => {
     return true
   }
 
+  async function searchOnline(keyword: string): Promise<OnlineTrack[]> {
+    return (await window.api.online.search(keyword)) as OnlineTrack[]
+  }
+
+  async function addOnline(track: OnlineTrack): Promise<boolean> {
+    const path = await window.api.media.download(track.url)
+    if (!path) return false
+    const name = track.artist ? `${track.name} - ${track.artist}` : track.name
+    tracks.value.push({ id: uid(), name, path })
+    void persist()
+    return true
+  }
+
   function remove(id: string): void {
     const track = tracks.value.find((t) => t.id === id)
     if (!track || isBuiltin(track.path)) return
@@ -170,6 +183,8 @@ export const useMusicStore = defineStore('music', () => {
     setLoop,
     importTracks,
     addByUrl,
+    searchOnline,
+    addOnline,
     remove
   }
 })

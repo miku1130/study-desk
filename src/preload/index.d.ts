@@ -35,6 +35,11 @@ export interface StudyDeskApi {
     url: (filePath: string) => string
     download: (url: string) => Promise<string>
   }
+  online: {
+    search: (
+      keyword: string
+    ) => Promise<Array<{ name: string; artist: string; url: string; duration: number }>>
+  }
   shell: {
     openPath: (p: string) => Promise<string>
   }

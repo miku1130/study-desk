@@ -35,6 +35,12 @@ const api = {
       filePath ? `studymedia://media/?p=${encodeURIComponent(filePath)}` : '',
     download: (url: string): Promise<string> => ipcRenderer.invoke('media:download', url)
   },
+  online: {
+    search: (
+      keyword: string
+    ): Promise<Array<{ name: string; artist: string; url: string; duration: number }>> =>
+      ipcRenderer.invoke('online:search', keyword)
+  },
   shell: {
     openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:openPath', p)
   },

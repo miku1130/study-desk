@@ -2,10 +2,12 @@
 import { ref } from 'vue'
 import { useMusicStore } from '@/stores/music'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
-import type { LoopMode } from '@/types'
+import OnlineSearchModal from '@/components/OnlineSearchModal.vue'
+import type { LoopMode, OnlineTrack } from '@/types'
 
 const music = useMusicStore()
 const showUrl = ref(false)
+const showSearch = ref(false)
 const msg = ref('')
 
 const loops: { v: LoopMode; l: string }[] = [
@@ -23,6 +25,13 @@ async function onAddUrl(url: string): Promise<void> {
   showUrl.value = false
   msg.value = ok ? '已添加在线音乐' : '添加失败，请检查链接'
   window.setTimeout(() => (msg.value = ''), 2600)
+}
+
+async function onPickOnline(t: OnlineTrack): Promise<boolean> {
+  const ok = await music.addOnline(t)
+  msg.value = ok ? `已添加「${t.name}」` : '添加失败，请重试'
+  window.setTimeout(() => (msg.value = ''), 2600)
+  return ok
 }
 </script>
 
@@ -65,7 +74,8 @@ async function onAddUrl(url: string): Promise<void> {
     <div class="list-head">
       <h3 class="section-title">曲库</h3>
       <div class="row">
-        <button class="btn btn-secondary btn-sm" @click="showUrl = true">在线添加</button>
+        <button class="btn btn-secondary btn-sm" @click="showSearch = true">在线搜索</button>
+        <button class="btn btn-secondary btn-sm" @click="showUrl = true">链接添加</button>
         <button class="btn btn-secondary btn-sm" @click="music.importTracks()">导入音乐</button>
       </div>
     </div>
@@ -95,11 +105,21 @@ async function onAddUrl(url: string): Promise<void> {
 
     <UrlPromptModal
       v-if="showUrl"
-      title="在线添加音乐"
+      title="链接添加音乐"
       placeholder="粘贴音频直链 (mp3 / ogg / wav)…"
       hint="可用 Pixabay、archive.org 等免费资源站的音频直链，下载到本地后离线播放。"
       @confirm="onAddUrl"
       @close="showUrl = false"
+    />
+
+    <OnlineSearchModal
+      v-if="showSearch"
+      title="在线搜索音乐"
+      placeholder="输入歌名 / 歌手 / 关键词，如「轻音乐」「钢琴」…"
+      default-keyword="轻音乐"
+      action-label="添加"
+      :on-pick="onPickOnline"
+      @close="showSearch = false"
     />
 
     <div v-else class="card">

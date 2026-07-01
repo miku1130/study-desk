@@ -32,6 +32,8 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 let mainWindow: BrowserWindow | null = null
+let isQuitting = false
+let trayHintShown = false
 let stores: AppStores
 let engine: PomodoroEngine
 let scheduler: BellScheduler
@@ -54,6 +56,8 @@ function guessExt(url: string, contentType: string): string {
   if (contentType.includes('mpeg')) return '.mp3'
   if (contentType.includes('wav')) return '.wav'
   if (contentType.includes('ogg')) return '.ogg'
+  if (contentType.includes('mp4') || contentType.includes('m4a') || contentType.includes('aac'))
+    return '.m4a'
   return '.bin'
 }
 
@@ -76,6 +80,17 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  // 关闭按钮：默认隐藏到托盘后台常驻，仅在托盘「退出」或应用真正退出时才销毁窗口
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      mainWindow?.hide()
+      if (!trayHintShown) {
+        trayHintShown = true
+        notify('学习桌面仍在后台运行', '已最小化到系统托盘，点击托盘图标可重新打开；右键托盘可退出。')
+      }
+    }
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -180,6 +195,33 @@ function registerIpc(): void {
       filters: filters || []
     })
     return res.canceled ? [] : res.filePaths
+  })
+
+  ipcMain.handle('online:search', async (_e, keyword: string) => {
+    const term = String(keyword ?? '').trim()
+    if (!term) return []
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
+    try {
+      const api = `https://itunes.apple.com/search?term=${encodeURIComponent(
+        term
+      )}&media=music&limit=25&country=CN`
+      const res = await net.fetch(api, { signal: controller.signal })
+      if (!res.ok) return []
+      const data = (await res.json()) as { results?: Array<Record<string, unknown>> }
+      return (data.results ?? [])
+        .filter((r) => typeof r.previewUrl === 'string' && r.previewUrl)
+        .map((r) => ({
+          name: String(r.trackName ?? '未知曲目'),
+          artist: String(r.artistName ?? ''),
+          url: String(r.previewUrl),
+          duration: Math.round(Number(r.trackTimeMillis ?? 30000) / 1000)
+        }))
+    } catch {
+      return []
+    } finally {
+      clearTimeout(timer)
+    }
   })
 
   ipcMain.handle('media:download', async (_e, url: string) => {
@@ -372,10 +414,15 @@ app.whenReady().then(() => {
   })
 })
 
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // 关闭窗口默认隐藏到托盘常驻，只有用户在托盘选择「退出」(isQuitting) 时才真正退出程序
+  if (process.platform !== 'darwin' && isQuitting) app.quit()
 })
