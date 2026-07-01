@@ -3,12 +3,14 @@ import { computed, ref } from 'vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
+import ClockOverlay from '@/components/ClockOverlay.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
 
 const showUrl = ref(false)
+const showClock = ref(false)
 const urlTarget = ref<'wallpaper' | 'sound'>('wallpaper')
 
 const C = 2 * Math.PI * 100
@@ -131,6 +133,9 @@ function testSound(): void {
         </button>
         <button class="btn-icon lg" aria-label="跳过" @click="pomodoro.skip()">⏭</button>
       </div>
+      <button class="btn btn-secondary btn-sm clock-summon" @click="showClock = true">
+        呼出全屏时钟弹窗
+      </button>
     </div>
 
     <h3 class="section-title">番茄设置</h3>
@@ -272,6 +277,8 @@ function testSound(): void {
       @confirm="onUrlConfirm"
       @close="showUrl = false"
     />
+
+    <ClockOverlay v-if="showClock" @close="showClock = false" />
   </div>
 </template>
 
@@ -345,6 +352,9 @@ function testSound(): void {
   align-items: center;
   gap: 16px;
   margin-top: 26px;
+}
+.clock-summon {
+  margin-top: 18px;
 }
 .btn-icon.lg {
   width: 46px;

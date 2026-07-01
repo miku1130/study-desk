@@ -20,29 +20,64 @@ const accents = ['#0a84ff', '#30d158', '#ff453a', '#ff9f0a', '#bf5af2', '#ff375f
 const version = ref('0.1.0')
 const updateState = ref('')
 const updateText = ref('点击检查是否有新版本')
+const updatePercent = ref(0)
+const checking = ref(false)
 let unsubUpdate: (() => void) | null = null
 
 onMounted(async () => {
   version.value = await window.api.app.getVersion()
   unsubUpdate = window.api.update.onStatus((s) => {
-    const st = s as { state: string; version?: string; percent?: number }
+    const st = s as { state: string; version?: string; percent?: number; message?: string }
     updateState.value = st.state
-    if (st.state === 'checking') updateText.value = '正在检查更新…'
-    else if (st.state === 'available') updateText.value = `发现新版本 ${st.version}，正在下载…`
-    else if (st.state === 'downloading') updateText.value = `下载中 ${st.percent}%`
-    else if (st.state === 'downloaded') updateText.value = `新版本 ${st.version} 已就绪`
-    else if (st.state === 'none') updateText.value = '已是最新版本'
-    else if (st.state === 'error') updateText.value = '检查更新失败'
+    if (st.state === 'checking') {
+      checking.value = true
+      updateText.value = '正在检查更新…'
+    } else if (st.state === 'available') {
+      checking.value = false
+      updatePercent.value = 0
+      updateText.value = `发现新版本 ${st.version}，开始下载…`
+    } else if (st.state === 'downloading') {
+      checking.value = false
+      updatePercent.value = st.percent ?? 0
+      updateText.value = `正在下载新版本 ${st.percent ?? 0}%`
+    } else if (st.state === 'downloaded') {
+      checking.value = false
+      updatePercent.value = 100
+      updateText.value = `新版本 ${st.version} 已下载完成，点击「立即重启更新」安装`
+    } else if (st.state === 'none') {
+      checking.value = false
+      updateText.value = '当前已是最新版本 ✓'
+    } else if (st.state === 'error') {
+      checking.value = false
+      updateText.value = '检查更新失败：' + (st.message ? String(st.message).slice(0, 80) : '请检查网络')
+    }
   })
 })
 onUnmounted(() => unsubUpdate?.())
 
 async function checkUpdate(): Promise<void> {
-  const r = (await window.api.update.check()) as { state?: string }
-  if (r?.state === 'dev') updateText.value = '开发模式不检查更新（打包安装后生效）'
-  else if (r?.state === 'error') updateText.value = '检查更新失败'
+  checking.value = true
+  updateState.value = 'checking'
+  updatePercent.value = 0
+  updateText.value = '正在检查更新…'
+  const r = (await window.api.update.check()) as { state?: string; message?: string }
+  if (r?.state === 'dev') {
+    checking.value = false
+    updateState.value = 'dev'
+    updateText.value = '开发模式不检查更新（打包安装后生效）'
+  } else if (r?.state === 'error') {
+    checking.value = false
+    updateState.value = 'error'
+    updateText.value = '检查更新失败：' + (r.message ? String(r.message).slice(0, 80) : '请稍后重试')
+  } else if (r?.state === 'checking') {
+    // 已进入检查，具体结果由 onStatus 推送
+    window.setTimeout(() => {
+      if (checking.value) updateText.value = '正在联网检查更新…请稍候'
+    }, 1200)
+  }
 }
 function installUpdate(): void {
+  updateText.value = '正在退出并安装新版本…'
   window.api.update.install()
 }
 
@@ -500,6 +535,26 @@ async function importTimetable(): Promise<void> {
       </div>
     </div>
 
+    <h3 class="section-title" style="margin-top: 22px">音乐接口</h3>
+    <div class="card">
+      <div class="setting-row">
+        <div class="update-info">
+          <p class="s-title">歌单解析接口</p>
+          <p class="s-sub">
+            用于「导入网易云/QQ 歌单」与在线搜索。留空使用内置默认；公共接口可能不稳定，建议自建
+            Meting-API / NeteaseCloudMusicApi 后填自己的地址（如 https://你的域名/api）。
+          </p>
+        </div>
+        <input
+          v-model="settings.s.musicApi"
+          class="input input-sm"
+          style="width: 240px"
+          placeholder="留空用默认"
+          @change="save"
+        />
+      </div>
+    </div>
+
     <h3 class="section-title" style="margin-top: 22px">关于与更新</h3>
     <div class="card">
       <div class="setting-row">
@@ -509,18 +564,19 @@ async function importTimetable(): Promise<void> {
         </div>
       </div>
       <div class="setting-row">
-        <div>
+        <div class="update-info">
           <p class="s-title">软件更新</p>
           <p class="s-sub">{{ updateText }}</p>
+          <div v-if="updateState === 'downloading'" class="up-bar">
+            <div class="up-fill" :style="{ width: updatePercent + '%' }" />
+          </div>
         </div>
-        <button
-          v-if="updateState !== 'downloaded'"
-          class="btn btn-secondary btn-sm"
-          @click="checkUpdate"
-        >
-          检查更新
+        <button v-if="updateState === 'downloaded'" class="btn btn-sm" @click="installUpdate">
+          立即重启更新
         </button>
-        <button v-else class="btn btn-sm" @click="installUpdate">立即重启更新</button>
+        <button v-else class="btn btn-secondary btn-sm" :disabled="checking" @click="checkUpdate">
+          {{ checking ? '检查中…' : '检查更新' }}
+        </button>
       </div>
     </div>
 
@@ -585,5 +641,23 @@ async function importTimetable(): Promise<void> {
 .row.wrap {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.update-info {
+  flex: 1;
+  min-width: 0;
+}
+.up-bar {
+  height: 6px;
+  background: var(--active);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-top: 8px;
+  max-width: 320px;
+}
+.up-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 100px;
+  transition: width 0.25s var(--ease);
 }
 </style>

@@ -40,6 +40,14 @@ export interface StudyDeskApi {
       keyword: string
     ) => Promise<Array<{ name: string; artist: string; url: string; duration: number }>>
   }
+  playlist: {
+    import: (url: string) => Promise<{
+      ok: boolean
+      tracks?: Array<{ name: string; artist: string; url: string; duration: number }>
+      server?: string
+      error?: string
+    }>
+  }
   shell: {
     openPath: (p: string) => Promise<string>
   }

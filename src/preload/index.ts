@@ -41,6 +41,16 @@ const api = {
     ): Promise<Array<{ name: string; artist: string; url: string; duration: number }>> =>
       ipcRenderer.invoke('online:search', keyword)
   },
+  playlist: {
+    import: (
+      url: string
+    ): Promise<{
+      ok: boolean
+      tracks?: Array<{ name: string; artist: string; url: string; duration: number }>
+      server?: string
+      error?: string
+    }> => ipcRenderer.invoke('playlist:import', url)
+  },
   shell: {
     openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:openPath', p)
   },

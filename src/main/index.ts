@@ -32,6 +32,9 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+// 默认歌单解析聚合接口（Meting-API 格式）；可在「设置 → 音乐接口」替换为自建地址以提升稳定性
+const DEFAULT_MUSIC_API = 'https://metingapi.nanorocky.top'
+
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 let trayHintShown = false
@@ -60,6 +63,41 @@ function guessExt(url: string, contentType: string): string {
   if (contentType.includes('mp4') || contentType.includes('m4a') || contentType.includes('aac'))
     return '.m4a'
   return '.bin'
+}
+
+/** 从任意文本/链接中识别歌单来源与 ID（网易云 / QQ 音乐） */
+function detectPlaylist(s: string): { server: string; id: string } | null {
+  if (!s) return null
+  let server = ''
+  if (/163\.com|163cn\.tv/.test(s)) server = 'netease'
+  else if (/qq\.com/.test(s)) server = 'tencent'
+  const m =
+    s.match(/[?&]id=([A-Za-z0-9]+)/) ||
+    s.match(/playlist[/_]?([A-Za-z0-9]{6,})/) ||
+    s.match(/(\d{6,})/)
+  const id = m ? m[1] : ''
+  if (!server || !id) return null
+  return { server, id }
+}
+
+/** 解析歌单链接（支持分享文案、短链跳转）为 {server,id} */
+async function resolvePlaylist(input: string): Promise<{ server: string; id: string } | null> {
+  let url = String(input || '').trim()
+  const urlMatch = url.match(/https?:\/\/[^\s，,、]+/)
+  if (urlMatch) url = urlMatch[0]
+  let r = detectPlaylist(input) || detectPlaylist(url)
+  if (r) return r
+  if (/^https?:\/\//.test(url)) {
+    try {
+      const res = await net.fetch(url)
+      r = detectPlaylist(res.url)
+      if (!r) r = detectPlaylist(await res.text())
+      if (r) return r
+    } catch {
+      /* 忽略短链解析失败 */
+    }
+  }
+  return null
 }
 
 function createWindow(): void {
@@ -174,9 +212,10 @@ function setupUpdater(): void {
   autoUpdater.on('download-progress', (p) =>
     sendToAll('update:status', { state: 'downloading', percent: Math.round(p.percent) })
   )
-  autoUpdater.on('update-downloaded', (i) =>
+  autoUpdater.on('update-downloaded', (i) => {
     sendToAll('update:status', { state: 'downloaded', version: i.version })
-  )
+    notify('更新已就绪', `新版本 ${i.version} 已下载完成，请在「设置 → 检查更新」点击「立即重启更新」完成安装`)
+  })
   autoUpdater.on('error', (e) => sendToAll('update:status', { state: 'error', message: String(e) }))
 }
 
@@ -246,6 +285,39 @@ function registerIpc(): void {
         }))
     } catch {
       return []
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+
+  ipcMain.handle('playlist:import', async (_e, rawUrl: string) => {
+    const parsed = await resolvePlaylist(rawUrl)
+    if (!parsed) {
+      return { ok: false, error: '无法识别歌单链接，请粘贴网易云/QQ音乐的歌单分享链接' }
+    }
+    const endpoint = (stores.settings.get('musicApi') as string) || DEFAULT_MUSIC_API
+    const api = `${endpoint}${endpoint.includes('?') ? '&' : '?'}server=${parsed.server}&type=playlist&id=${encodeURIComponent(parsed.id)}`
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12000)
+    try {
+      const res = await net.fetch(api, { signal: controller.signal })
+      if (!res.ok) return { ok: false, error: `歌单接口返回 ${res.status}，可在设置更换音乐接口` }
+      const data = (await res.json()) as Array<Record<string, unknown>>
+      if (!Array.isArray(data) || !data.length) {
+        return { ok: false, error: '未解析到歌单曲目（可能私密/接口受限）' }
+      }
+      const tracks = data
+        .map((x) => ({
+          name: String(x.name ?? x.title ?? '未知曲目'),
+          artist: String(x.artist ?? x.author ?? ''),
+          url: String(x.url ?? ''),
+          duration: 0
+        }))
+        .filter((t) => t.url)
+      if (!tracks.length) return { ok: false, error: '歌单曲目均无可用播放地址（多为版权限制）' }
+      return { ok: true, tracks, server: parsed.server }
+    } catch (e) {
+      return { ok: false, error: '歌单解析失败：' + String(e).slice(0, 60) }
     } finally {
       clearTimeout(timer)
     }
@@ -351,7 +423,11 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('update:install', () => {
-    if (app.isPackaged) autoUpdater.quitAndInstall()
+    if (app.isPackaged) {
+      // 先置退出标志，避免窗口 close 拦截阻断 quitAndInstall 的退出安装流程
+      isQuitting = true
+      setImmediate(() => autoUpdater.quitAndInstall())
+    }
   })
 
   ipcMain.handle('timetable:export', async () => {

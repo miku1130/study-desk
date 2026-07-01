@@ -51,6 +51,8 @@ const sample = {
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
 ipcMain.handle('store:set', () => true)
+ipcMain.handle('online:search', () => [])
+ipcMain.handle('media:download', () => '')
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)

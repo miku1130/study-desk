@@ -52,6 +52,7 @@ export interface AppSettings {
   autostart: boolean
   widget: boolean
   hotkeys: HotkeyConfig
+  musicApi: string
 }
 
 export const defaultSettings: AppSettings = {
@@ -76,7 +77,8 @@ export const defaultSettings: AppSettings = {
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
   autostart: false,
   widget: false,
-  hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
+  hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' },
+  musicApi: ''
 }
 
 export interface Period {

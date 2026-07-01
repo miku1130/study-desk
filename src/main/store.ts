@@ -83,7 +83,8 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
   autostart: false,
   widget: false,
-  hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
+  hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' },
+  musicApi: ''
 }
 
 export interface AppStores {
