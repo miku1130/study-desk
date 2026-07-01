@@ -21,3 +21,5 @@ nsis:
   shortcutName: 学习桌面
 publish:
   - provider: github
+    owner: miku1130
+    repo: study-desk

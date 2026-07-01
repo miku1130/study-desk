@@ -1,10 +1,15 @@
 {
   "name": "study-desk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "学习桌面 - macOS 风格学习辅助工具（课表/铃声/番茄钟/锁屏专注/轻音乐）",
   "main": "./out/main/index.js",
   "author": "StudyDesk",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miku1130/study-desk.git"
+  },
+  "homepage": "https://github.com/miku1130/study-desk",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
