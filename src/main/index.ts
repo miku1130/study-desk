@@ -8,7 +8,8 @@ import {
   net,
   Notification,
   dialog,
-  globalShortcut
+  globalShortcut,
+  nativeImage
 } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -21,7 +22,7 @@ import { HealthReminder } from './health'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
 import { openWidget, closeWidget, toggleWidget } from './widget'
-import { setupTray } from './tray'
+import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
 import { autoUpdater } from 'electron-updater'
 
 protocol.registerSchemesAsPrivileged([
@@ -105,6 +106,32 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+function trayHandlers(): TrayHandlers {
+  return {
+    onToggleWindow: () => toggleMainWindow(),
+    onToggleTimer: () => engine.toggle(),
+    onToggleWidget: () => {
+      const open = toggleWidget()
+      stores.settings.set('widget', open)
+    },
+    onQuit: () => app.quit()
+  }
+}
+
+/** 启动即用内置图标创建托盘，保证关闭窗口隐藏到托盘后一定能恢复；找不到图标则回退到渲染层创建。 */
+function initTray(): void {
+  const candidates = [
+    join(process.resourcesPath, 'icon.png'),
+    join(app.getAppPath(), 'build', 'icon.png'),
+    join(__dirname, '../../build/icon.png')
+  ]
+  const p = candidates.find((c) => existsSync(c))
+  if (!p) return
+  const img = nativeImage.createFromPath(p)
+  if (img.isEmpty()) return
+  setupTray(img.resize({ width: 16, height: 16 }), trayHandlers())
 }
 
 function toggleMainWindow(): void {
@@ -264,15 +291,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('tray:setIcon', (_e, dataUrl: string) => {
-    setupTray(dataUrl, {
-      onToggleWindow: () => toggleMainWindow(),
-      onToggleTimer: () => engine.toggle(),
-      onToggleWidget: () => {
-        const open = toggleWidget()
-        stores.settings.set('widget', open)
-      },
-      onQuit: () => app.quit()
-    })
+    setupTrayFromDataUrl(dataUrl, trayHandlers())
   })
 
   ipcMain.handle('autostart:get', () => app.getLoginItemSettings().openAtLogin)
@@ -404,6 +423,7 @@ app.whenReady().then(() => {
   registerShortcuts()
   app.setLoginItemSettings({ openAtLogin: Boolean(stores.settings.get('autostart')) })
   createWindow()
+  initTray()
   if (stores.settings.get('widget')) openWidget()
 
   setupUpdater()
