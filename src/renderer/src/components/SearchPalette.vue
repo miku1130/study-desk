@@ -38,8 +38,8 @@ const pages: Item[] = (
     ['课表', '/timetable'],
     ['番茄钟', '/pomodoro'],
     ['背景音乐', '/music'],
-    ['待办清单', '/todo'],
-    ['书架', '/bookshelf'],
+    ['备忘录中心', '/todo'],
+    ['学习资料库', '/bookshelf'],
     ['倒数日', '/countdown'],
     ['专注统计', '/stats'],
     ['设置', '/settings']
@@ -51,8 +51,8 @@ const results = computed<Item[]>(() => {
   if (!k) return pages
   const all: Item[] = [...pages]
   for (const l of tt.lessons) all.push({ label: l.name, sub: `课表 · ${l.location || ''}`, action: () => go('/timetable') })
-  for (const t of todos.items) all.push({ label: t.text, sub: '待办', action: () => go('/todo') })
-  for (const b of books.items) all.push({ label: b.name, sub: `书架 · ${b.category}`, action: () => openBook(b.path) })
+  for (const t of todos.items) all.push({ label: t.text, sub: `${t.kind === 'task' ? '任务' : '备忘录'} · ${t.tags.join(' ')}`, action: () => go('/todo') })
+  for (const b of books.items) all.push({ label: b.name, sub: `资料库 · ${b.category}`, action: () => openBook(b.path) })
   for (const c of cd.items) all.push({ label: c.title, sub: '倒数日', action: () => go('/countdown') })
   return all.filter((i) => i.label.toLowerCase().includes(k)).slice(0, 40)
 })
@@ -71,7 +71,7 @@ function onKey(e: KeyboardEvent): void {
           ref="inputEl"
           v-model="q"
           class="sp-input"
-          placeholder="搜索页面 / 课程 / 待办 / 书架 / 倒数日…  （Esc 关闭）"
+          placeholder="搜索页面 / 课程 / 备忘 / 资料 / 倒数日…  （Esc 关闭）"
           @keydown="onKey"
         />
         <div class="sp-list">

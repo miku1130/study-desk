@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
+import { useUiStore } from '@/stores/ui'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import OnlineSearchModal from '@/components/OnlineSearchModal.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
@@ -9,6 +10,7 @@ import type { OnlineTrack, ThemeMode, TimetableData } from '@/types'
 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
+const ui = useUiStore()
 
 const themes: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -81,6 +83,18 @@ function installUpdate(): void {
   window.api.update.install()
 }
 
+const QQ_GROUP = '1076144676'
+const qqCopied = ref(false)
+async function copyQQGroup(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(QQ_GROUP)
+    qqCopied.value = true
+    window.setTimeout(() => (qqCopied.value = false), 1500)
+  } catch {
+    // 剪贴板不可用时静默失败，群号仍展示在界面上可手动输入
+  }
+}
+
 function setTheme(t: ThemeMode): void {
   settings.s.theme = t
   settings.save()
@@ -88,6 +102,10 @@ function setTheme(t: ThemeMode): void {
 function setAccent(c: string): void {
   settings.s.accent = c
   settings.save()
+}
+const isCustomAccent = computed(() => !accents.includes(settings.s.accent))
+function onCustomAccent(e: Event): void {
+  setAccent((e.target as HTMLInputElement).value)
 }
 function save(): void {
   settings.save()
@@ -105,10 +123,18 @@ function saveHealth(): void {
   settings.save()
 }
 async function doBackupExport(): Promise<void> {
-  await window.api.backup.export()
+  const ok = await window.api.backup.export()
+  if (ok) ui.success('备份已导出')
 }
 async function doBackupImport(): Promise<void> {
-  await window.api.backup.import()
+  const confirmed = await ui.confirm({
+    title: '导入备份并覆盖当前数据？',
+    message: '导入会用备份文件替换现有的设置、课表、待办、书架、花园等全部数据。',
+    confirmText: '导入'
+  })
+  if (!confirmed) return
+  const ok = await window.api.backup.import()
+  if (ok) ui.success('备份已恢复')
 }
 
 const showAppBgUrl = ref(false)
@@ -247,7 +273,7 @@ async function importTimetable(): Promise<void> {
       <div class="setting-row">
         <div>
           <p class="s-title">强调色</p>
-          <p class="s-sub">用于高亮、按钮与选中态</p>
+          <p class="s-sub">用于高亮、按钮与选中态；最右侧可自选任意颜色</p>
         </div>
         <div class="swatches">
           <button
@@ -259,6 +285,10 @@ async function importTimetable(): Promise<void> {
             :aria-label="c"
             @click="setAccent(c)"
           />
+          <label class="swatch custom" :class="{ active: isCustomAccent }" :style="isCustomAccent ? { background: settings.s.accent } : {}" title="自定义颜色">
+            <span v-if="!isCustomAccent">+</span>
+            <input type="color" :value="settings.s.accent" @input="onCustomAccent" />
+          </label>
         </div>
       </div>
       <div class="setting-row">
@@ -564,6 +594,15 @@ async function importTimetable(): Promise<void> {
         </div>
       </div>
       <div class="setting-row">
+        <div>
+          <p class="s-title">交流反馈</p>
+          <p class="s-sub">QQ 群 {{ QQ_GROUP }} · 欢迎加群交流使用问题与建议</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" @click="copyQQGroup">
+          {{ qqCopied ? '已复制 ✓' : '复制群号' }}
+        </button>
+      </div>
+      <div class="setting-row">
         <div class="update-info">
           <p class="s-title">软件更新</p>
           <p class="s-sub">{{ updateText }}</p>
@@ -625,6 +664,24 @@ async function importTimetable(): Promise<void> {
 }
 .swatch.active {
   box-shadow: 0 0 0 2px var(--accent);
+}
+.swatch.custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 800;
+  position: relative;
+  overflow: hidden;
+}
+.swatch.custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .hk {
   width: 240px;

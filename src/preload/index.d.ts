@@ -23,6 +23,9 @@ export interface StudyDeskApi {
     toggle: () => Promise<boolean>
     close: () => Promise<void>
   }
+  clockWidget: {
+    toggle: () => Promise<boolean>
+  }
   store: {
     get: <T = Record<string, unknown>>(name: string) => Promise<T>
     set: (name: string, value: unknown) => Promise<boolean>
@@ -50,6 +53,12 @@ export interface StudyDeskApi {
   }
   shell: {
     openPath: (p: string) => Promise<string>
+  }
+  fs: {
+    exists: (p: string) => Promise<boolean>
+  }
+  todos: {
+    onChanged: (cb: () => void) => () => void
   }
   pomodoro: {
     start: () => Promise<void>

@@ -20,6 +20,9 @@ const api = {
     toggle: (): Promise<boolean> => ipcRenderer.invoke('widget:toggle'),
     close: (): Promise<void> => ipcRenderer.invoke('widget:close')
   },
+  clockWidget: {
+    toggle: (): Promise<boolean> => ipcRenderer.invoke('clockwidget:toggle')
+  },
   store: {
     get: (name: string): Promise<Record<string, unknown>> => ipcRenderer.invoke('store:get', name),
     set: (name: string, value: unknown): Promise<boolean> =>
@@ -53,6 +56,12 @@ const api = {
   },
   shell: {
     openPath: (p: string): Promise<string> => ipcRenderer.invoke('shell:openPath', p)
+  },
+  fs: {
+    exists: (p: string): Promise<boolean> => ipcRenderer.invoke('fs:exists', p)
+  },
+  todos: {
+    onChanged: (cb: () => void): (() => void) => on('todos:changed', () => cb())
   },
   pomodoro: {
     start: (): Promise<void> => ipcRenderer.invoke('pomodoro:start'),

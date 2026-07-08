@@ -33,10 +33,12 @@ const sample = {
     ]
   },
   todos: {
+    activeId: '1',
     items: [
-      { id: '1', text: '完成高数第三章习题', done: false, pomodoros: 2, createdAt: Date.now(), priority: 3, due: dkey(0), note: '', repeat: 'none' },
-      { id: '2', text: '背 30 个英语单词', done: false, pomodoros: 0, createdAt: Date.now(), priority: 2, due: dkey(0), note: '重点', repeat: 'daily' },
-      { id: '3', text: '复习数据结构', done: false, pomodoros: 0, createdAt: Date.now(), priority: 1, due: dkey(-1), note: '', repeat: 'none' },
+      { id: '1', text: '完成高数第三章习题', done: false, pomodoros: 2, createdAt: Date.now(), priority: 3, due: dkey(0), note: '重点是泰勒展开', repeat: 'none', pinned: true, estimatePomodoros: 4, tags: ['数学'], subtasks: [{ id: 's1', text: '例题 1-10', done: true }, { id: 's2', text: '习题 11-24', done: false }] },
+      { id: '2', text: '背 30 个英语单词', done: false, pomodoros: 0, createdAt: Date.now(), priority: 2, due: dkey(0), note: '', repeat: 'daily', reminderAt: `${dkey(-1)}T20:00`, tags: ['英语'] },
+      { id: '3', text: '给张老师发邮件确认答辩时间', done: false, pomodoros: 0, createdAt: Date.now(), priority: 1, due: dkey(-1), note: '', repeat: 'none', kind: 'memo' },
+      { id: '5', text: '把专注花园做成手机壁纸', done: false, pomodoros: 0, createdAt: Date.now(), priority: 0, due: '', note: '', repeat: 'none', kind: 'idea', tags: ['灵感'] },
       { id: '4', text: '整理错题本', done: true, pomodoros: 3, createdAt: Date.now(), priority: 0, due: '', note: '', repeat: 'none', completedAt: Date.now() }
     ]
   },
@@ -63,13 +65,54 @@ const sample = {
   water: { days: { [dkey(0)]: 4 } },
   books: {
     items: [
-      { id: 'b1', name: '高等数学（同济第七版）.pdf', path: 'C:/fake/math.pdf', category: '数学', addedAt: Date.now() },
-      { id: 'b2', name: '新概念英语 3.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now() },
-      { id: 'b3', name: '算法导论.epub', path: 'C:/fake/algo.epub', category: '计算机', addedAt: Date.now() },
-      { id: 'b4', name: '考研政治大纲.pdf', path: 'C:/fake/politics.pdf', category: '政治', addedAt: Date.now() },
-      { id: 'b5', name: '英语真题.pptx', path: 'C:/fake/exam.pptx', category: '英语', addedAt: Date.now() }
+      { id: 'b1', name: '高等数学（同济第七版）.pdf', path: 'C:/fake/math.pdf', category: '数学', addedAt: Date.now(), status: 'reading', totalPages: 460, currentPage: 285, rating: 5, favorite: true, lastOpenedAt: Date.now() - 3600e3, openCount: 26, tags: ['考研'], notes: [{ id: 'n1', text: '泰勒公式的余项形式要记牢：佩亚诺余项适合求极限，拉格朗日余项适合估计误差。', page: 182, createdAt: Date.now() - 86400e3 }, { id: 'n2', text: '第 9 章多元函数极值，条件极值用拉格朗日乘数法。', page: 236, createdAt: Date.now() - 43200e3 }], readLog: [{ id: 'r1', at: Date.now() - 86400e3, minutes: 45 }, { id: 'r2', at: Date.now() - 3600e3, minutes: 30 }] },
+      { id: 'b2', name: '新概念英语 3.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now(), status: 'reading', progress: 42, rating: 4, lastOpenedAt: Date.now() - 7200e3, openCount: 12 },
+      { id: 'b3', name: '算法导论.epub', path: 'C:/fake/algo.epub', category: '计算机', addedAt: Date.now(), status: 'unread', favorite: true },
+      { id: 'b4', name: '考研政治大纲.pdf', path: 'C:/fake/politics.pdf', category: '政治', addedAt: Date.now(), status: 'finished', progress: 100, rating: 3 },
+      { id: 'b5', name: '英语真题.pptx', path: 'C:/fake/exam.pptx', category: '英语', addedAt: Date.now(), status: 'reference' }
     ]
   },
+  garden: (() => {
+    const species = ['evergreen', 'pine', 'sakura', 'maple', 'evergreen', 'sakura', 'pine', 'evergreen']
+    const trees = []
+    for (let i = 0; i < 21; i++) {
+      const growth = i < 15 ? 3 : i < 19 ? 1 : 0
+      trees.push({
+        id: 't' + i,
+        species: species[i % species.length],
+        at: Date.now() - (21 - i) * 5400e3,
+        focusMinutes: 25,
+        growth,
+        golden: i === 7,
+        mood: i === 7 ? 'glow' : growth >= 3 ? 'mature' : growth > 0 ? 'growing' : 'sprout',
+        plot: i
+      })
+    }
+    return {
+      coins: 86,
+      trees,
+      unlocked: ['evergreen', 'pine', 'sakura', 'maple'],
+      current: 'sakura',
+      streak: 6,
+      lastRewardDate: dkey(0),
+      achievements: [
+        { id: 'first-seed', unlockedAt: Date.now() - 20 * 86400e3 },
+        { id: 'ten-trees', unlockedAt: Date.now() - 6 * 86400e3 },
+        { id: 'one-day-streak', unlockedAt: Date.now() - 3600e3 },
+        { id: 'golden-tree', unlockedAt: Date.now() - 4 * 86400e3 },
+        { id: 'collector', unlockedAt: Date.now() - 2 * 86400e3 }
+      ],
+      decors: [
+        { id: 'd1', kind: 'lantern', plot: 23 },
+        { id: 'd2', kind: 'pond', plot: 30 },
+        { id: 'd3', kind: 'bench', plot: 37 }
+      ],
+      decorOwned: { windchime: 1 },
+      quests: [],
+      questsDate: '',
+      questsCompletedTotal: 12
+    }
+  })(),
   countdowns: {
     items: [
       { id: 'c1', title: '期末考试', date: dkey(-12), color: '#ff453a', bg: '' },
@@ -97,8 +140,9 @@ function settingsFor() {
 
 ipcMain.handle('store:get', (_e, name) => (name === 'settings' ? settingsFor() : sample[name] ?? {}))
 ipcMain.handle('store:set', () => true)
+ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 3 }))
-ipcMain.handle('app:getVersion', () => '0.1.0')
+ipcMain.handle('app:getVersion', () => '0.2.0')
 ipcMain.handle('autostart:get', () => false)
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
@@ -113,6 +157,7 @@ const shots = [
   { route: '', theme: 'dark', name: 'dashboard-dark' },
   { route: '/timetable', theme: 'light', name: 'timetable' },
   { route: '/pomodoro', theme: 'dark', name: 'pomodoro' },
+  { route: '/garden', theme: 'light', name: 'garden' },
   { route: '/bookshelf', theme: 'light', name: 'bookshelf' },
   { route: '/countdown', theme: 'light', name: 'countdown' },
   { route: '/todo', theme: 'light', name: 'todo' },
@@ -131,10 +176,13 @@ app.whenReady().then(async () => {
   for (const s of shots) {
     currentTheme = s.theme
     nativeTheme.themeSource = s.theme
+    // 必须可见窗口：隐藏窗口的合成器不光栅化滚动内容层，capturePage 会得到空白内容区
     const win = new BrowserWindow({
       width: 1180,
       height: 760,
-      show: false,
+      show: true,
+      x: 40,
+      y: 40,
       backgroundColor: s.theme === 'dark' ? '#201d29' : '#eef0f4',
       webPreferences: {
         preload: join(__dirname, '../out/preload/index.js'),

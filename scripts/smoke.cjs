@@ -51,6 +51,7 @@ const sample = {
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
 ipcMain.handle('store:set', () => true)
+ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('online:search', () => [])
 ipcMain.handle('media:download', () => '')
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
@@ -67,15 +68,16 @@ const routes = [
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
-  { hash: '/todo', name: '待办', sel: ['.todo-tabs', '.add-bar'] },
-  { hash: '/bookshelf', name: '书架', sel: ['.bs-toolbar'] },
+  { hash: '/todo', name: '备忘录中心', sel: ['.memo-tabs', '.quick-card'] },
+  { hash: '/bookshelf', name: '学习资料库', sel: ['.library-tools', '.library-stats'] },
   { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
-  { hash: '/garden', name: '专注森林', sel: ['.garden', '.shop'] },
+  { hash: '/garden', name: '专注花园', sel: ['.garden-page', '.plot-grid', '.quest-card'] },
   { hash: '/breathe', name: '深呼吸', sel: ['.breathe', '.orb'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },
-  { hash: '/widget', name: '桌面浮窗', sel: ['.widget', '.w-time'] }
+  { hash: '/widget', name: '桌面浮窗', sel: ['.widget', '.w-time'] },
+  { hash: '/clockwidget', name: '时钟浮窗', sel: ['.cw', '.cw-clock'] }
 ]
 
 // 防止销毁窗口后所有窗口关闭触发默认自动退出，中断验收循环

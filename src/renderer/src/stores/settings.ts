@@ -17,6 +17,7 @@ export const useSettingsStore = defineStore('settings', () => {
         : s.value.theme
     root.setAttribute('data-theme', mode)
     root.style.setProperty('--accent', s.value.accent)
+    root.style.setProperty('--accent-soft', `color-mix(in srgb, ${s.value.accent} 14%, transparent)`)
   }
 
   async function load(): Promise<void> {

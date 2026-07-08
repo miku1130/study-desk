@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
+import { useTodoStore } from '@/stores/todos'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
-import ClockOverlay from '@/components/ClockOverlay.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
+const todos = useTodoStore()
+const router = useRouter()
 
 const showUrl = ref(false)
-const showClock = ref(false)
 const urlTarget = ref<'wallpaper' | 'sound'>('wallpaper')
+
+function toggleClockWidget(): void {
+  window.api.clockWidget.toggle()
+}
 
 const C = 2 * Math.PI * 100
 
@@ -107,6 +113,15 @@ function testSound(): void {
 <template>
   <div class="page narrow">
     <div class="timer-card card">
+      <div v-if="todos.activeItem" class="bound-task">
+        <span class="bound-label">正在专注</span>
+        <strong>{{ todos.activeItem.text }}</strong>
+        <span class="bound-count">🍅 {{ todos.activeItem.pomodoros }}{{ todos.activeItem.estimatePomodoros ? ` / ${todos.activeItem.estimatePomodoros}` : '' }}</span>
+        <button class="bound-clear" title="解除绑定" @click="todos.focusOn(todos.activeId)">✕</button>
+      </div>
+      <button v-else class="bound-empty" @click="router.push('/todo')">
+        绑定一个任务，完成的番茄会自动记到它头上 →
+      </button>
       <div class="ring-wrap">
         <svg viewBox="0 0 220 220" class="ring">
           <circle class="ring-bg" cx="110" cy="110" r="100" />
@@ -133,8 +148,8 @@ function testSound(): void {
         </button>
         <button class="btn-icon lg" aria-label="跳过" @click="pomodoro.skip()">⏭</button>
       </div>
-      <button class="btn btn-secondary btn-sm clock-summon" @click="showClock = true">
-        呼出全屏时钟弹窗
+      <button class="btn btn-secondary btn-sm clock-summon" @click="toggleClockWidget">
+        呼出时钟小浮窗
       </button>
     </div>
 
@@ -277,8 +292,6 @@ function testSound(): void {
       @confirm="onUrlConfirm"
       @close="showUrl = false"
     />
-
-    <ClockOverlay v-if="showClock" @close="showClock = false" />
   </div>
 </template>
 
@@ -299,6 +312,58 @@ function testSound(): void {
   align-items: center;
   padding: 32px;
   margin-bottom: 18px;
+}
+.bound-task {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+}
+.bound-label {
+  color: var(--accent);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.bound-task strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bound-count {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.bound-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  flex-shrink: 0;
+  padding: 2px;
+}
+.bound-clear:hover {
+  color: #ff453a;
+}
+.bound-empty {
+  border: 1px dashed var(--separator);
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: 999px;
+  padding: 8px 14px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.bound-empty:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .ring-wrap {
   position: relative;

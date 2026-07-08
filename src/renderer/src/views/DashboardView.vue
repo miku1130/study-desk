@@ -60,7 +60,14 @@ function isPast(end: string): boolean {
   return nowMin.value >= toMin(end)
 }
 
-const previewTodos = computed(() => todos.items.filter((t) => !t.done).slice(0, 4))
+const previewTodos = computed(() =>
+  todos.items
+    .filter((t) => !t.done)
+    .slice()
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.priority - a.priority)
+    .slice(0, 4)
+)
+const memoTotal = computed(() => todos.items.filter((t) => t.kind !== 'task').length)
 const focusStatus = computed(() => (pomodoro.running ? pomodoro.phaseLabel : '未开始'))
 
 function go(path: string): void {
@@ -113,19 +120,20 @@ function go(path: string): void {
         <p class="mini-label">今日专注</p>
         <p class="big">{{ todayStat.pomodoros }}<small> 个番茄</small></p>
         <p class="muted">{{ todayStat.focusMinutes }} 分钟 · {{ focusStatus }}</p>
-        <p class="garden-line" @click="go('/garden')">🪙 {{ garden.coins }} · 🌳 {{ garden.totalTrees }} 棵 →</p>
+        <p class="garden-line" @click="go('/garden')">Lv.{{ garden.level }} · {{ garden.totalFocusMinutes }} 分钟 · {{ garden.totalTrees }} 棵 →</p>
         <button class="btn block" @click="go('/pomodoro')">
           {{ pomodoro.running ? '查看计时' : '开始专注' }}
         </button>
       </section>
 
       <section class="card todo-card">
-        <p class="mini-label">待办（剩 {{ todos.remaining }}）</p>
+        <p class="mini-label">备忘录中心</p>
         <ul v-if="previewTodos.length" class="td-list">
           <li v-for="t in previewTodos" :key="t.id"><span class="td-dot" />{{ t.text }}</li>
         </ul>
         <div v-else class="muted pad-sm">暂无待办</div>
-        <button class="btn-link" @click="go('/todo')">管理待办 →</button>
+        <div class="memo-summary"><span>{{ todos.remaining }} 个任务</span><span>{{ memoTotal }} 条备忘</span></div>
+        <button class="btn-link" @click="go('/todo')">打开备忘录 →</button>
       </section>
 
       <section class="card water-card">
@@ -327,6 +335,20 @@ function go(path: string): void {
   align-items: center;
   gap: 9px;
   font-size: 13px;
+}
+.memo-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+}
+.memo-summary span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
 }
 .td-dot {
   width: 6px;

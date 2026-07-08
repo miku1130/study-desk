@@ -29,13 +29,13 @@ const routes: RouteRecordRaw[] = [
     path: '/todo',
     name: 'todo',
     component: () => import('@/views/TodoView.vue'),
-    meta: { title: '待办清单' }
+    meta: { title: '备忘录中心' }
   },
   {
     path: '/bookshelf',
     name: 'bookshelf',
     component: () => import('@/views/BookshelfView.vue'),
-    meta: { title: '书架' }
+    meta: { title: '学习资料库' }
   },
   {
     path: '/countdown',
@@ -53,7 +53,7 @@ const routes: RouteRecordRaw[] = [
     path: '/garden',
     name: 'garden',
     component: () => import('@/views/GardenView.vue'),
-    meta: { title: '专注森林' }
+    meta: { title: '专注花园' }
   },
   {
     path: '/breathe',
@@ -78,6 +78,12 @@ const routes: RouteRecordRaw[] = [
     name: 'widget',
     component: () => import('@/views/WidgetView.vue'),
     meta: { title: '桌面浮窗' }
+  },
+  {
+    path: '/clockwidget',
+    name: 'clockwidget',
+    component: () => import('@/views/ClockWidgetView.vue'),
+    meta: { title: '时钟浮窗' }
   }
 ]
 

@@ -19,9 +19,10 @@ import { PomodoroEngine } from './pomodoro'
 import { BellScheduler } from './scheduler'
 import { WaterReminder } from './water'
 import { HealthReminder } from './health'
+import { TodoReminder } from './reminders'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
-import { openWidget, closeWidget, toggleWidget } from './widget'
+import { openWidget, closeWidget, toggleWidget, toggleClockWidget } from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
 import { autoUpdater } from 'electron-updater'
 
@@ -43,6 +44,7 @@ let engine: PomodoroEngine
 let scheduler: BellScheduler
 let waterReminder: WaterReminder
 let healthReminder: HealthReminder
+let todoReminder: TodoReminder
 
 function sendToAll(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -248,6 +250,7 @@ function registerIpc(): void {
       else closeWidget()
     }
     if (name === 'timetable') scheduler.reload()
+    if (name === 'todos') todoReminder.check()
     return true
   })
 
@@ -361,6 +364,7 @@ function registerIpc(): void {
     closeWidget()
     stores.settings.set('widget', false)
   })
+  ipcMain.handle('clockwidget:toggle', () => toggleClockWidget())
 
   ipcMain.handle('tray:setIcon', (_e, dataUrl: string) => {
     setupTrayFromDataUrl(dataUrl, trayHandlers())
@@ -376,6 +380,13 @@ function registerIpc(): void {
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('notify:show', (_e, title: string, body: string) => notify(title, body))
   ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
+  ipcMain.handle('fs:exists', (_e, p: string) => {
+    try {
+      return Boolean(p) && existsSync(p)
+    } catch {
+      return false
+    }
+  })
 
   ipcMain.handle('backup:export', async () => {
     const res = await dialog.showSaveDialog({
@@ -494,6 +505,9 @@ app.whenReady().then(() => {
 
   healthReminder = new HealthReminder(stores.settings, notify)
   healthReminder.start()
+
+  todoReminder = new TodoReminder(stores.todos, notify, sendToAll)
+  todoReminder.start()
 
   registerIpc()
   registerShortcuts()

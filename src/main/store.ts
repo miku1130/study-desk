@@ -103,7 +103,7 @@ export function createStores(): AppStores {
   return {
     settings: new JsonStore('settings.json', DEFAULT_SETTINGS),
     timetable: new JsonStore('timetable.json', { periods: DEFAULT_PERIODS, lessons: [] }),
-    todos: new JsonStore('todos.json', { items: [] }),
+    todos: new JsonStore('todos.json', { items: [], activeId: '' }),
     stats: new JsonStore('stats.json', { days: {} }),
     music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' }),
     water: new JsonStore('water.json', { days: {} }),
@@ -113,7 +113,15 @@ export function createStores(): AppStores {
       coins: 0,
       trees: [],
       unlocked: ['evergreen'],
-      current: 'evergreen'
+      current: 'evergreen',
+      streak: 0,
+      lastRewardDate: '',
+      achievements: [],
+      decors: [],
+      decorOwned: {},
+      quests: [],
+      questsDate: '',
+      questsCompletedTotal: 0
     })
   }
 }
