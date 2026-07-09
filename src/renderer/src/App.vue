@@ -5,6 +5,7 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import WindowControls from '@/components/WindowControls.vue'
 import SearchPalette from '@/components/SearchPalette.vue'
 import UiFeedbackHost from '@/components/UiFeedbackHost.vue'
+import UpdatePromptModal from '@/components/UpdatePromptModal.vue'
 import LockView from '@/views/LockView.vue'
 import WidgetView from '@/views/WidgetView.vue'
 import ClockWidgetView from '@/views/ClockWidgetView.vue'
@@ -135,4 +136,5 @@ onMounted(() => {
   </div>
   <SearchPalette v-if="showSearch" @close="showSearch = false" />
   <UiFeedbackHost v-if="!isLock && !isWidget && !isClockWidget" />
+  <UpdatePromptModal v-if="!isLock && !isWidget && !isClockWidget" />
 </template>
