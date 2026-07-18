@@ -294,7 +294,7 @@ async function importTimetable(): Promise<void> {
       <div class="setting-row">
         <div>
           <p class="s-title">应用背景图</p>
-          <p class="s-sub">{{ settings.s.appBg ? '已设置（半透明叠加于界面）' : '未设置' }}</p>
+          <p class="s-sub">{{ settings.s.appBg ? '已设置（透明玻璃叠加于界面）' : '未设置' }}</p>
         </div>
         <div class="row wrap">
           <button class="btn btn-secondary btn-sm" @click="pickAppBgOnline">随机在线</button>
@@ -305,12 +305,12 @@ async function importTimetable(): Promise<void> {
       </div>
       <div v-if="settings.s.appBg" class="setting-row">
         <div>
-          <p class="s-title">背景不透明度</p>
+          <p class="s-title">界面透明度</p>
           <p class="s-sub">{{ Math.round(settings.s.appBgOpacity * 100) }}%</p>
         </div>
         <input
           type="range"
-          min="0.03"
+          min="0"
           max="1"
           step="0.01"
           :value="settings.s.appBgOpacity"

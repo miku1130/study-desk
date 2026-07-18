@@ -28,11 +28,11 @@
 :root[data-theme="light"] {
   /* 清新治愈表面：奶油白为底，薄荷、蜜桃与晴空蓝只做局部层级 */
   --surface-canvas: #f5f5ef;
-  --surface-sidebar: rgba(255, 252, 247, 0.96);
-  --surface-content: rgba(249, 251, 247, 0.94);
-  --surface-card: rgba(255, 255, 255, 0.92);
-  --surface-raised: #ffffff;
-  --surface-muted: #f1f7f3;
+  --surface-sidebar: rgb(255 252 247 / var(--glass-sidebar-alpha, 0.96));
+  --surface-content: rgb(249 251 247 / var(--glass-content-alpha, 0.94));
+  --surface-card: rgb(255 255 255 / var(--glass-card-alpha, 0.92));
+  --surface-raised: rgb(255 255 255 / var(--glass-raised-alpha, 1));
+  --surface-muted: rgb(241 247 243 / var(--glass-muted-alpha, 1));
   --surface-hover: rgba(79, 174, 152, 0.08);
   --surface-pressed: rgba(79, 174, 152, 0.13);
 
@@ -71,11 +71,11 @@
 
 :root[data-theme="dark"] {
   --surface-canvas: #202925;
-  --surface-sidebar: rgba(38, 49, 44, 0.96);
-  --surface-content: rgba(33, 43, 39, 0.94);
-  --surface-card: rgba(45, 57, 52, 0.92);
-  --surface-raised: #374640;
-  --surface-muted: #33413c;
+  --surface-sidebar: rgb(38 49 44 / var(--glass-sidebar-alpha, 0.96));
+  --surface-content: rgb(33 43 39 / var(--glass-content-alpha, 0.94));
+  --surface-card: rgb(45 57 52 / var(--glass-card-alpha, 0.92));
+  --surface-raised: rgb(55 70 64 / var(--glass-raised-alpha, 1));
+  --surface-muted: rgb(51 65 60 / var(--glass-muted-alpha, 1));
   --surface-hover: rgba(143, 216, 190, 0.08);
   --surface-pressed: rgba(143, 216, 190, 0.13);
 

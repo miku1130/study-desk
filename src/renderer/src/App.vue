@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, shallowRef, type CSSProperties } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import WindowControls from '@/components/WindowControls.vue'
@@ -20,6 +20,7 @@ import { useBooksStore } from '@/stores/books'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useGardenStore } from '@/stores/garden'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
+import { getGlassSurfaceAlphas } from '@/lib/appearance'
 
 const route = useRoute()
 const isLock = computed(() => route.name === 'lock')
@@ -37,6 +38,19 @@ const water = useWaterStore()
 const books = useBooksStore()
 const countdowns = useCountdownStore()
 const garden = useGardenStore()
+
+const appShellStyle = computed<CSSProperties>(() => {
+  if (!settings.s.appBg) return {}
+
+  const surfaces = getGlassSurfaceAlphas(settings.s.appBgOpacity)
+  return {
+    '--glass-sidebar-alpha': String(surfaces.sidebar),
+    '--glass-content-alpha': String(surfaces.content),
+    '--glass-card-alpha': String(surfaces.card),
+    '--glass-raised-alpha': String(surfaces.raised),
+    '--glass-muted-alpha': String(surfaces.muted)
+  } as CSSProperties
+})
 
 const showSearch = shallowRef(false)
 const qqCopied = shallowRef(false)
@@ -103,7 +117,7 @@ onMounted(() => {
   <LockView v-if="isLock" />
   <WidgetView v-else-if="isWidget" />
   <ClockWidgetView v-else-if="isClockWidget" />
-  <div v-else class="app-shell">
+  <div v-else class="app-shell" :style="appShellStyle">
     <div
       v-if="settings.s.appBg"
       class="app-bg"
