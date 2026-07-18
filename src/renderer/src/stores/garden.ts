@@ -11,16 +11,16 @@ export const PLOT_COUNT = 48
 const GOLDEN_CHANCE = 0.06
 
 export const ACHIEVEMENT_CATALOG: GardenAchievement[] = [
-  { id: 'first-seed', title: '第一颗种子', desc: '完成第 1 个番茄并种下第一棵树', icon: '✦' },
-  { id: 'ten-trees', title: '小小林地', desc: '累计种下 10 棵树', icon: '◆' },
-  { id: 'fifty-trees', title: '成片森林', desc: '累计种下 50 棵树', icon: '❖' },
-  { id: 'one-day-streak', title: '今日开张', desc: '今天至少完成一次专注', icon: '●' },
-  { id: 'seven-streak', title: '七日守林人', desc: '连续 7 天完成专注', icon: '▲' },
-  { id: 'collector', title: '树种收藏家', desc: '解锁 4 种不同树种', icon: '◇' },
-  { id: 'deep-focus', title: '深度专注', desc: '累计专注 600 分钟', icon: '✧' },
-  { id: 'golden-tree', title: '黄金之枝', desc: '幸运种下 1 棵金树', icon: '★' },
-  { id: 'decorator', title: '花园设计师', desc: '摆放 3 件装饰', icon: '⬟' },
-  { id: 'quest-master', title: '任务达人', desc: '累计完成 10 个每日任务', icon: '✪' }
+  { id: 'first-seed', title: '第一颗种子', desc: '完成第 1 个番茄并种下第一棵树', icon: 'seed' },
+  { id: 'ten-trees', title: '小小林地', desc: '累计种下 10 棵树', icon: 'tree' },
+  { id: 'fifty-trees', title: '成片森林', desc: '累计种下 50 棵树', icon: 'forest' },
+  { id: 'one-day-streak', title: '今日开张', desc: '今天至少完成一次专注', icon: 'sun' },
+  { id: 'seven-streak', title: '七日守林人', desc: '连续 7 天完成专注', icon: 'flame' },
+  { id: 'collector', title: '树种收藏家', desc: '解锁 4 种不同树种', icon: 'layers' },
+  { id: 'deep-focus', title: '深度专注', desc: '累计专注 600 分钟', icon: 'target' },
+  { id: 'golden-tree', title: '黄金之枝', desc: '幸运种下 1 棵金树', icon: 'sparkle' },
+  { id: 'decorator', title: '花园设计师', desc: '摆放 3 件装饰', icon: 'lantern' },
+  { id: 'quest-master', title: '任务达人', desc: '累计完成 10 个每日任务', icon: 'medal' }
 ]
 
 interface QuestTemplate {

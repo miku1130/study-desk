@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import AppIcon from '@/components/AppIcon.vue'
 import { useUiStore } from '@/stores/ui'
 
 const ui = useUiStore()
 
 const iconOf: Record<string, string> = {
-  success: '✓',
-  info: 'ⓘ',
-  error: '✕'
+  success: 'check',
+  info: 'info',
+  error: 'x'
 }
 </script>
 
@@ -15,7 +16,7 @@ const iconOf: Record<string, string> = {
     <div class="toast-stack" aria-live="polite">
       <TransitionGroup name="toast">
         <div v-for="t in ui.toasts" :key="t.id" class="toast" :class="t.type">
-          <span class="toast-icon">{{ iconOf[t.type] }}</span>
+          <span class="toast-icon"><AppIcon :name="iconOf[t.type]" :size="11" :stroke-width="2.6" /></span>
           <span class="toast-text">{{ t.text }}</span>
         </div>
       </TransitionGroup>

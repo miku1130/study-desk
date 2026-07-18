@@ -1,8 +1,16 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, shallowRef, type CSSProperties } from 'vue'
 import AppModal from '@/components/AppModal.vue'
 import { useTimetableStore } from '@/stores/timetable'
 import { useClock } from '@/composables/useClock'
+import {
+  formatDuration,
+  formatHour,
+  getPeriodPosition,
+  getTimelineBounds,
+  timeToMinutes,
+  TIMETABLE_HOUR_HEIGHT
+} from '@/lib/timetableLayout'
 import { WEEKDAYS, LESSON_COLORS, uid, type Lesson, type Period, type TimetableData } from '@/types'
 
 const tt = useTimetableStore()
@@ -10,12 +18,12 @@ const { now } = useClock()
 
 const weekday = computed(() => (now.value.getDay() === 0 ? 7 : now.value.getDay()))
 const nowMin = computed(() => now.value.getHours() * 60 + now.value.getMinutes())
-const toMin = (hm: string): number => {
-  const [h, m] = hm.split(':').map(Number)
-  return h * 60 + m
-}
 function isCurrent(day: number, p: Period): boolean {
-  return day === weekday.value && nowMin.value >= toMin(p.start) && nowMin.value < toMin(p.end)
+  return (
+    day === weekday.value &&
+    nowMin.value >= timeToMinutes(p.start) &&
+    nowMin.value < timeToMinutes(p.end)
+  )
 }
 
 const lessonMap = computed(() => {
@@ -23,20 +31,46 @@ const lessonMap = computed(() => {
   for (const l of tt.lessons) m[`${l.day}-${l.periodId}`] = l
   return m
 })
-const grid = computed(() =>
-  tt.periods.map((p) => ({
-    period: p,
-    cells: Array.from({ length: 7 }, (_, i) => ({
-      day: i + 1,
-      lesson: lessonMap.value[`${i + 1}-${p.id}`] ?? null
-    }))
-  }))
+const timeline = computed(() => getTimelineBounds(tt.periods))
+const gridStyle = { gridTemplateColumns: '92px repeat(7, minmax(0, 1fr))' }
+const timelineStyle = computed<CSSProperties>(() => ({
+  height: `${timeline.value.hours.length * TIMETABLE_HOUR_HEIGHT}px`
+}))
+const positionedPeriods = computed(() =>
+  [...tt.periods]
+    .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start))
+    .map((period) => {
+      const position = getPeriodPosition(period, timeline.value)
+      return {
+        period,
+        durationMinutes: position.durationMinutes,
+        timeLabel: `${period.start}–${period.end}`,
+        durationLabel: formatDuration(position.durationMinutes),
+        style: { top: position.top, height: position.height } satisfies CSSProperties
+      }
+    })
+    .filter(({ durationMinutes }) => durationMinutes > 0)
 )
-const gridStyle = computed(() => ({ gridTemplateColumns: '92px repeat(7, minmax(0, 1fr))' }))
+const timetableDays = computed(() =>
+  Array.from({ length: 7 }, (_, index) => {
+    const day = index + 1
+    return {
+      day,
+      slots: positionedPeriods.value.map((slot) => {
+        const lesson = lessonMap.value[`${day}-${slot.period.id}`] ?? null
+        return {
+          ...slot,
+          lesson,
+          detailLabel: lesson ? [lesson.teacher, lesson.location].filter(Boolean).join(' · ') : ''
+        }
+      })
+    }
+  })
+)
 
 /* 课程编辑 */
-const showLesson = ref(false)
-const isEdit = ref(false)
+const showLesson = shallowRef(false)
+const isEdit = shallowRef(false)
 const editing = reactive<Lesson>({
   id: '',
   day: 1,
@@ -77,7 +111,7 @@ function deleteLesson(): void {
 }
 
 /* 作息编辑 */
-const showPeriods = ref(false)
+const showPeriods = shallowRef(false)
 const draftPeriods = ref<Period[]>([])
 function openPeriods(): void {
   draftPeriods.value = JSON.parse(JSON.stringify(tt.periods))
@@ -118,31 +152,69 @@ async function doImport(): Promise<void> {
       <button class="btn btn-secondary btn-sm" @click="doExport">导出</button>
     </div>
 
-    <div class="tt-grid card" :style="gridStyle">
-      <div class="tt-corner" />
-      <div v-for="(w, i) in WEEKDAYS" :key="w" class="tt-head" :class="{ today: i + 1 === weekday }">
-        {{ w }}
+    <div class="tt-grid card">
+      <div class="tt-grid-head" :style="gridStyle">
+        <div class="tt-corner" />
+        <div
+          v-for="(w, i) in WEEKDAYS"
+          :key="w"
+          class="tt-head"
+          :class="{ today: i + 1 === weekday }"
+        >
+          {{ w }}
+        </div>
       </div>
 
-      <template v-for="row in grid" :key="row.period.id">
-        <div class="tt-period">
-          <span>{{ row.period.name }}</span>
-          <small>{{ row.period.start }}</small>
-        </div>
-        <div
-          v-for="cell in row.cells"
-          :key="cell.day"
-          class="tt-cell"
-          :class="{ now: isCurrent(cell.day, row.period) }"
-          @click="openCell(cell.day, row.period)"
-        >
-          <div v-if="cell.lesson" class="lesson" :style="{ background: cell.lesson.color }">
-            <span class="lesson-name">{{ cell.lesson.name }}</span>
-            <span v-if="cell.lesson.location" class="lesson-loc">{{ cell.lesson.location }}</span>
+      <div class="tt-grid-body" :style="[gridStyle, timelineStyle]">
+        <div class="tt-time-axis">
+          <div v-for="hour in timeline.hours" :key="hour" class="tt-time-label">
+            {{ formatHour(hour) }}
           </div>
-          <span v-else class="tt-add">+</span>
         </div>
-      </template>
+
+        <div
+          v-for="day in timetableDays"
+          :key="day.day"
+          class="tt-day"
+          :class="{ today: day.day === weekday }"
+        >
+          <div class="tt-hour-grid" aria-hidden="true">
+            <div v-for="hour in timeline.hours" :key="hour" class="tt-hour-cell" />
+          </div>
+
+          <button
+            v-for="slot in day.slots"
+            :key="slot.period.id"
+            class="tt-slot"
+            :class="{
+              'has-lesson': slot.lesson,
+              compact: slot.durationMinutes < 40,
+              micro: slot.durationMinutes < 30,
+              now: isCurrent(day.day, slot.period)
+            }"
+            :style="[
+              slot.style,
+              slot.lesson ? { backgroundColor: slot.lesson.color } : undefined
+            ]"
+            :aria-label="`${slot.period.name} ${slot.timeLabel} ${slot.durationLabel}${slot.lesson ? ` ${slot.lesson.name}` : ' 添加课程'}`"
+            :title="slot.lesson ? `${slot.lesson.name}\n${slot.timeLabel} · ${slot.durationLabel}${slot.detailLabel ? `\n${slot.detailLabel}` : ''}` : `${slot.period.name}\n${slot.timeLabel} · ${slot.durationLabel}`"
+            @click="openCell(day.day, slot.period)"
+          >
+            <template v-if="slot.lesson">
+              <span class="lesson-name">{{ slot.lesson.name }}</span>
+              <span v-if="slot.durationMinutes >= 30" class="lesson-meta">
+                <span>{{ slot.timeLabel }}</span>
+                <span aria-hidden="true">·</span>
+                <span>{{ slot.durationLabel }}</span>
+              </span>
+              <span v-if="slot.detailLabel && slot.durationMinutes >= 40" class="lesson-detail">
+                {{ slot.detailLabel }}
+              </span>
+            </template>
+            <span v-else class="tt-add">+</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <AppModal
@@ -237,9 +309,17 @@ async function doImport(): Promise<void> {
   flex: 1;
 }
 .tt-grid {
-  display: grid;
-  gap: 6px;
   padding: 14px;
+  overflow-x: auto;
+}
+.tt-grid-head,
+.tt-grid-body {
+  display: grid;
+  column-gap: 6px;
+  min-width: 820px;
+}
+.tt-grid-head {
+  margin-bottom: 6px;
 }
 .tt-corner {
   height: 34px;
@@ -258,38 +338,89 @@ async function doImport(): Promise<void> {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.tt-period {
+.tt-time-axis,
+.tt-day,
+.tt-hour-grid {
+  height: 100%;
+}
+.tt-time-axis,
+.tt-hour-grid {
+  display: grid;
+  grid-auto-rows: 72px;
+}
+.tt-time-label {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: flex-start;
-  padding: 0 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  min-height: 64px;
-}
-.tt-period small {
-  font-size: 11px;
+  padding: 7px 8px 0;
+  font-size: 12px;
+  line-height: 1;
   color: var(--text-tertiary);
-  font-weight: 500;
+  border-top: 1px solid var(--separator);
 }
-.tt-cell {
-  min-height: 64px;
-  border-radius: 9px;
-  background: var(--bg-input);
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-  cursor: pointer;
-  transition: background 0.15s var(--ease);
+.tt-day {
+  position: relative;
+  min-width: 0;
+  border-radius: 10px;
   overflow: hidden;
 }
-.tt-cell:hover {
-  background: var(--hover);
+.tt-hour-grid {
+  position: absolute;
+  inset: 0;
 }
-.tt-cell.now {
+.tt-hour-cell {
+  background: var(--bg-input);
+  border-top: 1px solid var(--separator);
+}
+.tt-day.today .tt-hour-cell {
+  background: color-mix(in srgb, var(--accent-soft) 30%, var(--bg-input));
+}
+.tt-slot {
+  position: absolute;
+  z-index: 1;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 0;
+  padding: 6px 8px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.tt-slot:hover {
+  background: var(--hover);
+  border-color: var(--separator);
+}
+.tt-slot.has-lesson {
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 4px 7px;
+  color: #fff;
+  border-color: color-mix(in srgb, #fff 32%, transparent);
+  box-shadow: 0 2px 8px rgb(37 54 48 / 10%);
+}
+.tt-slot.has-lesson:hover {
+  filter: brightness(0.98);
+}
+.tt-slot.compact {
+  justify-content: center;
+  padding-block: 2px;
+}
+.tt-slot.micro {
+  padding-block: 1px;
+}
+.tt-slot.now {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline-offset: -1px;
 }
 .tt-add {
   margin: auto;
@@ -298,26 +429,37 @@ async function doImport(): Promise<void> {
   opacity: 0;
   transition: opacity 0.15s var(--ease);
 }
-.tt-cell:hover .tt-add {
+.tt-slot:hover .tt-add {
   opacity: 1;
 }
-.lesson {
-  flex: 1;
-  padding: 8px;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  border-radius: 9px;
-}
 .lesson-name {
-  font-size: 12.5px;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.lesson-loc {
-  font-size: 11px;
-  opacity: 0.85;
+.lesson-meta,
+.lesson-detail {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.2;
+  opacity: 0.88;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lesson-meta {
+  display: flex;
+  gap: 3px;
+}
+.lesson-detail {
+  font-size: 10.5px;
+  opacity: 0.82;
 }
 
 .form {

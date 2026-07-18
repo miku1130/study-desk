@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import WindowControls from '@/components/WindowControls.vue'
@@ -25,6 +25,7 @@ const route = useRoute()
 const isLock = computed(() => route.name === 'lock')
 const isWidget = computed(() => route.name === 'widget')
 const isClockWidget = computed(() => route.name === 'clockwidget')
+const isDashboard = computed(() => route.name === 'dashboard' || route.path === '/')
 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
@@ -37,8 +38,8 @@ const books = useBooksStore()
 const countdowns = useCountdownStore()
 const garden = useGardenStore()
 
-const showSearch = ref(false)
-const qqCopied = ref(false)
+const showSearch = shallowRef(false)
+const qqCopied = shallowRef(false)
 const QQ_GROUP = '1076144676'
 
 function media(p: string): string {
@@ -125,7 +126,7 @@ onMounted(() => {
         <div class="toolbar-spacer" />
         <WindowControls />
       </header>
-      <div class="view-scroll">
+      <div class="view-scroll" :class="{ 'view-scroll--dashboard': isDashboard }">
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
             <component :is="Component" />

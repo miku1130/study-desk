@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { useMusicStore } from '@/stores/music'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import OnlineSearchModal from '@/components/OnlineSearchModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { LoopMode, OnlineTrack } from '@/types'
 
 const music = useMusicStore()
@@ -60,18 +62,23 @@ onMounted(() => {
   <div class="page narrow">
     <div class="player card">
       <div class="np">
-        <div class="np-art" :class="{ spin: music.playing }">♫</div>
+        <div class="np-art" :class="{ spin: music.playing }"><AppIcon name="music" :size="22" /></div>
         <div class="np-info">
           <p class="np-name">{{ music.current ? music.current.name : '未播放' }}</p>
           <p class="np-sub">{{ music.tracks.length }} 首已收藏</p>
         </div>
       </div>
       <div class="np-controls">
-        <button class="btn-icon lg" aria-label="上一首" @click="music.prev()">⏮</button>
+        <button class="btn-icon lg" aria-label="上一首" @click="music.prev()">
+          <AppIcon name="skip-forward" :size="17" class="flip-x" />
+        </button>
         <button class="btn play" @click="music.toggle()">
+          <AppIcon :name="music.playing ? 'pause' : 'play'" :size="14" :stroke-width="2.1" />
           {{ music.playing ? '暂停' : '播放' }}
         </button>
-        <button class="btn-icon lg" aria-label="下一首" @click="music.next()">⏭</button>
+        <button class="btn-icon lg" aria-label="下一首" @click="music.next()">
+          <AppIcon name="skip-forward" :size="17" />
+        </button>
       </div>
       <div class="np-extra">
         <div class="vol">
@@ -113,7 +120,7 @@ onMounted(() => {
           class="track"
           @click="onPlayOnline(t)"
         >
-          <span class="t-ico">▶</span>
+          <span class="t-ico"><AppIcon name="play" :size="12" /></span>
           <span class="t-name">{{ t.name }}<span class="t-artist"> · {{ t.artist || '未知' }}</span></span>
           <button class="fav" aria-label="收藏" @click.stop="onPickOnline(t)">＋ 收藏</button>
         </div>
@@ -136,17 +143,13 @@ onMounted(() => {
         :class="{ active: t.id === music.currentId }"
         @click="music.play(t.id)"
       >
-        <span class="t-ico">{{ t.id === music.currentId && music.playing ? '▶' : '♪' }}</span>
+        <span class="t-ico"><AppIcon :name="t.id === music.currentId && music.playing ? 'pause' : 'play'" :size="12" /></span>
         <span class="t-name">{{ t.name }}</span>
-        <button class="del" aria-label="删除" @click.stop="music.remove(t.id)">✕</button>
+        <button class="del" aria-label="删除" @click.stop="music.remove(t.id)"><AppIcon name="x" :size="12" /></button>
       </div>
     </div>
     <div v-else class="card">
-      <div class="empty-state">
-        <div class="emoji">🎧</div>
-        <h2>曲库为空</h2>
-        <p>从上方「轻音乐推荐」点 ＋收藏，或导入本地音乐 / 链接添加，专注时即可播放。</p>
-      </div>
+      <EmptyState icon="music" title="曲库为空" desc="从上方「轻音乐推荐」点 ＋收藏，或导入本地音乐 / 链接添加，专注时即可播放。" />
     </div>
 
     <UrlPromptModal
@@ -211,6 +214,9 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+.flip-x {
+  transform: scaleX(-1);
 }
 .np-name {
   font-size: 17px;

@@ -14,7 +14,7 @@ function dkey(offset) {
 const sample = {
   settings: {
     theme: 'light',
-    accent: '#0a84ff',
+    accent: '#4fae98',
     bell: { enabled: true, onSound: '', offSound: '', volume: 0.8 },
     pomodoro: {
       workMin: 25,
@@ -33,7 +33,7 @@ const sample = {
   timetable: {
     periods: [{ id: 'p1', name: '第 1 节', start: '08:00', end: '08:45' }],
     lessons: [
-      { id: 'a', day: 1, periodId: 'p1', name: '高等数学', teacher: '王', location: 'A101', color: '#0a84ff' }
+      { id: 'a', day: 1, periodId: 'p1', name: '高等数学', teacher: '王', location: 'A101', color: '#77b5e8' }
     ]
   },
   todos: { items: [{ id: '1', text: '测试任务', done: false, pomodoros: 0, createdAt: Date.now() }] },

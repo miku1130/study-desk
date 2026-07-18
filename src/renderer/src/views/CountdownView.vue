@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import AppModal from '@/components/AppModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import { useCountdownStore, daysLeft } from '@/stores/countdowns'
 import { LESSON_COLORS, uid, type Countdown } from '@/types'
@@ -85,12 +86,9 @@ async function onBgUrl(url: string): Promise<void> {
       </div>
     </div>
     <div v-else class="card">
-      <div class="empty-state">
-        <div class="emoji">⏳</div>
-        <h2>还没有倒数日</h2>
-        <p>添加考试、截止日或重要日子，主界面会显示「距 X 还有 N 天」。</p>
+      <EmptyState icon="hourglass" title="还没有倒数日" desc="添加考试、截止日或重要日子，主界面会显示「距 X 还有 N 天」。">
         <button class="btn" @click="openAdd">添加倒数日</button>
-      </div>
+      </EmptyState>
     </div>
 
     <AppModal v-if="showEdit" :title="isEdit ? '编辑倒数日' : '添加倒数日'" @close="showEdit = false">

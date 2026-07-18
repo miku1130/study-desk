@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { useGardenStore, COINS_PER_POMODORO, PLOT_COUNT } from '@/stores/garden'
 import { useUiStore } from '@/stores/ui'
 import { DECOR_ITEMS, TREE_SPECIES, type GardenDecor, type GardenTree } from '@/types'
+import { decorSvg, treeSvg, type TreeStage } from '@/lib/sprites'
+import AppIcon from '@/components/AppIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const garden = useGardenStore()
 const ui = useUiStore()
@@ -43,13 +46,15 @@ function decorOf(kind: string) {
   return DECOR_ITEMS.find((item) => item.id === kind) ?? DECOR_ITEMS[0]
 }
 
-function moodClass(tree: GardenTree): string {
-  return `mood-${tree.mood}`
+function stageOf(tree: GardenTree): TreeStage {
+  if (tree.golden) return 'mature'
+  if (tree.growth <= 0) return 'sprout'
+  if (tree.growth < 3) return 'young'
+  return 'mature'
 }
 
-function treeEmoji(tree: GardenTree): string {
-  if (tree.mood === 'sprout') return '🌱'
-  return speciesOf(tree.species).emoji
+function treeSprite(tree: GardenTree): string {
+  return treeSvg(tree.species, stageOf(tree), tree.golden)
 }
 
 function plotTitle(cell: PlotCell): string {
@@ -108,13 +113,13 @@ function onPlotClick(cell: PlotCell): void {
 
 function unlockSpecies(id: string): void {
   const sp = speciesOf(id)
-  if (garden.unlock(id)) ui.success(`已解锁${sp.name} ${sp.emoji}，自动切换为当前树种`)
+  if (garden.unlock(id)) ui.success(`已解锁${sp.name}，自动切换为当前树种`)
 }
 
 function buyDecor(kind: string): void {
   const spec = decorOf(kind)
   if (garden.buyDecor(kind)) {
-    ui.success(`已购买${spec.name} ${spec.emoji}，点击空地块摆放`)
+    ui.success(`已购买${spec.name}，点击空地块摆放`)
     placingKind.value = kind
   }
 }
@@ -157,23 +162,23 @@ function startFocus(): void {
 
     <section class="garden-stats">
       <div class="metric">
-        <span>金币</span>
+        <span class="metric-head"><AppIcon name="coins" :size="13" />金币</span>
         <strong>{{ garden.coins }}</strong>
       </div>
       <div class="metric">
-        <span>总树木</span>
+        <span class="metric-head"><AppIcon name="tree" :size="13" />总树木</span>
         <strong>{{ garden.totalTrees }}</strong>
       </div>
       <div class="metric">
-        <span>金树</span>
+        <span class="metric-head"><AppIcon name="sparkle" :size="13" />金树</span>
         <strong>{{ garden.goldenTrees }}</strong>
       </div>
       <div class="metric">
-        <span>今日种下</span>
+        <span class="metric-head"><AppIcon name="sun" :size="13" />今日种下</span>
         <strong>{{ garden.todayTrees }}</strong>
       </div>
       <div class="metric">
-        <span>已获成就</span>
+        <span class="metric-head"><AppIcon name="medal" :size="13" />已获成就</span>
         <strong>{{ garden.unlockedAchievements.length }}/{{ garden.achievements.length }}</strong>
       </div>
     </section>
@@ -203,7 +208,7 @@ function startFocus(): void {
           >
             {{ q.progress >= q.target ? `领 ${q.reward} 金币` : `+${q.reward}` }}
           </button>
-          <span v-else class="quest-done">已领取 ✓</span>
+          <span v-else class="quest-done"><AppIcon name="check" :size="13" />已领取</span>
         </article>
       </div>
     </section>
@@ -213,14 +218,16 @@ function startFocus(): void {
         <div class="section-head">
           <div>
             <h3>{{ PLOT_COUNT }} 块专注地块</h3>
-            <p>
-              点击空地块指定下一棵树的位置；点击装饰可收回。幼苗 🌱 会随后续专注长成大树。
-            </p>
+            <p>点击空地块指定下一棵树的位置；点击装饰可收回。幼苗会随后续专注长成大树。</p>
           </div>
-          <span class="current-species">{{ garden.currentSpecies.emoji }} {{ garden.currentSpecies.name }}</span>
+          <span class="current-species">
+            <span class="cs-sprite" v-html="treeSvg(garden.currentSpecies.id, 'mature')" />
+            {{ garden.currentSpecies.name }}
+          </span>
         </div>
         <p v-if="placingKind" class="placing-tip">
-          正在摆放 {{ decorOf(placingKind).emoji }} {{ decorOf(placingKind).name }}，点击空地块放置
+          <span class="pt-sprite" v-html="decorSvg(placingKind)" />
+          正在摆放「{{ decorOf(placingKind).name }}」，点击空地块放置
           <button class="btn btn-secondary btn-sm" @click="placingKind = ''">取消</button>
         </p>
         <div class="plot-grid" :class="{ placing: !!placingKind }">
@@ -229,17 +236,15 @@ function startFocus(): void {
             :key="cell.index"
             class="plot"
             :class="[
-              cell.tree ? moodClass(cell.tree) : cell.decor ? 'decor' : 'empty',
+              cell.tree ? 'planted' : cell.decor ? 'decor' : 'empty',
               { marked: garden.nextPlot === cell.index, golden: cell.tree?.golden }
             ]"
             :title="plotTitle(cell)"
             @click="onPlotClick(cell)"
           >
-            <span v-if="cell.tree" class="plot-emoji" :class="`stage-${cell.tree.mood}`">
-              {{ treeEmoji(cell.tree) }}
-            </span>
-            <span v-else-if="cell.decor" class="plot-emoji">{{ decorOf(cell.decor.kind).emoji }}</span>
-            <span v-else-if="garden.nextPlot === cell.index" class="plot-mark">✦</span>
+            <span v-if="cell.tree" class="plot-sprite" v-html="treeSprite(cell.tree)" />
+            <span v-else-if="cell.decor" class="plot-sprite" v-html="decorSvg(cell.decor.kind)" />
+            <AppIcon v-else-if="garden.nextPlot === cell.index" class="plot-mark" name="locate" :size="15" />
           </div>
         </div>
       </section>
@@ -253,7 +258,7 @@ function startFocus(): void {
 
           <div v-if="shopTab === 'species'" class="shop-list">
             <article v-for="sp in TREE_SPECIES" :key="sp.id" class="shop-item" :class="sp.rarity">
-              <span class="shop-icon">{{ sp.emoji }}</span>
+              <span class="shop-sprite" v-html="treeSvg(sp.id, 'mature')" />
               <div class="shop-info">
                 <strong>{{ sp.name }}</strong>
                 <span>{{ sp.biome }} · {{ sp.cost === 0 ? '初始' : `${sp.cost} 金币` }}</span>
@@ -279,7 +284,7 @@ function startFocus(): void {
 
           <div v-else class="shop-list">
             <article v-for="d in DECOR_ITEMS" :key="d.id" class="shop-item">
-              <span class="shop-icon">{{ d.emoji }}</span>
+              <span class="shop-sprite" v-html="decorSvg(d.id)" />
               <div class="shop-info">
                 <strong>{{ d.name }}<em v-if="garden.decorOwned[d.id]"> ×{{ garden.decorOwned[d.id] }}</em></strong>
                 <span>{{ d.desc }} · {{ d.cost }} 金币</span>
@@ -319,7 +324,8 @@ function startFocus(): void {
               class="col-item"
               :class="{ locked: !c.count }"
             >
-              <span class="col-emoji">{{ c.count ? c.species.emoji : '❔' }}</span>
+              <span v-if="c.count" class="col-sprite" v-html="treeSvg(c.species.id, 'mature')" />
+              <span v-else class="col-unknown"><AppIcon name="help" :size="22" :stroke-width="1.6" /></span>
               <strong>{{ c.species.name }}</strong>
               <small v-if="c.count">×{{ c.count }} · {{ formatDate(c.firstAt) }}</small>
               <small v-else>{{ c.unlockedSpecies ? '已解锁 · 待种植' : '未解锁' }}</small>
@@ -344,7 +350,7 @@ function startFocus(): void {
             class="ach"
             :class="{ unlocked: achievement.unlockedAt }"
           >
-            <span>{{ achievement.icon }}</span>
+            <span class="ach-badge"><AppIcon :name="achievement.icon" :size="15" /></span>
             <strong>{{ achievement.title }}</strong>
             <p>{{ achievement.desc }}</p>
           </article>
@@ -360,17 +366,15 @@ function startFocus(): void {
         </div>
         <div v-if="recentTrees.length" class="timeline">
           <article v-for="tree in recentTrees" :key="tree.id" class="timeline-row">
-            <span class="timeline-icon">{{ speciesOf(tree.species).emoji }}</span>
+            <span class="timeline-sprite" v-html="treeSprite(tree)" />
             <div>
               <strong>{{ speciesOf(tree.species).name }}<em v-if="tree.golden" class="gold-tag">金树</em></strong>
               <p>{{ formatTime(tree.at) }} · {{ tree.focusMinutes }} 分钟</p>
             </div>
           </article>
         </div>
-        <div v-else class="empty-state compact-empty">
-          <div class="emoji">🌱</div>
-          <h2>还没有专注记录</h2>
-          <p>完成一个番茄后，这里会出现你的第一条成长记录。</p>
+        <div v-else class="card-empty">
+          <EmptyState icon="seed" title="还没有专注记录" desc="完成一个番茄后，这里会出现你的第一条成长记录。" />
         </div>
       </section>
     </div>
@@ -382,24 +386,53 @@ function startFocus(): void {
   max-width: 1120px;
 }
 .garden-hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   gap: 16px;
   align-items: stretch;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding: 22px 22px 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--brand-sun) 20%, transparent), transparent 22%),
+    radial-gradient(circle at 72% 100%, color-mix(in srgb, var(--brand-peach) 14%, transparent), transparent 26%),
+    linear-gradient(128deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 50%),
+    var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+.garden-hero::after {
+  content: '';
+  position: absolute;
+  width: 260px;
+  height: 150px;
+  right: -54px;
+  bottom: -100px;
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 18px color-mix(in srgb, var(--accent) 4%, transparent),
+    0 0 0 42px color-mix(in srgb, var(--accent) 3%, transparent);
+  pointer-events: none;
 }
 .garden-copy {
-  padding: 10px 4px 4px;
+  position: relative;
+  z-index: 1;
+  padding: 2px 4px;
 }
 .eyebrow {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 750;
+  letter-spacing: 0.08em;
   margin-bottom: 6px;
 }
 .garden-copy h2 {
-  font-size: 28px;
-  line-height: 1.16;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
   max-width: 680px;
 }
 .garden-copy p {
@@ -419,9 +452,13 @@ function startFocus(): void {
   font-size: 12.5px;
 }
 .level-card {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  box-shadow: none;
 }
 .level-label {
   color: var(--text-tertiary);
@@ -429,7 +466,8 @@ function startFocus(): void {
   font-weight: 700;
 }
 .level-card strong {
-  font-size: 36px;
+  font-size: 34px;
+  letter-spacing: -0.03em;
   margin-top: 6px;
 }
 .level-card p {
@@ -438,16 +476,16 @@ function startFocus(): void {
   margin-top: 10px;
 }
 .level-bar {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  background: var(--active);
+  background: var(--surface-pressed);
   margin-top: 12px;
 }
 .level-bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #30d158, #0a84ff);
+  background: linear-gradient(90deg, var(--brand-peach), var(--brand-sun), var(--accent));
   transition: width 0.4s var(--ease);
 }
 .garden-stats {
@@ -457,26 +495,65 @@ function startFocus(): void {
   margin-bottom: 14px;
 }
 .metric {
-  border: 1px solid var(--separator);
-  border-radius: 15px;
-  background: var(--bg-card);
-  padding: 14px 15px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-card);
+  padding: 13px 15px;
+  box-shadow: 0 1px 2px rgba(26, 35, 31, 0.025);
 }
-.metric span {
-  display: block;
+.metric::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: color-mix(in srgb, var(--accent) 48%, transparent);
+}
+.metric:nth-child(2)::before {
+  background: var(--brand-sky);
+}
+.metric:nth-child(3)::before {
+  background: var(--brand-sun);
+}
+.metric:nth-child(4)::before {
+  background: var(--brand-peach);
+}
+.metric:nth-child(5)::before {
+  background: var(--brand-lilac);
+}
+.metric:nth-child(2)::before {
+  background: var(--brand-sky);
+}
+.metric:nth-child(3)::before {
+  background: var(--brand-sun);
+}
+.metric:nth-child(4)::before {
+  background: var(--brand-peach);
+}
+.metric:nth-child(5)::before {
+  background: var(--brand-lilac);
+}
+.metric-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--text-tertiary);
   font-size: 12px;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 .metric strong {
-  font-size: 24px;
+  display: block;
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
 }
 .quest-card {
   margin-bottom: 16px;
 }
 .claim-hint {
-  background: #30d158;
-  color: #fff;
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+  color: var(--status-success);
+  border: 1px solid color-mix(in srgb, var(--status-success) 25%, transparent);
   border-radius: 999px;
   padding: 5px 11px;
   font-size: 12px;
@@ -493,9 +570,9 @@ function startFocus(): void {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--separator);
-  border-radius: 13px;
-  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+  background: var(--surface-muted);
 }
 .quest.done {
   opacity: 0.62;
@@ -512,22 +589,37 @@ function startFocus(): void {
   height: 6px;
   margin: 8px 0 5px;
   border-radius: 999px;
-  background: var(--active);
+  background: var(--surface-pressed);
   overflow: hidden;
 }
 .quest-bar span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #30d158, #0a84ff);
+  background: linear-gradient(90deg, var(--brand-highlight), var(--accent));
   transition: width 0.35s var(--ease);
+}
+.quest:nth-child(2) .quest-bar span {
+  background: linear-gradient(90deg, var(--brand-sky), var(--accent));
+}
+.quest:nth-child(3) .quest-bar span {
+  background: linear-gradient(90deg, var(--brand-peach), var(--brand-sun));
+}
+.quest:nth-child(2) .quest-bar span {
+  background: linear-gradient(90deg, var(--brand-sky), var(--accent));
+}
+.quest:nth-child(3) .quest-bar span {
+  background: linear-gradient(90deg, var(--brand-peach), var(--brand-sun));
 }
 .quest-info small {
   color: var(--text-tertiary);
   font-size: 11px;
 }
 .quest-done {
-  color: #30d158;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--status-success);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
@@ -557,55 +649,85 @@ function startFocus(): void {
   font-size: 12.5px;
 }
 .current-species {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-strong);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 4px 12px 4px 5px;
   font-size: 12.5px;
   font-weight: 800;
   white-space: nowrap;
+}
+.cs-sprite {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
 }
 .placing-tip {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: 11px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 12.5px;
   font-weight: 700;
 }
+.pt-sprite {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
 .plot-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, minmax(34px, 1fr));
-  gap: 8px;
-  padding: 12px;
-  border-radius: 18px;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(48, 209, 88, 0.13), rgba(90, 200, 250, 0.12)),
-    var(--bg-input);
+    linear-gradient(30deg, color-mix(in srgb, var(--accent) 3%, transparent) 12%, transparent 12.5%, transparent 87%, color-mix(in srgb, var(--accent) 3%, transparent) 87.5%),
+    linear-gradient(150deg, color-mix(in srgb, var(--accent) 3%, transparent) 12%, transparent 12.5%, transparent 87%, color-mix(in srgb, var(--accent) 3%, transparent) 87.5%),
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 42%),
+    radial-gradient(circle at 84% 88%, color-mix(in srgb, var(--brand-sky) 15%, transparent), transparent 46%),
+    var(--surface-muted);
+  background-size: 28px 48px, 28px 48px, auto, auto, auto;
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 8px rgba(25, 39, 31, 0.04);
 }
 .plot {
+  position: relative;
   aspect-ratio: 1;
   min-width: 0;
-  border-radius: 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(48, 209, 88, 0.14);
-  border: 1px solid rgba(48, 209, 88, 0.18);
-  font-size: 22px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-card));
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--border-subtle));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface-raised) 72%, transparent);
   cursor: pointer;
-  transition: transform 0.14s var(--ease), filter 0.14s var(--ease), box-shadow 0.2s var(--ease);
+  padding: 6%;
+  transition: transform 0.14s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 .plot:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow: 0 4px 10px rgba(29, 45, 36, 0.09);
+}
+.plot:hover .plot-sprite {
+  transform: translateY(-1px) scale(1.05);
 }
 .plot.empty {
-  background: rgba(127, 127, 127, 0.08);
+  background: color-mix(in srgb, var(--text-tertiary) 3%, transparent);
   border-style: dashed;
+  border-color: color-mix(in srgb, var(--text-tertiary) 20%, transparent);
+  box-shadow: none;
 }
 .plot-grid.placing .plot.empty {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
@@ -617,31 +739,28 @@ function startFocus(): void {
 }
 .plot-mark {
   color: var(--accent);
-  font-size: 15px;
-  font-weight: 900;
 }
 .plot.decor {
-  background: rgba(255, 159, 10, 0.13);
-  border-color: rgba(255, 159, 10, 0.28);
+  background: color-mix(in srgb, var(--brand-peach) 12%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--brand-peach) 32%, transparent);
 }
-.plot.golden,
-.mood-glow {
-  box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.24), 0 0 24px rgba(255, 204, 0, 0.22);
+.plot.golden {
+  border-color: rgba(212, 168, 66, 0.5);
+  box-shadow: 0 0 0 2px rgba(226, 181, 79, 0.22), 0 4px 18px rgba(226, 181, 79, 0.25);
 }
-.plot-emoji {
-  transition: transform 0.25s var(--ease);
+.plot-sprite {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 180ms var(--ease);
 }
-.plot-emoji.stage-sprout {
-  font-size: 15px;
-  opacity: 0.9;
-}
-.plot-emoji.stage-growing {
-  font-size: 18px;
-  filter: saturate(1.1);
-}
-.plot-emoji.stage-mature,
-.plot-emoji.stage-glow {
-  font-size: 22px;
+.plot-sprite :deep(svg) {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 3px 2px rgba(29, 45, 36, 0.14));
 }
 .side-stack {
   display: flex;
@@ -650,8 +769,9 @@ function startFocus(): void {
 }
 .shop-tabs {
   display: flex;
-  background: var(--bg-input);
-  border-radius: 11px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
   padding: 3px;
   margin-bottom: 12px;
 }
@@ -666,8 +786,9 @@ function startFocus(): void {
   font-weight: 800;
 }
 .shop-tabs button.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--surface-raised);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 3px rgba(18, 27, 23, 0.09);
 }
 .shop-list {
   display: flex;
@@ -676,17 +797,32 @@ function startFocus(): void {
 }
 .shop-item {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-  padding: 10px;
-  border: 1px solid var(--separator);
-  border-radius: 12px;
-  background: var(--bg-input);
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-muted);
 }
-.shop-icon {
-  font-size: 25px;
-  text-align: center;
+.shop-item.rare {
+  background: color-mix(in srgb, var(--brand-sky) 8%, var(--surface-raised));
+}
+.shop-item.epic {
+  background: color-mix(in srgb, var(--brand-lilac) 9%, var(--surface-raised));
+}
+.shop-sprite {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 11%, transparent);
+  padding: 3px;
+}
+.shop-sprite :deep(svg) {
+  width: 100%;
+  height: 100%;
 }
 .shop-info strong,
 .shop-info span {
@@ -697,7 +833,7 @@ function startFocus(): void {
 }
 .shop-info strong em {
   font-style: normal;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 12px;
   margin-left: 3px;
 }
@@ -717,19 +853,30 @@ function startFocus(): void {
   gap: 8px;
 }
 .col-item {
-  border: 1px solid var(--separator);
-  border-radius: 12px;
-  background: var(--bg-input);
-  padding: 10px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 10px 8px 9px;
   text-align: center;
 }
 .col-item.locked {
-  opacity: 0.5;
+  opacity: 0.55;
 }
-.col-emoji {
-  display: block;
-  font-size: 24px;
+.col-sprite,
+.col-unknown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
   margin-bottom: 5px;
+}
+.col-unknown {
+  color: var(--text-tertiary);
+}
+.col-sprite :deep(svg) {
+  width: 100%;
+  height: 100%;
 }
 .col-item strong {
   display: block;
@@ -754,9 +901,9 @@ function startFocus(): void {
 }
 .ach {
   min-height: 118px;
-  border-radius: 13px;
-  border: 1px solid var(--separator);
-  background: var(--bg-input);
+  border-radius: 11px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-muted);
   padding: 12px;
   opacity: 0.48;
   transition: opacity 0.25s var(--ease);
@@ -766,16 +913,16 @@ function startFocus(): void {
   border-color: color-mix(in srgb, var(--accent) 36%, transparent);
   background: linear-gradient(135deg, var(--accent-soft), var(--bg-input));
 }
-.ach span {
+.ach-badge {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--bg-card-strong);
+  border-radius: 8px;
+  background: var(--surface-raised);
   color: var(--accent);
-  font-weight: 900;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   margin-bottom: 9px;
 }
 .ach strong {
@@ -797,12 +944,19 @@ function startFocus(): void {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 9px;
-  border-radius: 12px;
-  background: var(--bg-input);
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: var(--surface-muted);
 }
-.timeline-icon {
-  font-size: 23px;
+.timeline-sprite {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.timeline-sprite :deep(svg) {
+  width: 100%;
+  height: 100%;
 }
 .timeline-row strong {
   font-size: 13.5px;
@@ -812,8 +966,8 @@ function startFocus(): void {
   margin-left: 6px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: rgba(255, 204, 0, 0.2);
-  color: #b8860b;
+  background: rgba(226, 181, 79, 0.2);
+  color: #a8802a;
   font-size: 10.5px;
   font-weight: 800;
 }
@@ -822,8 +976,8 @@ function startFocus(): void {
   font-size: 11.5px;
   margin-top: 2px;
 }
-.compact-empty {
-  padding: 28px 12px;
+.card-empty {
+  padding: 16px 0;
 }
 @media (max-width: 980px) {
   .garden-hero,

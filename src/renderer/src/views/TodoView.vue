@@ -2,6 +2,8 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppModal from '@/components/AppModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useTodoStore } from '@/stores/todos'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useUiStore } from '@/stores/ui'
@@ -329,7 +331,7 @@ function reminderPending(item: TodoItem): boolean {
 
     <template v-if="filtered.length">
       <section v-if="pinnedItems.length" class="pin-block">
-        <p class="block-title">📌 置顶</p>
+        <p class="block-title"><AppIcon name="pin" :size="12" />置顶</p>
         <TransitionGroup name="list" tag="div" class="memo-list">
           <article
             v-for="item in pinnedItems"
@@ -366,19 +368,24 @@ function reminderPending(item: TodoItem): boolean {
                   :title="todos.activeId === item.id ? '解除绑定' : '绑定番茄钟开始专注'"
                   @click.stop="startFocus(item)"
                 >
-                  ▶
+                  <AppIcon name="play" :size="12" />
                 </button>
-                <button class="mini-act" :title="item.pinned ? '取消置顶' : '置顶'" @click.stop="todos.togglePin(item.id)">
-                  {{ item.pinned ? '📌' : '📍' }}
+                <button
+                  class="mini-act"
+                  :class="{ on: item.pinned }"
+                  :title="item.pinned ? '取消置顶' : '置顶'"
+                  @click.stop="todos.togglePin(item.id)"
+                >
+                  <AppIcon name="pin" :size="12" />
                 </button>
               </div>
               <span v-if="item.priority > 0" class="flag" :style="{ background: priColor(item.priority) }" />
               <span v-if="item.due" class="due" :class="{ over: isOverdue(item) }">{{ dueLabel(item.due) }}</span>
               <span v-if="item.reminderAt" class="reminder" :class="{ armed: reminderPending(item) }">
-                ⏰ {{ formatReminder(item.reminderAt) }}
+                <AppIcon name="bell" :size="11" />{{ formatReminder(item.reminderAt) }}
               </span>
               <span v-if="item.pomodoros || item.estimatePomodoros" class="pomodoros">
-                🍅 {{ item.pomodoros }}{{ item.estimatePomodoros ? ` / ${item.estimatePomodoros}` : '' }}
+                <AppIcon name="tomato" :size="11" />{{ item.pomodoros }}{{ item.estimatePomodoros ? ` / ${item.estimatePomodoros}` : '' }}
               </span>
             </div>
           </article>
@@ -412,7 +419,7 @@ function reminderPending(item: TodoItem): boolean {
                 </div>
               </div>
               <div class="memo-side">
-                <span v-if="item.pomodoros" class="pomodoros">🍅 {{ item.pomodoros }}</span>
+                <span v-if="item.pomodoros" class="pomodoros"><AppIcon name="tomato" :size="11" />{{ item.pomodoros }}</span>
               </div>
             </article>
           </div>
@@ -455,30 +462,35 @@ function reminderPending(item: TodoItem): boolean {
                 :title="todos.activeId === item.id ? '解除绑定' : '绑定番茄钟开始专注'"
                 @click.stop="startFocus(item)"
               >
-                ▶
+                <AppIcon name="play" :size="12" />
               </button>
-              <button class="mini-act" :title="item.pinned ? '取消置顶' : '置顶'" @click.stop="todos.togglePin(item.id)">
-                {{ item.pinned ? '📌' : '📍' }}
+              <button
+                class="mini-act"
+                :class="{ on: item.pinned }"
+                :title="item.pinned ? '取消置顶' : '置顶'"
+                @click.stop="todos.togglePin(item.id)"
+              >
+                <AppIcon name="pin" :size="12" />
               </button>
             </div>
             <span v-if="item.priority > 0" class="flag" :style="{ background: priColor(item.priority) }" />
             <span v-if="item.due" class="due" :class="{ over: isOverdue(item) }">{{ dueLabel(item.due) }}</span>
             <span v-if="item.reminderAt" class="reminder" :class="{ armed: reminderPending(item) }">
-              ⏰ {{ formatReminder(item.reminderAt) }}
+              <AppIcon name="bell" :size="11" />{{ formatReminder(item.reminderAt) }}
             </span>
             <span v-if="item.pomodoros || item.estimatePomodoros" class="pomodoros">
-              🍅 {{ item.pomodoros }}{{ item.estimatePomodoros ? ` / ${item.estimatePomodoros}` : '' }}
+              <AppIcon name="tomato" :size="11" />{{ item.pomodoros }}{{ item.estimatePomodoros ? ` / ${item.estimatePomodoros}` : '' }}
             </span>
           </div>
         </article>
       </TransitionGroup>
     </template>
     <section v-else class="card">
-      <div class="empty-state">
-        <div class="emoji">🗒️</div>
-        <h2>{{ tab === 'done' ? '还没有已完成记录' : '这里很清爽' }}</h2>
-        <p>添加任务、备忘或灵感，必要时设置标签、提醒、子任务和预计番茄数。</p>
-      </div>
+      <EmptyState
+        icon="note"
+        :title="tab === 'done' ? '还没有已完成记录' : '这里很清爽'"
+        desc="添加任务、备忘或灵感，必要时设置标签、提醒、子任务和预计番茄数。"
+      />
     </section>
 
     <AppModal v-if="showEdit" title="编辑记录" @close="showEdit = false">
@@ -752,6 +764,9 @@ function reminderPending(item: TodoItem): boolean {
   flex: 1;
 }
 .block-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--text-tertiary);
   font-size: 12px;
   font-weight: 800;
@@ -924,13 +939,17 @@ function reminderPending(item: TodoItem): boolean {
   border: 1px solid var(--separator);
   background: var(--bg-card-strong);
   color: var(--accent);
-  font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .mini-act:hover {
   background: var(--hover);
+}
+.mini-act.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 .flag {
   width: 32px;
@@ -940,6 +959,9 @@ function reminderPending(item: TodoItem): boolean {
 .due,
 .reminder,
 .pomodoros {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11.5px;
   color: var(--text-secondary);
   background: var(--bg-input);

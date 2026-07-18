@@ -2,57 +2,111 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
 
-  --radius-xl: 20px;
-  --radius-lg: 16px;
-  --radius-md: 11px;
-  --radius-sm: 7px;
+  --radius-xl: 22px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
 
-  --sidebar-w: 224px;
-  --titlebar-h: 52px;
+  --sidebar-w: 218px;
+  --titlebar-h: 56px;
 
-  --accent: #0a84ff;
-  --accent-soft: rgba(10, 132, 255, 0.14);
+  --accent: #4fae98;
+  --accent-soft: rgba(79, 174, 152, 0.14);
+  --accent-strong: color-mix(in srgb, var(--accent) 68%, #174f44);
+  --brand-highlight: #f2a477;
+  --brand-peach: #f2a477;
+  --brand-sky: #77b5e8;
+  --brand-sun: #f6c85f;
+  --brand-lilac: #a88ad8;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
 }
 
 :root,
 :root[data-theme="light"] {
-  --app-bg: #eceef2;
-  --bg-sidebar: rgba(245, 245, 247, 0.62);
-  --bg-content: rgba(252, 252, 253, 0.5);
-  --bg-card: rgba(255, 255, 255, 0.74);
-  --bg-card-strong: rgba(255, 255, 255, 0.92);
-  --bg-input: rgba(255, 255, 255, 0.7);
+  /* 清新治愈表面：奶油白为底，薄荷、蜜桃与晴空蓝只做局部层级 */
+  --surface-canvas: #f5f5ef;
+  --surface-sidebar: rgba(255, 252, 247, 0.96);
+  --surface-content: rgba(249, 251, 247, 0.94);
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-raised: #ffffff;
+  --surface-muted: #f1f7f3;
+  --surface-hover: rgba(79, 174, 152, 0.08);
+  --surface-pressed: rgba(79, 174, 152, 0.13);
 
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-tertiary: #8e8e93;
+  --text-primary: #25332d;
+  --text-secondary: #62736b;
+  --text-tertiary: #8c9c94;
+  --text-on-accent: #ffffff;
 
-  --separator: rgba(0, 0, 0, 0.08);
-  --hover: rgba(0, 0, 0, 0.05);
-  --active: rgba(0, 0, 0, 0.09);
+  --border-subtle: rgba(57, 92, 76, 0.1);
+  --border-strong: rgba(57, 92, 76, 0.17);
+  --focus-ring: color-mix(in srgb, var(--accent) 34%, transparent);
+  --nav-active-bg: color-mix(in srgb, var(--accent) 13%, #ffffff);
+  --nav-active-border: color-mix(in srgb, var(--accent) 28%, transparent);
+  --button-primary-bg: color-mix(in srgb, var(--accent) 67%, #174f44);
+  --button-primary-hover: color-mix(in srgb, var(--accent) 78%, #174f44);
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(0, 0, 0, 0.08);
-  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.18);
+  --status-success: #38876d;
+  --status-warning: #a8751f;
+  --status-danger: #b85f58;
+
+  --shadow-card: 0 2px 3px rgba(52, 81, 68, 0.035), 0 10px 30px rgba(73, 117, 96, 0.07);
+  --shadow-raised: 0 14px 38px rgba(64, 105, 86, 0.13);
+  --shadow-pop: 0 20px 52px rgba(49, 80, 66, 0.19);
+
+  /* 兼容现有组件，新增代码优先使用 surface/border 语义变量 */
+  --app-bg: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-content: var(--surface-content);
+  --bg-card: var(--surface-card);
+  --bg-card-strong: var(--surface-raised);
+  --bg-input: var(--surface-muted);
+  --separator: var(--border-subtle);
+  --hover: var(--surface-hover);
+  --active: var(--surface-pressed);
 }
 
 :root[data-theme="dark"] {
-  --app-bg: #1b1b1d;
-  --bg-sidebar: rgba(40, 40, 43, 0.52);
-  --bg-content: rgba(28, 28, 30, 0.46);
-  --bg-card: rgba(54, 54, 58, 0.66);
-  --bg-card-strong: rgba(58, 58, 62, 0.9);
-  --bg-input: rgba(70, 70, 74, 0.6);
+  --surface-canvas: #202925;
+  --surface-sidebar: rgba(38, 49, 44, 0.96);
+  --surface-content: rgba(33, 43, 39, 0.94);
+  --surface-card: rgba(45, 57, 52, 0.92);
+  --surface-raised: #374640;
+  --surface-muted: #33413c;
+  --surface-hover: rgba(143, 216, 190, 0.08);
+  --surface-pressed: rgba(143, 216, 190, 0.13);
 
-  --text-primary: #f5f5f7;
-  --text-secondary: #aeaeb2;
-  --text-tertiary: #8e8e93;
+  --text-primary: #f4f8f5;
+  --text-secondary: #c2cec7;
+  --text-tertiary: #96aaa0;
+  --text-on-accent: #ffffff;
 
-  --separator: rgba(255, 255, 255, 0.1);
-  --hover: rgba(255, 255, 255, 0.06);
-  --active: rgba(255, 255, 255, 0.11);
+  --border-subtle: rgba(225, 244, 234, 0.11);
+  --border-strong: rgba(225, 244, 234, 0.2);
+  --focus-ring: color-mix(in srgb, var(--accent) 46%, transparent);
+  --nav-active-bg: color-mix(in srgb, var(--accent) 18%, transparent);
+  --nav-active-border: color-mix(in srgb, var(--accent) 38%, transparent);
+  --button-primary-bg: color-mix(in srgb, var(--accent) 72%, #174f44);
+  --button-primary-hover: color-mix(in srgb, var(--accent) 84%, #174f44);
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.42);
-  --shadow-pop: 0 10px 34px rgba(0, 0, 0, 0.55);
+  --status-success: #80cfac;
+  --status-warning: #f0c36d;
+  --status-danger: #ee938b;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 26px rgba(0, 0, 0, 0.2);
+  --shadow-raised: 0 14px 40px rgba(0, 0, 0, 0.36);
+  --shadow-pop: 0 18px 52px rgba(0, 0, 0, 0.52);
+
+  --app-bg: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-content: var(--surface-content);
+  --bg-card: var(--surface-card);
+  --bg-card-strong: var(--surface-raised);
+  --bg-input: var(--surface-muted);
+  --separator: var(--border-subtle);
+  --hover: var(--surface-hover);
+  --active: var(--surface-pressed);
 }

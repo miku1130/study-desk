@@ -23,6 +23,10 @@ export const useSettingsStore = defineStore('settings', () => {
   async function load(): Promise<void> {
     const data = await loadStore<Partial<AppSettings>>('settings')
     s.value = { ...clone(defaultSettings), ...data }
+    // 仅迁移历史默认色；用户选择的其它自定义强调色保持不变。
+    if (data.accent === '#0a84ff' || data.accent === '#2f6b63') {
+      s.value.accent = defaultSettings.accent
+    }
     loaded.value = true
     applyTheme()
   }

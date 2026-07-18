@@ -24,7 +24,7 @@ const sample = {
       { id: 'p6', name: '第 6 节', start: '14:55', end: '15:40' }
     ],
     lessons: [
-      { id: 'a', day: 1, periodId: 'p1', name: '高等数学', teacher: '王', location: 'A101', color: '#0a84ff' },
+      { id: 'a', day: 1, periodId: 'p1', name: '高等数学', teacher: '王', location: 'A101', color: '#77b5e8' },
       { id: 'b', day: 1, periodId: 'p2', name: '大学英语', teacher: '李', location: 'B202', color: '#30d158' },
       { id: 'c', day: 2, periodId: 'p3', name: '线性代数', teacher: '张', location: 'A305', color: '#ff9f0a' },
       { id: 'd', day: 3, periodId: 'p1', name: '数据结构', teacher: '陈', location: 'C401', color: '#bf5af2' },
@@ -73,14 +73,14 @@ const sample = {
     ]
   },
   garden: (() => {
-    const species = ['evergreen', 'pine', 'sakura', 'maple', 'evergreen', 'sakura', 'pine', 'evergreen']
+    const species = ['evergreen', 'pine', 'sakura', 'maple', 'palm', 'xmas', 'evergreen', 'sakura']
     const trees = []
-    for (let i = 0; i < 21; i++) {
-      const growth = i < 15 ? 3 : i < 19 ? 1 : 0
+    for (let i = 0; i < 22; i++) {
+      const growth = i < 12 ? 3 : i < 19 ? 1 : 0
       trees.push({
         id: 't' + i,
         species: species[i % species.length],
-        at: Date.now() - (21 - i) * 5400e3,
+        at: Date.now() - (22 - i) * 5400e3,
         focusMinutes: 25,
         growth,
         golden: i === 7,
@@ -91,7 +91,7 @@ const sample = {
     return {
       coins: 86,
       trees,
-      unlocked: ['evergreen', 'pine', 'sakura', 'maple'],
+      unlocked: ['evergreen', 'pine', 'sakura', 'maple', 'palm', 'xmas'],
       current: 'sakura',
       streak: 6,
       lastRewardDate: dkey(0),
@@ -103,9 +103,12 @@ const sample = {
         { id: 'collector', unlockedAt: Date.now() - 2 * 86400e3 }
       ],
       decors: [
-        { id: 'd1', kind: 'lantern', plot: 23 },
+        { id: 'd1', kind: 'lantern', plot: 25 },
         { id: 'd2', kind: 'pond', plot: 30 },
-        { id: 'd3', kind: 'bench', plot: 37 }
+        { id: 'd3', kind: 'bench', plot: 33 },
+        { id: 'd4', kind: 'fountain', plot: 36 },
+        { id: 'd5', kind: 'tent', plot: 41 },
+        { id: 'd6', kind: 'windchime', plot: 44 }
       ],
       decorOwned: { windchime: 1 },
       quests: [],
@@ -116,8 +119,8 @@ const sample = {
   countdowns: {
     items: [
       { id: 'c1', title: '期末考试', date: dkey(-12), color: '#ff453a', bg: '' },
-      { id: 'c2', title: '英语六级', date: dkey(-30), color: '#0a84ff', bg: '' },
-      { id: 'c3', title: '寒假', date: dkey(-45), color: '#30d158', bg: '' }
+      { id: 'c2', title: '英语六级', date: dkey(-30), color: '#77b5e8', bg: '' },
+      { id: 'c3', title: '寒假', date: dkey(-45), color: '#67bfa4', bg: '' }
     ]
   }
 }
@@ -125,7 +128,7 @@ const sample = {
 function settingsFor() {
   return {
     theme: currentTheme,
-    accent: '#0a84ff',
+    accent: '#4fae98',
     appBg: '',
     appBgOpacity: 0.18,
     bell: { enabled: true, onSound: '', offSound: '', volume: 0.8 },
@@ -141,8 +144,10 @@ function settingsFor() {
 ipcMain.handle('store:get', (_e, name) => (name === 'settings' ? settingsFor() : sample[name] ?? {}))
 ipcMain.handle('store:set', () => true)
 ipcMain.handle('fs:exists', () => true)
+ipcMain.handle('online:search', () => [])
+ipcMain.handle('media:download', () => '')
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 3 }))
-ipcMain.handle('app:getVersion', () => '0.2.0')
+ipcMain.handle('app:getVersion', () => '0.2.1')
 ipcMain.handle('autostart:get', () => false)
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
@@ -157,7 +162,7 @@ const shots = [
   { route: '', theme: 'dark', name: 'dashboard-dark' },
   { route: '/timetable', theme: 'light', name: 'timetable' },
   { route: '/pomodoro', theme: 'dark', name: 'pomodoro' },
-  { route: '/garden', theme: 'light', name: 'garden' },
+  { route: '/garden', theme: 'light', name: 'garden', scrollTo: '.plot-grid' },
   { route: '/bookshelf', theme: 'light', name: 'bookshelf' },
   { route: '/countdown', theme: 'light', name: 'countdown' },
   { route: '/todo', theme: 'light', name: 'todo' },
@@ -183,7 +188,7 @@ app.whenReady().then(async () => {
       show: true,
       x: 40,
       y: 40,
-      backgroundColor: s.theme === 'dark' ? '#201d29' : '#eef0f4',
+      backgroundColor: s.theme === 'dark' ? '#202925' : '#f5f5ef',
       webPreferences: {
         preload: join(__dirname, '../out/preload/index.js'),
         sandbox: false,
@@ -192,6 +197,12 @@ app.whenReady().then(async () => {
     })
     await win.loadURL(s.route ? `${base}#${s.route}` : base)
     await wait(1500)
+    if (s.scrollTo) {
+      await win.webContents.executeJavaScript(
+        `document.querySelector('${s.scrollTo}')?.scrollIntoView({ block: 'center' })`
+      )
+      await wait(400)
+    }
     const img = await win.webContents.capturePage()
     writeFileSync(join(dir, `${s.name}.png`), img.toPNG())
     win.destroy()

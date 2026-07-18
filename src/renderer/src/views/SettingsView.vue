@@ -17,7 +17,7 @@ const themes: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' }
 ]
-const accents = ['#0a84ff', '#30d158', '#ff453a', '#ff9f0a', '#bf5af2', '#ff375f']
+const accents = ['#4fae98', '#77b5e8', '#f28b82', '#e2a33e', '#a88ad8', '#e887b0']
 
 const version = ref('0.1.0')
 const updateState = ref('')

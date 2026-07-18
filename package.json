@@ -20,6 +20,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "vitest run",
     "smoke": "electron scripts/smoke.cjs",
+    "gen:icon": "electron scripts/gen-icon.cjs",
     "build:win": "electron-vite build && electron-builder --win",
     "build:dir": "electron-vite build && electron-builder --dir"
   },

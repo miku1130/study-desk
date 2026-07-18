@@ -54,8 +54,8 @@ export function useGlobalEffects(): void {
             const sp = TREE_SPECIES.find((s) => s.id === r.species)
             ui.success(
               r.golden
-                ? `幸运！种下一棵金色${sp?.name ?? '树'} ${sp?.emoji ?? ''}，金币 +${r.coins}`
-                : `专注完成，种下一棵${sp?.name ?? '树'} ${sp?.emoji ?? ''}，金币 +${r.coins}`
+                ? `幸运！种下一棵金色${sp?.name ?? '树'}，金币 +${r.coins}`
+                : `专注完成，种下一棵${sp?.name ?? '树'}，金币 +${r.coins}`
             )
           }
         }

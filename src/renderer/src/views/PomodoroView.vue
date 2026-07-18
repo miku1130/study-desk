@@ -5,6 +5,7 @@ import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
 import { useTodoStore } from '@/stores/todos'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
 
 const pomodoro = usePomodoroStore()
@@ -116,8 +117,12 @@ function testSound(): void {
       <div v-if="todos.activeItem" class="bound-task">
         <span class="bound-label">正在专注</span>
         <strong>{{ todos.activeItem.text }}</strong>
-        <span class="bound-count">🍅 {{ todos.activeItem.pomodoros }}{{ todos.activeItem.estimatePomodoros ? ` / ${todos.activeItem.estimatePomodoros}` : '' }}</span>
-        <button class="bound-clear" title="解除绑定" @click="todos.focusOn(todos.activeId)">✕</button>
+        <span class="bound-count">
+          <AppIcon name="tomato" :size="12" />{{ todos.activeItem.pomodoros }}{{ todos.activeItem.estimatePomodoros ? ` / ${todos.activeItem.estimatePomodoros}` : '' }}
+        </span>
+        <button class="bound-clear" title="解除绑定" @click="todos.focusOn(todos.activeId)">
+          <AppIcon name="x" :size="12" />
+        </button>
       </div>
       <button v-else class="bound-empty" @click="router.push('/todo')">
         绑定一个任务，完成的番茄会自动记到它头上 →
@@ -142,11 +147,16 @@ function testSound(): void {
         </div>
       </div>
       <div class="controls">
-        <button class="btn-icon lg" aria-label="重置" @click="pomodoro.reset()">↺</button>
+        <button class="btn-icon lg" aria-label="重置" title="重置" @click="pomodoro.reset()">
+          <AppIcon name="rotate-ccw" :size="18" />
+        </button>
         <button class="btn play" @click="pomodoro.toggle()">
+          <AppIcon :name="pomodoro.running ? 'pause' : 'play'" :size="15" :stroke-width="2.1" />
           {{ pomodoro.running ? '暂停' : '开始' }}
         </button>
-        <button class="btn-icon lg" aria-label="跳过" @click="pomodoro.skip()">⏭</button>
+        <button class="btn-icon lg" aria-label="跳过" title="跳过当前阶段" @click="pomodoro.skip()">
+          <AppIcon name="skip-forward" :size="18" />
+        </button>
       </div>
       <button class="btn btn-secondary btn-sm clock-summon" @click="toggleClockWidget">
         呼出时钟小浮窗
@@ -337,6 +347,9 @@ function testSound(): void {
   white-space: nowrap;
 }
 .bound-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-secondary);
   flex-shrink: 0;
 }

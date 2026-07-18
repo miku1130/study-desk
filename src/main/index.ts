@@ -9,7 +9,8 @@ import {
   Notification,
   dialog,
   globalShortcut,
-  nativeImage
+  nativeImage,
+  type NativeImage
 } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -102,7 +103,20 @@ async function resolvePlaylist(input: string): Promise<{ server: string; id: str
   return null
 }
 
+function resolveAppIcon(): NativeImage | undefined {
+  const candidates = [
+    join(process.resourcesPath, 'icon.png'),
+    join(app.getAppPath(), 'build', 'icon.png'),
+    join(__dirname, '../../build/icon.png')
+  ]
+  const p = candidates.find((c) => existsSync(c))
+  if (!p) return undefined
+  const img = nativeImage.createFromPath(p)
+  return img.isEmpty() ? undefined : img
+}
+
 function createWindow(): void {
+  const icon = resolveAppIcon()
   mainWindow = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -111,8 +125,9 @@ function createWindow(): void {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1b1b1d' : '#eceef2',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#202925' : '#f5f5ef',
     autoHideMenuBar: true,
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -162,15 +177,8 @@ function trayHandlers(): TrayHandlers {
 
 /** 启动即用内置图标创建托盘，保证关闭窗口隐藏到托盘后一定能恢复；找不到图标则回退到渲染层创建。 */
 function initTray(): void {
-  const candidates = [
-    join(process.resourcesPath, 'icon.png'),
-    join(app.getAppPath(), 'build', 'icon.png'),
-    join(__dirname, '../../build/icon.png')
-  ]
-  const p = candidates.find((c) => existsSync(c))
-  if (!p) return
-  const img = nativeImage.createFromPath(p)
-  if (img.isEmpty()) return
+  const img = resolveAppIcon()
+  if (!img) return
   setupTray(img.resize({ width: 16, height: 16 }), trayHandlers())
 }
 

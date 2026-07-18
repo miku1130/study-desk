@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
+import AppLogo from '@/components/AppLogo.vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 
 interface NavItem {
@@ -18,7 +19,7 @@ const QQ_GROUP = '1076144676'
 
 const router = useRouter()
 const pomodoro = usePomodoroStore()
-const version = ref('')
+const version = shallowRef('')
 
 onMounted(async () => {
   version.value = await window.api.app.getVersion()
@@ -129,8 +130,8 @@ const groups: NavGroup[] = [
 <template>
   <aside class="sidebar">
     <div class="sidebar-top">
-      <div class="brand-mark">S</div>
-      <div>
+      <AppLogo :size="38" />
+      <div class="brand-lockup">
         <span class="brand">学习桌面</span>
         <span class="brand-sub">StudyDesk</span>
       </div>
@@ -169,18 +170,32 @@ const groups: NavGroup[] = [
 </template>
 
 <style scoped>
+.brand-lockup {
+  min-width: 0;
+}
 .mini-timer {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 12px 8px;
-  padding: 9px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
-  border-radius: 12px;
-  background: var(--accent-soft);
+  margin: 0 10px 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--nav-active-border);
+  border-radius: 9px;
+  background: var(--nav-active-bg);
   color: var(--text-primary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
+  overflow: hidden;
+}
+.mini-timer::before {
+  content: '';
+  position: absolute;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
 }
 .mini-timer strong {
   margin-left: auto;
@@ -191,19 +206,19 @@ const groups: NavGroup[] = [
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #30d158;
+  background: var(--status-success);
   animation: mini-pulse 1.6s infinite;
 }
 .mini-timer.paused .mini-dot {
-  background: #ff9f0a;
+  background: var(--status-warning);
   animation: none;
 }
 .mini-phase {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 @keyframes mini-pulse {
   50% {
-    box-shadow: 0 0 0 4px rgba(48, 209, 88, 0.18);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-success) 18%, transparent);
   }
 }
 </style>

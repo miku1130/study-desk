@@ -56,8 +56,8 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
-  theme: 'system',
-  accent: '#0a84ff',
+  theme: 'light',
+  accent: '#4fae98',
   appBg: '',
   appBgOpacity: 0.18,
   bell: { enabled: false, onSound: 'chime:school-bell', offSound: 'chime:westminster', volume: 0.8 },
@@ -148,10 +148,10 @@ export interface PriorityMeta {
 }
 
 export const PRIORITIES: PriorityMeta[] = [
-  { value: 3, label: '高', color: '#ff453a' },
-  { value: 2, label: '中', color: '#ff9f0a' },
-  { value: 1, label: '低', color: '#0a84ff' },
-  { value: 0, label: '无', color: '#8e8e93' }
+  { value: 3, label: '高', color: '#e2736b' },
+  { value: 2, label: '中', color: '#e2a33e' },
+  { value: 1, label: '低', color: '#5c9fd8' },
+  { value: 0, label: '无', color: '#8c9c94' }
 ]
 
 export interface TodoItem {
@@ -252,19 +252,18 @@ export interface CountdownData {
 export interface TreeSpecies {
   id: string
   name: string
-  emoji: string
   cost: number
   biome: string
   rarity: 'common' | 'rare' | 'epic'
 }
 
 export const TREE_SPECIES: TreeSpecies[] = [
-  { id: 'evergreen', name: '常青树', emoji: '🌳', cost: 0, biome: '晨雾林地', rarity: 'common' },
-  { id: 'pine', name: '松树', emoji: '🌲', cost: 30, biome: '山脊针叶林', rarity: 'common' },
-  { id: 'sakura', name: '樱花树', emoji: '🌸', cost: 40, biome: '春日溪谷', rarity: 'rare' },
-  { id: 'palm', name: '椰子树', emoji: '🌴', cost: 60, biome: '海风沙洲', rarity: 'rare' },
-  { id: 'maple', name: '枫树', emoji: '🍁', cost: 60, biome: '秋色坡地', rarity: 'rare' },
-  { id: 'xmas', name: '圣诞树', emoji: '🎄', cost: 90, biome: '雪夜营地', rarity: 'epic' }
+  { id: 'evergreen', name: '常青树', cost: 0, biome: '晨雾林地', rarity: 'common' },
+  { id: 'pine', name: '松树', cost: 30, biome: '山脊针叶林', rarity: 'common' },
+  { id: 'sakura', name: '樱花树', cost: 40, biome: '春日溪谷', rarity: 'rare' },
+  { id: 'palm', name: '椰子树', cost: 60, biome: '海风沙洲', rarity: 'rare' },
+  { id: 'maple', name: '枫树', cost: 60, biome: '秋色坡地', rarity: 'rare' },
+  { id: 'xmas', name: '圣诞树', cost: 90, biome: '雪夜营地', rarity: 'epic' }
 ]
 
 export type TreeMood = 'sprout' | 'growing' | 'mature' | 'glow'
@@ -293,18 +292,17 @@ export interface GardenAchievement {
 export interface DecorSpec {
   id: string
   name: string
-  emoji: string
   cost: number
   desc: string
 }
 
 export const DECOR_ITEMS: DecorSpec[] = [
-  { id: 'lantern', name: '石灯笼', emoji: '🏮', cost: 25, desc: '夜里为花园留一盏灯' },
-  { id: 'bench', name: '木长椅', emoji: '🪑', cost: 30, desc: '坐下来看看自己种的树' },
-  { id: 'windchime', name: '风铃', emoji: '🎐', cost: 40, desc: '风吹过便有清脆铃声' },
-  { id: 'pond', name: '莲花池', emoji: '🪷', cost: 45, desc: '水面倒映着专注时光' },
-  { id: 'fountain', name: '喷泉', emoji: '⛲', cost: 60, desc: '花园的中心景观' },
-  { id: 'tent', name: '露营帐篷', emoji: '⛺', cost: 80, desc: '在森林里过夜的浪漫' }
+  { id: 'lantern', name: '石灯笼', cost: 25, desc: '夜里为花园留一盏灯' },
+  { id: 'bench', name: '木长椅', cost: 30, desc: '坐下来看看自己种的树' },
+  { id: 'windchime', name: '风铃', cost: 40, desc: '风吹过便有清脆铃声' },
+  { id: 'pond', name: '莲花池', cost: 45, desc: '水面倒映着专注时光' },
+  { id: 'fountain', name: '喷泉', cost: 60, desc: '花园的中心景观' },
+  { id: 'tent', name: '露营帐篷', cost: 80, desc: '在森林里过夜的浪漫' }
 ]
 
 export interface GardenDecor {
@@ -354,14 +352,14 @@ export interface PomodoroState {
 export const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 export const LESSON_COLORS = [
-  '#0a84ff',
-  '#30d158',
-  '#ff9f0a',
-  '#ff453a',
-  '#bf5af2',
-  '#5ac8fa',
-  '#ff375f',
-  '#64d2ff'
+  '#77b5e8',
+  '#67bfa4',
+  '#f6c85f',
+  '#f28b82',
+  '#a88ad8',
+  '#5bc0d1',
+  '#e887b0',
+  '#8bc6a3'
 ]
 
 export const uid = (): string =>

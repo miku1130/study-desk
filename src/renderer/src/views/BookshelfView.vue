@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import AppModal from '@/components/AppModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import BookCover from '@/components/BookCover.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useBooksStore } from '@/stores/books'
 import { useUiStore } from '@/stores/ui'
 import type { Book, BookStatus } from '@/types'
@@ -18,7 +21,7 @@ const selectedId = ref('')
 
 const statusTabs: { key: FilterStatus; label: string }[] = [
   { key: 'all', label: '全部' },
-  { key: 'favorite', label: '⭐ 收藏' },
+  { key: 'favorite', label: '收藏' },
   { key: 'reading', label: '在读' },
   { key: 'finished', label: '读完' },
   { key: 'reference', label: '资料' },
@@ -73,22 +76,6 @@ watch(filtered, (list) => {
   if (!list.length) selectedId.value = ''
   else if (!list.some((book) => book.id === selectedId.value)) selectedId.value = list[0].id
 })
-
-function ext(name: string): string {
-  const match = name.match(/\.([^.]+)$/)
-  return match ? match[1].toUpperCase() : 'FILE'
-}
-
-function extColor(name: string): string {
-  const e = ext(name).toLowerCase()
-  if (e === 'pdf') return '#ff5f57'
-  if (['doc', 'docx'].includes(e)) return '#0a84ff'
-  if (['ppt', 'pptx'].includes(e)) return '#ff9f0a'
-  if (['xls', 'xlsx'].includes(e)) return '#30d158'
-  if (['epub', 'mobi', 'azw3'].includes(e)) return '#bf5af2'
-  if (['md', 'txt'].includes(e)) return '#64d2ff'
-  return '#8e8e93'
-}
 
 function formatDate(ts: number): string {
   if (!ts) return '尚未打开'
@@ -284,8 +271,8 @@ function setProgress(book: Book, event: Event): void {
       class="continue-strip card"
       @click="selectedId = books.continueReading.id"
     >
-      <div class="cs-cover" :style="{ '--cover': extColor(books.continueReading.name) }">
-        {{ ext(books.continueReading.name) }}
+      <div class="cs-cover">
+        <BookCover :name="books.continueReading.name" compact />
       </div>
       <div class="cs-main">
         <p class="cs-label">继续阅读</p>
@@ -364,8 +351,8 @@ function setProgress(book: Book, event: Event): void {
             @click="selectedId = book.id"
             @dblclick="openBook(book)"
           >
-            <div class="book-cover" :style="{ '--cover': extColor(book.name) }">
-              <span class="book-ext">{{ ext(book.name) }}</span>
+            <div class="book-cover">
+              <BookCover :name="book.name" compact />
               <span class="book-progress">{{ book.progress }}%</span>
               <button
                 class="fav-btn"
@@ -373,7 +360,7 @@ function setProgress(book: Book, event: Event): void {
                 :title="book.favorite ? '取消收藏' : '收藏'"
                 @click.stop="books.toggleFavorite(book.id)"
               >
-                ★
+                <AppIcon name="star" :size="13" :stroke-width="2" />
               </button>
               <span v-if="isMissing(book)" class="missing-badge">文件丢失</span>
             </div>
@@ -383,22 +370,22 @@ function setProgress(book: Book, event: Event): void {
               <div class="progress-line"><span :style="{ width: book.progress + '%' }" /></div>
               <div class="book-meta">
                 <span class="state" :class="statusClass[book.status]">{{ statusLabel[book.status] }}</span>
-                <span>{{ book.rating ? '★'.repeat(book.rating) : '未评分' }}</span>
+                <span v-if="book.rating" class="rate"><AppIcon name="star" :size="11" />{{ book.rating }}.0</span>
+                <span v-else class="rate muted">未评分</span>
               </div>
             </div>
           </article>
         </div>
-        <div v-else class="empty-state compact-empty">
-          <div class="emoji">📚</div>
-          <h2>还没有匹配资料</h2>
-          <p>添加 PDF / 电子书 / 课件 / 笔记后，可以按进度、分类和标签整理。</p>
-          <button class="btn" @click="addBooks">添加资料</button>
+        <div v-else class="compact-empty">
+          <EmptyState icon="book" title="还没有匹配资料" desc="添加 PDF / 电子书 / 课件 / 笔记后，可以按进度、分类和标签整理。">
+            <button class="btn" @click="addBooks">添加资料</button>
+          </EmptyState>
         </div>
       </section>
 
       <aside v-if="selected" class="detail-panel card">
-        <div class="detail-cover" :style="{ '--cover': extColor(selected.name) }">
-          <span>{{ ext(selected.name) }}</span>
+        <div class="detail-cover">
+          <BookCover :name="selected.name" />
         </div>
         <div class="detail-main">
           <p class="detail-kicker">{{ selected.category }}</p>
@@ -409,7 +396,7 @@ function setProgress(book: Book, event: Event): void {
               :title="selected.favorite ? '取消收藏' : '收藏'"
               @click="books.toggleFavorite(selected.id)"
             >
-              ★
+              <AppIcon name="star" :size="16" :stroke-width="2" />
             </button>
             {{ selected.name }}
           </h2>
@@ -417,7 +404,7 @@ function setProgress(book: Book, event: Event): void {
         </div>
 
         <p v-if="isMissing(selected)" class="missing-tip">
-          ⚠ 源文件不存在（可能被移动或删除）
+          <span class="mt-text"><AppIcon name="warning" :size="13" />源文件不存在（可能被移动或删除）</span>
           <button class="btn btn-secondary btn-sm" @click="relocateBook(selected)">重新定位</button>
         </p>
 
@@ -428,7 +415,8 @@ function setProgress(book: Book, event: Event): void {
             :class="{ 'timer-on': books.readingId === selected.id }"
             @click="toggleTimer(selected)"
           >
-            {{ books.readingId === selected.id ? `⏹ ${readingElapsed}` : '⏱ 计时阅读' }}
+            <AppIcon :name="books.readingId === selected.id ? 'pause' : 'timer'" :size="13" />
+            {{ books.readingId === selected.id ? readingElapsed : '计时阅读' }}
           </button>
           <button class="btn btn-secondary" @click="openEdit(selected)">编辑</button>
         </div>
@@ -575,23 +563,34 @@ function setProgress(book: Book, event: Event): void {
   max-width: 1180px;
 }
 .library-hero {
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 14px;
-  padding: 10px 4px 0;
+  margin-bottom: 16px;
+  padding: 12px 4px 2px 18px;
+}
+.library-hero::before {
+  content: '';
+  position: absolute;
+  inset-block: 12px 2px;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(var(--brand-highlight), var(--accent));
 }
 .eyebrow {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 750;
+  letter-spacing: 0.07em;
   margin-bottom: 6px;
 }
 .library-hero h2 {
-  font-size: 27px;
-  letter-spacing: 0;
-  line-height: 1.18;
+  font-size: 26px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   max-width: 620px;
 }
 .hero-copy {
@@ -604,47 +603,51 @@ function setProgress(book: Book, event: Event): void {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 16px;
+  padding: 13px 16px;
   margin-bottom: 12px;
   cursor: pointer;
 }
+.continue-strip {
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--brand-sky) 11%, transparent), transparent 38%),
+    linear-gradient(290deg, color-mix(in srgb, var(--brand-peach) 9%, transparent), transparent 34%),
+    var(--surface-card);
+}
 .reading-strip {
   cursor: default;
-  border-color: color-mix(in srgb, #30d158 45%, transparent);
-  background: linear-gradient(135deg, rgba(48, 209, 88, 0.12), var(--bg-card));
+  border-color: color-mix(in srgb, var(--status-success) 42%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--status-success) 9%, transparent), var(--surface-card));
 }
 .reading-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #30d158;
+  background: var(--status-success);
   flex-shrink: 0;
   animation: reading-pulse 1.4s infinite;
 }
 @keyframes reading-pulse {
   50% {
-    box-shadow: 0 0 0 6px rgba(48, 209, 88, 0.14);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--status-success) 14%, transparent);
   }
 }
 .cs-cover {
   width: 46px;
-  height: 58px;
-  border-radius: 9px;
-  background: linear-gradient(145deg, var(--cover), color-mix(in srgb, var(--cover) 70%, #111));
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 60px;
   flex-shrink: 0;
+  font-size: 14px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.16));
+}
+/* 小尺寸封面放不下类型徽章 */
+.cs-cover :deep(.bk-type) {
+  display: none;
 }
 .cs-main {
   flex: 1;
   min-width: 0;
 }
 .cs-label {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 11.5px;
   font-weight: 800;
   margin-bottom: 3px;
@@ -681,10 +684,31 @@ function setProgress(book: Book, event: Event): void {
   margin-bottom: 14px;
 }
 .metric {
+  position: relative;
+  overflow: hidden;
   padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--separator);
+  border-radius: 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+}
+.metric::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+.metric:nth-child(2)::before {
+  background: var(--brand-sky);
+}
+.metric:nth-child(3)::before {
+  background: var(--brand-sun);
+}
+.metric:nth-child(4)::before {
+  background: var(--brand-peach);
+}
+.metric:nth-child(5)::before {
+  background: var(--brand-lilac);
 }
 .metric-label {
   display: block;
@@ -694,6 +718,7 @@ function setProgress(book: Book, event: Event): void {
 }
 .metric strong {
   font-size: 23px;
+  font-variant-numeric: tabular-nums;
 }
 .metric strong small {
   font-size: 12px;
@@ -722,6 +747,7 @@ function setProgress(book: Book, event: Event): void {
 .shelf-panel {
   min-height: 520px;
   padding: 14px;
+  background: color-mix(in srgb, var(--surface-card) 90%, transparent);
 }
 .book-grid {
   display: grid;
@@ -730,45 +756,36 @@ function setProgress(book: Book, event: Event): void {
 }
 .book-card {
   min-height: 236px;
-  border: 1px solid var(--separator);
-  border-radius: 14px;
-  background: var(--bg-card-strong);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-raised);
   padding: 12px;
   cursor: pointer;
   transition: transform 0.16s var(--ease), border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
 }
 .book-card:hover,
 .book-card.active {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  box-shadow: 0 10px 24px rgba(27, 36, 32, 0.09);
+}
+.book-card.active {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 50%),
+    var(--surface-raised);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 10px 24px rgba(27, 36, 32, 0.09);
 }
 .book-card.missing {
   opacity: 0.75;
 }
 .book-cover {
   position: relative;
-  height: 116px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 128px;
   margin-bottom: 12px;
-  background: linear-gradient(145deg, var(--cover), color-mix(in srgb, var(--cover) 70%, #111));
-  color: #fff;
-  overflow: hidden;
-}
-.book-cover::before {
-  content: '';
-  position: absolute;
-  inset: 12px auto 12px 12px;
-  width: 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.22);
-}
-.book-ext {
-  font-size: 19px;
-  font-weight: 900;
+  font-size: 22px;
+  filter: drop-shadow(0 7px 10px rgba(28, 36, 32, 0.12));
 }
 .book-progress {
   position: absolute;
@@ -782,24 +799,30 @@ function setProgress(book: Book, event: Event): void {
 }
 .fav-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 25px;
-  height: 25px;
+  top: 7px;
+  left: 7px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.26);
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 13px;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.62);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   transition: opacity 0.15s var(--ease), color 0.15s var(--ease);
+  backdrop-filter: blur(4px);
 }
 .book-card:hover .fav-btn,
 .fav-btn.on {
   opacity: 1;
 }
 .fav-btn.on {
-  color: #ffd60a;
+  color: #f5c84c;
+}
+.fav-btn.on :deep(svg) {
+  fill: #f5c84c;
 }
 .missing-badge {
   position: absolute;
@@ -845,21 +868,41 @@ function setProgress(book: Book, event: Event): void {
 .book-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
   color: var(--text-tertiary);
   font-size: 11.5px;
+}
+.rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #b8891f;
+  font-weight: 700;
+}
+.rate :deep(svg) {
+  fill: #f5c84c;
+  color: #d9a72e;
+}
+.rate.muted {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+.rate.muted :deep(svg) {
+  fill: none;
+  color: var(--text-tertiary);
 }
 .state {
   font-weight: 700;
 }
 .is-blue {
-  color: #0a84ff;
+  color: #4f97cc;
 }
 .is-green {
-  color: #30d158;
+  color: var(--status-success);
 }
 .is-violet {
-  color: #bf5af2;
+  color: #715b83;
 }
 .is-muted {
   color: var(--text-tertiary);
@@ -868,18 +911,14 @@ function setProgress(book: Book, event: Event): void {
   position: sticky;
   top: 0;
   padding: 18px;
+  background: var(--surface-card);
 }
 .detail-cover {
-  height: 118px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, var(--cover), color-mix(in srgb, var(--cover) 58%, #111));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 26px;
-  font-weight: 900;
-  margin-bottom: 14px;
+  width: 126px;
+  height: 164px;
+  margin: 0 auto 14px;
+  font-size: 24px;
+  filter: drop-shadow(0 12px 18px rgba(26, 35, 31, 0.16));
 }
 .detail-main h2 {
   font-size: 18px;
@@ -892,12 +931,15 @@ function setProgress(book: Book, event: Event): void {
   border: none;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 17px;
-  padding: 0;
+  padding: 1px 0 0;
   flex-shrink: 0;
+  display: inline-flex;
 }
 .fav-inline.on {
-  color: #ffd60a;
+  color: #d9a72e;
+}
+.fav-inline.on :deep(svg) {
+  fill: #f5c84c;
 }
 .detail-kicker,
 .detail-sub,
@@ -908,7 +950,7 @@ function setProgress(book: Book, event: Event): void {
 .detail-kicker {
   margin-bottom: 5px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 .detail-sub {
   margin-top: 5px;
@@ -921,10 +963,16 @@ function setProgress(book: Book, event: Event): void {
   margin-top: 12px;
   padding: 9px 12px;
   border-radius: 11px;
-  background: rgba(255, 69, 58, 0.12);
-  color: #ff453a;
+  background: color-mix(in srgb, var(--status-danger) 11%, transparent);
+  color: var(--status-danger);
   font-size: 12.5px;
   font-weight: 700;
+}
+.mt-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .detail-actions {
   display: grid;
@@ -933,8 +981,8 @@ function setProgress(book: Book, event: Event): void {
   margin: 14px 0;
 }
 .timer-on {
-  border-color: #30d158;
-  color: #30d158;
+  border-color: var(--status-success);
+  color: var(--status-success);
   font-variant-numeric: tabular-nums;
 }
 .progress-editor {
@@ -974,7 +1022,8 @@ function setProgress(book: Book, event: Event): void {
 .detail-facts div {
   padding: 9px 7px;
   border-radius: 10px;
-  background: var(--bg-input);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
   text-align: center;
 }
 .detail-facts span {
@@ -996,7 +1045,7 @@ function setProgress(book: Book, event: Event): void {
   padding: 4px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 11.5px;
   font-weight: 700;
 }
@@ -1040,7 +1089,7 @@ function setProgress(book: Book, event: Event): void {
 .note-item {
   padding: 10px 12px;
   border-radius: 11px;
-  background: var(--bg-input);
+  background: var(--surface-muted);
   border-left: 3px solid var(--accent);
 }
 .note-text {
@@ -1076,7 +1125,7 @@ function setProgress(book: Book, event: Event): void {
   justify-content: space-between;
   padding: 7px 10px;
   border-radius: 9px;
-  background: var(--bg-input);
+  background: var(--surface-muted);
   font-size: 12px;
   color: var(--text-secondary);
 }
@@ -1098,6 +1147,9 @@ function setProgress(book: Book, event: Event): void {
 }
 .compact-empty {
   min-height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .form {
   display: flex;
