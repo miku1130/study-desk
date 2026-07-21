@@ -306,7 +306,9 @@ async function importTimetable(): Promise<void> {
       <div v-if="settings.s.appBg" class="setting-row">
         <div>
           <p class="s-title">界面透明度</p>
-          <p class="s-sub">{{ Math.round(settings.s.appBgOpacity * 100) }}%</p>
+          <p class="s-sub">
+            {{ Math.round(settings.s.appBgOpacity * 100) }}% · 100% 时侧边栏与内容底板完全透明
+          </p>
         </div>
         <input
           type="range"

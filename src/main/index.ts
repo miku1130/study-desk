@@ -47,6 +47,16 @@ let waterReminder: WaterReminder
 let healthReminder: HealthReminder
 let todoReminder: TodoReminder
 
+function setAutostart(openAtLogin: boolean): void {
+  // Development runs use Electron's executable directly. Registering it without
+  // the packaged app would create a stray "electron.app.Electron" startup item.
+  app.setLoginItemSettings({ openAtLogin: app.isPackaged && openAtLogin })
+}
+
+function getAutostart(): boolean {
+  return app.isPackaged && app.getLoginItemSettings().openAtLogin
+}
+
 function sendToAll(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send(channel, ...args)
@@ -251,7 +261,7 @@ function registerIpc(): void {
       waterReminder.reload()
       healthReminder.reload()
       registerShortcuts()
-      app.setLoginItemSettings({ openAtLogin: Boolean(value.autostart) })
+      setAutostart(Boolean(value.autostart))
       const pcfg = value.pomodoro as { lockscreen?: boolean } | undefined
       if (!pcfg?.lockscreen) closeLock()
       if (value.widget) openWidget()
@@ -378,9 +388,9 @@ function registerIpc(): void {
     setupTrayFromDataUrl(dataUrl, trayHandlers())
   })
 
-  ipcMain.handle('autostart:get', () => app.getLoginItemSettings().openAtLogin)
+  ipcMain.handle('autostart:get', () => getAutostart())
   ipcMain.handle('autostart:set', (_e, v: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: v })
+    setAutostart(v)
     return v
   })
 
@@ -424,7 +434,7 @@ function registerIpc(): void {
       waterReminder.reload()
       healthReminder.reload()
       registerShortcuts()
-      app.setLoginItemSettings({ openAtLogin: Boolean(s.autostart) })
+      setAutostart(Boolean(s.autostart))
       sendToAll('data:reloaded')
       return true
     } catch {
@@ -519,7 +529,7 @@ app.whenReady().then(() => {
 
   registerIpc()
   registerShortcuts()
-  app.setLoginItemSettings({ openAtLogin: Boolean(stores.settings.get('autostart')) })
+  setAutostart(Boolean(stores.settings.get('autostart')))
   createWindow()
   initTray()
   if (stores.settings.get('widget')) openWidget()

@@ -46,6 +46,16 @@ a {
 
 /* ===== 应用外壳 ===== */
 .app-shell {
+  --surface-sidebar: rgb(255 252 247 / var(--glass-sidebar-alpha, 0.96));
+  --surface-content: rgb(249 251 247 / var(--glass-content-alpha, 0.94));
+  --surface-card: rgb(255 255 255 / var(--glass-card-alpha, 0.92));
+  --surface-raised: rgb(255 255 255 / var(--glass-raised-alpha, 1));
+  --surface-muted: rgb(241 247 243 / var(--glass-muted-alpha, 1));
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-content: var(--surface-content);
+  --bg-card: var(--surface-card);
+  --bg-card-strong: var(--surface-raised);
+  --bg-input: var(--surface-muted);
   display: flex;
   height: 100vh;
   width: 100vw;
@@ -55,6 +65,14 @@ a {
     radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--brand-sky) 15%, transparent), transparent 25%),
     radial-gradient(circle at 68% 108%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 32%),
     var(--surface-canvas);
+}
+
+:root[data-theme="dark"] .app-shell {
+  --surface-sidebar: rgb(38 49 44 / var(--glass-sidebar-alpha, 0.96));
+  --surface-content: rgb(33 43 39 / var(--glass-content-alpha, 0.94));
+  --surface-card: rgb(45 57 52 / var(--glass-card-alpha, 0.92));
+  --surface-raised: rgb(55 70 64 / var(--glass-raised-alpha, 1));
+  --surface-muted: rgb(51 65 60 / var(--glass-muted-alpha, 1));
 }
 
 .app-bg {
@@ -71,14 +89,16 @@ a {
   width: var(--sidebar-w);
   flex-shrink: 0;
   background: var(--surface-sidebar);
-  -webkit-backdrop-filter: blur(28px) saturate(125%);
-  backdrop-filter: blur(28px) saturate(125%);
+  -webkit-backdrop-filter: blur(var(--glass-sidebar-blur, 28px))
+    saturate(var(--glass-sidebar-saturation, 125%));
+  backdrop-filter: blur(var(--glass-sidebar-blur, 28px))
+    saturate(var(--glass-sidebar-saturation, 125%));
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   position: relative;
   z-index: 1;
-  box-shadow: 6px 0 30px rgba(96, 139, 119, 0.045);
+  box-shadow: 6px 0 30px rgb(96 139 119 / var(--glass-sidebar-shadow-alpha, 0.045));
 }
 
 .sidebar-top {
@@ -271,8 +291,8 @@ a {
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-content) 82%, transparent);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(var(--glass-toolbar-blur, 18px));
+  backdrop-filter: blur(var(--glass-toolbar-blur, 18px));
 }
 
 .toolbar-title {

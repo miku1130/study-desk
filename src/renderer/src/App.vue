@@ -48,7 +48,11 @@ const appShellStyle = computed<CSSProperties>(() => {
     '--glass-content-alpha': String(surfaces.content),
     '--glass-card-alpha': String(surfaces.card),
     '--glass-raised-alpha': String(surfaces.raised),
-    '--glass-muted-alpha': String(surfaces.muted)
+    '--glass-muted-alpha': String(surfaces.muted),
+    '--glass-sidebar-blur': `${surfaces.sidebarBlur}px`,
+    '--glass-sidebar-saturation': `${surfaces.sidebarSaturation}%`,
+    '--glass-toolbar-blur': `${surfaces.toolbarBlur}px`,
+    '--glass-sidebar-shadow-alpha': String(surfaces.sidebarShadow)
   } as CSSProperties
 })
 
