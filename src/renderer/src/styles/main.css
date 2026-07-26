@@ -24,6 +24,36 @@ body {
   user-select: none;
 }
 
+html.desktop-widget-window,
+html.desktop-widget-window body,
+html.desktop-widget-window #app {
+  background: transparent !important;
+}
+
+@font-face {
+  font-family: "Ma Shan Zheng";
+  src: url("../assets/fonts/MaShanZheng-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "ZCOOL XiaoWei";
+  src: url("../assets/fonts/ZCOOLXiaoWei-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "ZCOOL QingKe HuangYou";
+  src: url("../assets/fonts/ZCOOLQingKeHuangYou-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;

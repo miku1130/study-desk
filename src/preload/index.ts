@@ -25,6 +25,8 @@ const api = {
   },
   desktopWidgets: {
     close: (id: string): Promise<boolean> => ipcRenderer.invoke('desktop-widget:close', id),
+    setPointerInteractive: (id: string, interactive: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('desktop-widget:set-pointer-interactive', id, interactive),
     onConfigChanged: (cb: () => void): (() => void) => on('desktop-widget:config-changed', () => cb())
   },
   store: {

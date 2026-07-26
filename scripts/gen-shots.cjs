@@ -135,7 +135,7 @@ const sample = {
         id: 'w2', kind: 'memo', sourceId: '5', title: '灵感便签', enabled: true,
         launchOnStartup: false, locked: true, alwaysOnTop: true, size: 'small', background: '',
         backgroundColor: '#3a3428', overlayOpacity: 0.38, surfaceOpacity: 0.96,
-        font: 'serif', fontColor: '#fffdf7', accentColor: '#e4bd68'
+        font: 'handwriting', fontColor: '#fffdf7', accentColor: '#e4bd68'
       }
     ]
   }
@@ -163,7 +163,7 @@ ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('online:search', () => [])
 ipcMain.handle('media:download', () => '')
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 3 }))
-ipcMain.handle('app:getVersion', () => '0.3.0')
+ipcMain.handle('app:getVersion', () => '0.3.1')
 ipcMain.handle('autostart:get', () => false)
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
@@ -171,6 +171,7 @@ ipcMain.handle('window:maximize', () => false)
 ipcMain.handle('window:close', () => undefined)
 ipcMain.handle('window:isMaximized', () => false)
 ipcMain.handle('desktop-widget:close', () => true)
+ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
 
 app.on('window-all-closed', () => undefined)
 
@@ -207,7 +208,9 @@ app.whenReady().then(async () => {
       show: process.env.OFFSCREEN_SHOTS !== '1',
       x: 40,
       y: 40,
-      backgroundColor: s.theme === 'dark' ? '#202925' : '#f5f5ef',
+      transparent: s.name === 'desktop-widget',
+      frame: s.name !== 'desktop-widget',
+      backgroundColor: s.name === 'desktop-widget' ? '#00000000' : s.theme === 'dark' ? '#202925' : '#f5f5ef',
       webPreferences: {
         preload: join(__dirname, '../out/preload/index.js'),
         offscreen: process.env.OFFSCREEN_SHOTS === '1',

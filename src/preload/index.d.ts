@@ -28,6 +28,7 @@ export interface StudyDeskApi {
   }
   desktopWidgets: {
     close: (id: string) => Promise<boolean>
+    setPointerInteractive: (id: string, interactive: boolean) => Promise<boolean>
     onConfigChanged: (cb: () => void) => () => void
   }
   store: {

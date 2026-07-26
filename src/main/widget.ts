@@ -54,7 +54,9 @@ function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfi
   const locked = Boolean(config.locked)
   win.setMovable(!locked)
   win.setResizable(!locked)
-  win.setAlwaysOnTop(config.alwaysOnTop !== false, config.alwaysOnTop === false ? 'normal' : 'floating')
+  // 桌面摆件使用普通窗口层级，切换到其他应用时不会遮挡其内容。
+  win.setAlwaysOnTop(false)
+  win.setIgnoreMouseEvents(locked, { forward: true })
   const bounds = win.getBounds()
   const size = widgetDimensions(config)
   const next = fitToDisplay({ ...bounds, ...size })
@@ -92,14 +94,15 @@ function createDesktopWidget(config: DesktopWidgetConfig, index: number): Browse
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: config.alwaysOnTop !== false,
+    alwaysOnTop: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true
     }
   })
-  win.setAlwaysOnTop(config.alwaysOnTop !== false, config.alwaysOnTop === false ? 'normal' : 'floating')
+  win.setAlwaysOnTop(false)
+  win.setIgnoreMouseEvents(Boolean(config.locked), { forward: true })
 
   const target = desktopWidgetUrl(config.id)
   if (target.url) win.loadURL(target.url)
@@ -141,6 +144,13 @@ export function syncDesktopWidgets(
 export function closeDesktopWidgets(): void {
   for (const win of desktopWidgetWins.values()) win.close()
   desktopWidgetWins.clear()
+}
+
+export function setDesktopWidgetPointerInteractive(id: string, interactive: boolean): boolean {
+  const win = desktopWidgetWins.get(id)
+  if (!win || win.isDestroyed()) return false
+  win.setIgnoreMouseEvents(!interactive, { forward: true })
+  return true
 }
 
 let widgetWin: BrowserWindow | null = null

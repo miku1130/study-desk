@@ -251,7 +251,14 @@ export interface CountdownData {
 
 export type DesktopWidgetKind = 'countdown' | 'timetable' | 'memo'
 export type DesktopWidgetSize = 'small' | 'medium' | 'large'
-export type DesktopWidgetFont = 'system' | 'serif' | 'rounded' | 'mono'
+export type DesktopWidgetFont =
+  | 'system'
+  | 'serif'
+  | 'rounded'
+  | 'mono'
+  | 'handwriting'
+  | 'literary'
+  | 'display'
 
 export interface DesktopWidgetConfig {
   id: string

@@ -13,7 +13,10 @@ const fonts: Array<{ value: DesktopWidgetFont; label: string }> = [
   { value: 'system', label: '系统黑体' },
   { value: 'serif', label: '书卷宋体' },
   { value: 'rounded', label: '柔和圆体' },
-  { value: 'mono', label: '等宽数字' }
+  { value: 'mono', label: '等宽数字' },
+  { value: 'handwriting', label: '马善政手写体' },
+  { value: 'literary', label: '站酷小薇体' },
+  { value: 'display', label: '站酷庆科黄油体' }
 ]
 
 function patch(value: Partial<DesktopWidgetConfig>): void {
@@ -77,7 +80,6 @@ async function pickBackground(): Promise<void> {
     <div class="toggle-grid">
       <label><input type="checkbox" :checked="modelValue.enabled" @change="patch({ enabled: ($event.target as HTMLInputElement).checked })" /><span>固定显示</span></label>
       <label><input type="checkbox" :checked="modelValue.locked" @change="patch({ locked: ($event.target as HTMLInputElement).checked })" /><span>锁定位置和大小</span></label>
-      <label><input type="checkbox" :checked="modelValue.alwaysOnTop" @change="patch({ alwaysOnTop: ($event.target as HTMLInputElement).checked })" /><span>保持在最前</span></label>
       <label><input type="checkbox" :checked="modelValue.launchOnStartup" @change="patch({ launchOnStartup: ($event.target as HTMLInputElement).checked })" /><span>开机自动启动</span></label>
     </div>
   </div>

@@ -12,7 +12,7 @@ const DEFAULTS: Omit<DesktopWidgetConfig, 'id' | 'kind' | 'sourceId' | 'title'> 
   enabled: true,
   launchOnStartup: false,
   locked: false,
-  alwaysOnTop: true,
+  alwaysOnTop: false,
   size: 'medium',
   background: '',
   backgroundColor: '#24312c',
@@ -28,7 +28,14 @@ function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWid
     raw.kind === 'timetable' || raw.kind === 'memo' ? raw.kind : 'countdown'
   const size = raw.size === 'small' || raw.size === 'large' ? raw.size : 'medium'
   const font =
-    raw.font === 'serif' || raw.font === 'rounded' || raw.font === 'mono' ? raw.font : 'system'
+    raw.font === 'serif' ||
+    raw.font === 'rounded' ||
+    raw.font === 'mono' ||
+    raw.font === 'handwriting' ||
+    raw.font === 'literary' ||
+    raw.font === 'display'
+      ? raw.font
+      : 'system'
   const clamp = (value: unknown, fallback: number): number => {
     const number = Number(value)
     return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : fallback
@@ -47,7 +54,7 @@ function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWid
     enabled: raw.enabled !== false,
     launchOnStartup: Boolean(raw.launchOnStartup),
     locked: Boolean(raw.locked),
-    alwaysOnTop: raw.alwaysOnTop !== false
+    alwaysOnTop: false
   }
 }
 

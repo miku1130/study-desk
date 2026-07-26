@@ -10,6 +10,10 @@ files:
 extraResources:
   - from: build/icon.png
     to: icon.png
+  - from: src/renderer/src/assets/fonts
+    to: licenses/fonts
+    filter:
+      - OFL-*.txt
 win:
   icon: build/icon.png
   target:

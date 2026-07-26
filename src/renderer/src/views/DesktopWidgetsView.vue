@@ -5,6 +5,7 @@ import AppModal from '@/components/AppModal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import DesktopWidgetCard, { type WidgetLessonItem } from '@/components/widgets/DesktopWidgetCard.vue'
 import WidgetAppearanceEditor from '@/components/widgets/WidgetAppearanceEditor.vue'
+import { clone } from '@/lib/persist'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useTimetableStore } from '@/stores/timetable'
@@ -22,6 +23,7 @@ const showCreate = ref(false)
 const showEdit = ref(false)
 const creating = reactive({ kind: 'countdown' as DesktopWidgetKind, sourceId: '' })
 const editing = ref<DesktopWidgetConfig | null>(null)
+const editingOriginal = ref<DesktopWidgetConfig | null>(null)
 
 const memoOptions = computed(() => todos.items.filter((item) => !item.done && item.kind !== 'task'))
 const periodMap = computed(() => new Map(timetable.periods.map((period) => [period.id, period])))
@@ -39,9 +41,6 @@ const todayLessons = computed<WidgetLessonItem[]>(() => {
 function countdownFor(config: DesktopWidgetConfig) {
   return countdowns.items.find((item) => item.id === config.sourceId) ?? null
 }
-function memoFor(config: DesktopWidgetConfig) {
-  return todos.items.find((item) => item.id === config.sourceId) ?? null
-}
 function kindLabel(kind: DesktopWidgetKind): string {
   return kind === 'countdown' ? '倒数日' : kind === 'timetable' ? '今日课表' : '备忘录'
 }
@@ -50,23 +49,35 @@ function sizeLabel(size: DesktopWidgetConfig['size']): string {
 }
 function openCreate(kind: DesktopWidgetKind): void {
   creating.kind = kind
-  creating.sourceId = kind === 'countdown' ? countdowns.items[0]?.id ?? '' : kind === 'memo' ? memoOptions.value[0]?.id ?? '' : 'today'
+  creating.sourceId = kind === 'countdown' ? countdowns.items[0]?.id ?? '' : ''
   showCreate.value = true
 }
 function create(): void {
-  if (creating.kind !== 'timetable' && !creating.sourceId) return
+  if (creating.kind === 'countdown' && !creating.sourceId) return
   const item = widgets.add(creating.kind, creating.sourceId)
   showCreate.value = false
   openEdit(item)
 }
 function openEdit(config: DesktopWidgetConfig): void {
-  editing.value = structuredClone(config)
+  editingOriginal.value = clone(config)
+  editing.value = clone(config)
   showEdit.value = true
+}
+function updateEditing(value: DesktopWidgetConfig): void {
+  editing.value = value
+  widgets.update(value)
+}
+function cancelEdit(): void {
+  if (editingOriginal.value) widgets.update(editingOriginal.value)
+  showEdit.value = false
+  editing.value = null
+  editingOriginal.value = null
 }
 function saveEdit(): void {
   if (!editing.value) return
-  widgets.update(editing.value)
   showEdit.value = false
+  editing.value = null
+  editingOriginal.value = null
   ui.success('摆件设置已应用')
 }
 async function remove(config: DesktopWidgetConfig): Promise<void> {
@@ -97,12 +108,12 @@ function toggle(config: DesktopWidgetConfig): void {
     <div v-if="widgets.items.length" class="widget-list">
       <article v-for="config in widgets.items" :key="config.id" class="widget-row">
         <div class="preview-wrap" :class="`preview-${config.size}`">
-          <DesktopWidgetCard :config="config" :countdown="countdownFor(config)" :lessons="todayLessons" :memo="memoFor(config)" preview />
+          <DesktopWidgetCard :config="config" :countdown="countdownFor(config)" :lessons="todayLessons" :memos="memoOptions" preview />
         </div>
         <div class="widget-info">
           <span class="kind-label">{{ kindLabel(config.kind) }}</span>
-          <h3>{{ config.title || countdownFor(config)?.title || memoFor(config)?.text || (config.kind === 'timetable' ? '今天的课程' : '未命名摆件') }}</h3>
-          <p>{{ sizeLabel(config.size) }} · {{ config.locked ? '已锁定' : '可拖动' }} · {{ config.alwaysOnTop ? '保持在最前' : '普通层级' }}</p>
+          <h3>{{ config.title || countdownFor(config)?.title || (config.kind === 'timetable' ? '今天的课程' : config.kind === 'memo' ? '备忘与灵感' : '未命名摆件') }}</h3>
+          <p>{{ sizeLabel(config.size) }} · {{ config.locked ? '已锁定并穿透鼠标' : '可拖动' }} · 桌面普通层级</p>
           <div class="state-line">
             <span :class="{ on: config.enabled }">{{ config.enabled ? '正在显示' : '已隐藏' }}</span>
             <span v-if="config.launchOnStartup">开机启动</span>
@@ -127,20 +138,19 @@ function toggle(config: DesktopWidgetConfig): void {
           <button v-for="kind in (['countdown', 'timetable', 'memo'] as DesktopWidgetKind[])" :key="kind" :class="{ active: creating.kind === kind }" @click="openCreate(kind)">{{ kindLabel(kind) }}</button>
         </div>
         <label v-if="creating.kind === 'countdown'" class="field"><span>选择倒数日</span><select v-model="creating.sourceId" class="input select"><option value="" disabled>请选择</option><option v-for="item in countdowns.items" :key="item.id" :value="item.id">{{ item.title }} · {{ item.date }}</option></select></label>
-        <label v-else-if="creating.kind === 'memo'" class="field"><span>选择备忘录</span><select v-model="creating.sourceId" class="input select"><option value="" disabled>请选择</option><option v-for="item in memoOptions" :key="item.id" :value="item.id">{{ item.text }}</option></select></label>
+        <p v-else-if="creating.kind === 'memo'" class="create-tip">备忘录摆件会展示全部未完成的备忘与灵感，并支持在桌面直接快捷记录。</p>
         <p v-else class="create-tip">课表摆件会自动显示当天课程，并随课表内容更新。</p>
         <p v-if="creating.kind === 'countdown' && !countdowns.items.length" class="create-tip">请先在倒数日页面添加一个目标日期。</p>
-        <p v-if="creating.kind === 'memo' && !memoOptions.length" class="create-tip">请先在备忘录中心添加一条备忘或灵感。</p>
       </div>
-      <template #footer><button class="btn btn-secondary btn-sm" @click="showCreate = false">取消</button><button class="btn btn-sm" :disabled="creating.kind !== 'timetable' && !creating.sourceId" @click="create">创建并显示</button></template>
+      <template #footer><button class="btn btn-secondary btn-sm" @click="showCreate = false">取消</button><button class="btn btn-sm" :disabled="creating.kind === 'countdown' && !creating.sourceId" @click="create">创建并显示</button></template>
     </AppModal>
 
-    <AppModal v-if="showEdit && editing" title="摆件外观与行为" @close="showEdit = false">
+    <AppModal v-if="showEdit && editing" title="摆件外观与行为" @close="cancelEdit">
       <div class="editor-layout">
-        <div class="editor-preview"><DesktopWidgetCard :config="editing" :countdown="countdownFor(editing)" :lessons="todayLessons" :memo="memoFor(editing)" preview /></div>
-        <WidgetAppearanceEditor v-model="editing" />
+        <div class="editor-preview"><DesktopWidgetCard :config="editing" :countdown="countdownFor(editing)" :lessons="todayLessons" :memos="memoOptions" preview /></div>
+        <WidgetAppearanceEditor :model-value="editing" @update:model-value="updateEditing" />
       </div>
-      <template #footer><button class="btn btn-secondary btn-sm" @click="showEdit = false">取消</button><button class="btn btn-sm" @click="saveEdit">应用设置</button></template>
+      <template #footer><button class="btn btn-secondary btn-sm" @click="cancelEdit">取消</button><button class="btn btn-sm" @click="saveEdit">完成</button></template>
     </AppModal>
   </div>
 </template>

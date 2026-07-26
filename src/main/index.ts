@@ -30,6 +30,7 @@ import {
   toggleClockWidget,
   syncDesktopWidgets,
   closeDesktopWidgets,
+  setDesktopWidgetPointerInteractive,
   type DesktopWidgetConfig
 } from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
@@ -436,6 +437,9 @@ function registerIpc(): void {
     sendToAll('data:reloaded')
     return true
   })
+  ipcMain.handle('desktop-widget:set-pointer-interactive', (_e, id: string, interactive: boolean) =>
+    setDesktopWidgetPointerInteractive(id, Boolean(interactive))
+  )
 
   ipcMain.handle('tray:setIcon', (_e, dataUrl: string) => {
     setupTrayFromDataUrl(dataUrl, trayHandlers())
