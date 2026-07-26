@@ -44,6 +44,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '倒数日' }
   },
   {
+    path: '/widgets',
+    name: 'desktop-widgets',
+    component: () => import('@/views/DesktopWidgetsView.vue'),
+    meta: { title: '桌面摆件' }
+  },
+  {
     path: '/stats',
     name: 'stats',
     component: () => import('@/views/StatsView.vue'),
@@ -84,6 +90,12 @@ const routes: RouteRecordRaw[] = [
     name: 'clockwidget',
     component: () => import('@/views/ClockWidgetView.vue'),
     meta: { title: '时钟浮窗' }
+  },
+  {
+    path: '/desktop-widget/:id',
+    name: 'desktop-widget',
+    component: () => import('@/views/DesktopWidgetView.vue'),
+    meta: { title: '桌面摆件' }
   }
 ]
 

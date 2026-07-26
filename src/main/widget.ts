@@ -1,6 +1,148 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 
+export interface DesktopWidgetConfig {
+  id: string
+  enabled?: boolean
+  launchOnStartup?: boolean
+  locked?: boolean
+  alwaysOnTop?: boolean
+  size?: 'small' | 'medium' | 'large'
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+}
+
+type BoundsHandler = (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
+
+const desktopWidgetWins = new Map<string, BrowserWindow>()
+let onDesktopWidgetBounds: BoundsHandler | null = null
+
+const WIDGET_SIZES = {
+  small: { width: 248, height: 176 },
+  medium: { width: 340, height: 218 },
+  large: { width: 430, height: 330 }
+}
+
+function widgetDimensions(config: DesktopWidgetConfig): { width: number; height: number } {
+  const fallback = WIDGET_SIZES[config.size ?? 'medium']
+  return {
+    width: Math.max(220, Math.min(800, Number(config.width) || fallback.width)),
+    height: Math.max(150, Math.min(600, Number(config.height) || fallback.height))
+  }
+}
+
+function fitToDisplay(bounds: { x: number; y: number; width: number; height: number }): typeof bounds {
+  const area = screen.getDisplayMatching(bounds).workArea
+  return {
+    ...bounds,
+    x: Math.min(Math.max(bounds.x, area.x), area.x + Math.max(0, area.width - bounds.width)),
+    y: Math.min(Math.max(bounds.y, area.y), area.y + Math.max(0, area.height - bounds.height))
+  }
+}
+
+function desktopWidgetUrl(id: string): { url?: string; file?: string; hash?: string } {
+  const route = `/desktop-widget/${encodeURIComponent(id)}`
+  const base = process.env['ELECTRON_RENDERER_URL']
+  return base
+    ? { url: `${base}#${route}` }
+    : { file: join(__dirname, '../renderer/index.html'), hash: route }
+}
+
+function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfig): void {
+  const locked = Boolean(config.locked)
+  win.setMovable(!locked)
+  win.setResizable(!locked)
+  win.setAlwaysOnTop(config.alwaysOnTop !== false, config.alwaysOnTop === false ? 'normal' : 'floating')
+  const bounds = win.getBounds()
+  const size = widgetDimensions(config)
+  const next = fitToDisplay({ ...bounds, ...size })
+  if (
+    bounds.x !== next.x ||
+    bounds.y !== next.y ||
+    bounds.width !== next.width ||
+    bounds.height !== next.height
+  ) {
+    win.setBounds(next)
+  }
+}
+
+function createDesktopWidget(config: DesktopWidgetConfig, index: number): BrowserWindow {
+  const { workArea } = screen.getPrimaryDisplay()
+  const { width, height } = widgetDimensions(config)
+  const initialBounds = fitToDisplay({
+    width,
+    height,
+    x: config.x ?? workArea.x + workArea.width - width - 24,
+    y: config.y ?? workArea.y + 56 + index * 28
+  })
+  const win = new BrowserWindow({
+    ...initialBounds,
+    show: false,
+    minWidth: 220,
+    minHeight: 150,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: !config.locked,
+    movable: !config.locked,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: config.alwaysOnTop !== false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true
+    }
+  })
+  win.setAlwaysOnTop(config.alwaysOnTop !== false, config.alwaysOnTop === false ? 'normal' : 'floating')
+
+  const target = desktopWidgetUrl(config.id)
+  if (target.url) win.loadURL(target.url)
+  else win.loadFile(target.file!, { hash: target.hash })
+  win.once('ready-to-show', () => win.showInactive())
+
+  const persistBounds = (): void => {
+    if (!win.isDestroyed()) onDesktopWidgetBounds?.(config.id, win.getBounds())
+  }
+  win.on('moved', persistBounds)
+  win.on('resized', persistBounds)
+  win.on('closed', () => desktopWidgetWins.delete(config.id))
+  desktopWidgetWins.set(config.id, win)
+  return win
+}
+
+export function syncDesktopWidgets(
+  configs: DesktopWidgetConfig[],
+  boundsHandler?: BoundsHandler
+): void {
+  if (boundsHandler) onDesktopWidgetBounds = boundsHandler
+  const enabled = new Map(configs.filter((item) => item.enabled !== false).map((item) => [item.id, item]))
+
+  for (const [id, win] of desktopWidgetWins) {
+    const config = enabled.get(id)
+    if (!config) {
+      win.close()
+      continue
+    }
+    applyDesktopWidgetConfig(win, config)
+    win.webContents.send('desktop-widget:config-changed')
+    enabled.delete(id)
+  }
+
+  let index = desktopWidgetWins.size
+  for (const config of enabled.values()) createDesktopWidget(config, index++)
+}
+
+export function closeDesktopWidgets(): void {
+  for (const win of desktopWidgetWins.values()) win.close()
+  desktopWidgetWins.clear()
+}
+
 let widgetWin: BrowserWindow | null = null
 
 export function openWidget(): void {

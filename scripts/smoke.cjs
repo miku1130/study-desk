@@ -46,7 +46,29 @@ const sample = {
       { id: 'b2', name: '英语语法.docx', path: 'C:/fake/eng.docx', category: '英语', addedAt: Date.now() }
     ]
   },
-  countdowns: { items: [{ id: 'c1', title: '期末考试', date: dkey(-30), color: '#ff453a' }] }
+  countdowns: { items: [{ id: 'c1', title: '期末考试', date: dkey(-30), color: '#ff453a', bg: '' }] },
+  desktopWidgets: {
+    items: [
+      {
+        id: 'w1',
+        kind: 'countdown',
+        sourceId: 'c1',
+        title: '期末考试',
+        enabled: true,
+        launchOnStartup: false,
+        locked: false,
+        alwaysOnTop: true,
+        size: 'medium',
+        background: '',
+        backgroundColor: '#24312c',
+        overlayOpacity: 0.42,
+        surfaceOpacity: 1,
+        font: 'system',
+        fontColor: '#ffffff',
+        accentColor: '#7ed4b5'
+      }
+    ]
+  }
 }
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
@@ -62,6 +84,7 @@ ipcMain.handle('window:minimize', () => undefined)
 ipcMain.handle('window:maximize', () => false)
 ipcMain.handle('window:close', () => undefined)
 ipcMain.handle('window:isMaximized', () => false)
+ipcMain.handle('desktop-widget:close', () => true)
 
 const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
@@ -71,13 +94,15 @@ const routes = [
   { hash: '/todo', name: '备忘录中心', sel: ['.memo-tabs', '.quick-card'] },
   { hash: '/bookshelf', name: '学习资料库', sel: ['.library-tools', '.library-stats'] },
   { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
+  { hash: '/widgets', name: '桌面摆件管理', sel: ['.widgets-page', '.widget-list', '.desktop-widget-card'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/garden', name: '专注花园', sel: ['.garden-page', '.plot-grid', '.quest-card'] },
   { hash: '/breathe', name: '深呼吸', sel: ['.breathe', '.orb'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },
   { hash: '/widget', name: '桌面浮窗', sel: ['.widget', '.w-time'] },
-  { hash: '/clockwidget', name: '时钟浮窗', sel: ['.cw', '.cw-clock'] }
+  { hash: '/clockwidget', name: '时钟浮窗', sel: ['.cw', '.cw-clock'] },
+  { hash: '/desktop-widget/w1', name: '倒数日桌面摆件', width: 340, height: 218, assertOpaque: true, sel: ['.desktop-widget-root', '.desktop-widget-card', '.countdown-value'] }
 ]
 
 // 防止销毁窗口后所有窗口关闭触发默认自动退出，中断验收循环
@@ -103,8 +128,8 @@ function makeConsoleHandler(errors) {
 async function checkRoute(route) {
   const errors = []
   const win = new BrowserWindow({
-    width: 1180,
-    height: 760,
+    width: route.width ?? 1180,
+    height: route.height ?? 760,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../out/preload/index.js'),
@@ -135,6 +160,14 @@ async function checkRoute(route) {
     )
   } catch (e) {
     errors.push('executeJavaScript: ' + (e && e.message))
+  }
+  if (route.assertOpaque) {
+    const background = await win.webContents.executeJavaScript(
+      `getComputedStyle(document.querySelector('.desktop-widget-card')).backgroundColor`
+    )
+    if (/rgba\([^)]*,\s*0\./.test(background) || /\/\s*0\./.test(background)) {
+      errors.push(`100% 不透明度未生效: ${background}`)
+    }
   }
 
   win.destroy()

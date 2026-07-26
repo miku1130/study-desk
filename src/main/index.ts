@@ -23,7 +23,15 @@ import { HealthReminder } from './health'
 import { TodoReminder } from './reminders'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
-import { openWidget, closeWidget, toggleWidget, toggleClockWidget } from './widget'
+import {
+  openWidget,
+  closeWidget,
+  toggleWidget,
+  toggleClockWidget,
+  syncDesktopWidgets,
+  closeDesktopWidgets,
+  type DesktopWidgetConfig
+} from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
 import { autoUpdater } from 'electron-updater'
 
@@ -55,6 +63,29 @@ function setAutostart(openAtLogin: boolean): void {
 
 function getAutostart(): boolean {
   return app.isPackaged && app.getLoginItemSettings().openAtLogin
+}
+
+function desktopWidgetItems(): DesktopWidgetConfig[] {
+  const value = stores.desktopWidgets.get('items')
+  return Array.isArray(value) ? (value as unknown as DesktopWidgetConfig[]) : []
+}
+
+function syncAutostart(): void {
+  const widgetAutostart = desktopWidgetItems().some(
+    (item) => item.enabled !== false && Boolean(item.launchOnStartup)
+  )
+  setAutostart(Boolean(stores.settings.get('autostart')) || widgetAutostart)
+}
+
+function persistDesktopWidgetBounds(
+  id: string,
+  bounds: { x: number; y: number; width: number; height: number }
+): void {
+  const items = desktopWidgetItems()
+  const index = items.findIndex((item) => item.id === id)
+  if (index < 0) return
+  items[index] = { ...items[index], ...bounds }
+  stores.desktopWidgets.set('items', items)
 }
 
 function sendToAll(channel: string, ...args: unknown[]): void {
@@ -261,14 +292,26 @@ function registerIpc(): void {
       waterReminder.reload()
       healthReminder.reload()
       registerShortcuts()
-      setAutostart(Boolean(value.autostart))
+      syncAutostart()
       const pcfg = value.pomodoro as { lockscreen?: boolean } | undefined
       if (!pcfg?.lockscreen) closeLock()
       if (value.widget) openWidget()
       else closeWidget()
     }
+    if (name === 'desktopWidgets') {
+      syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
+      syncAutostart()
+    }
     if (name === 'timetable') scheduler.reload()
     if (name === 'todos') todoReminder.check()
+    if (
+      name === 'desktopWidgets' ||
+      name === 'countdowns' ||
+      name === 'timetable' ||
+      name === 'todos'
+    ) {
+      sendToAll('data:reloaded')
+    }
     return true
   })
 
@@ -383,6 +426,16 @@ function registerIpc(): void {
     stores.settings.set('widget', false)
   })
   ipcMain.handle('clockwidget:toggle', () => toggleClockWidget())
+  ipcMain.handle('desktop-widget:close', (_e, id: string) => {
+    const items = desktopWidgetItems()
+    const index = items.findIndex((item) => item.id === id)
+    if (index < 0) return false
+    items[index] = { ...items[index], enabled: false }
+    stores.desktopWidgets.set('items', items)
+    syncDesktopWidgets(items, persistDesktopWidgetBounds)
+    sendToAll('data:reloaded')
+    return true
+  })
 
   ipcMain.handle('tray:setIcon', (_e, dataUrl: string) => {
     setupTrayFromDataUrl(dataUrl, trayHandlers())
@@ -434,7 +487,8 @@ function registerIpc(): void {
       waterReminder.reload()
       healthReminder.reload()
       registerShortcuts()
-      setAutostart(Boolean(s.autostart))
+      syncAutostart()
+      syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
       sendToAll('data:reloaded')
       return true
     } catch {
@@ -529,10 +583,11 @@ app.whenReady().then(() => {
 
   registerIpc()
   registerShortcuts()
-  setAutostart(Boolean(stores.settings.get('autostart')))
+  syncAutostart()
   createWindow()
   initTray()
   if (stores.settings.get('widget')) openWidget()
+  syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
 
   setupUpdater()
   if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify().catch(() => undefined)
@@ -544,6 +599,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  closeDesktopWidgets()
 })
 
 app.on('will-quit', () => {

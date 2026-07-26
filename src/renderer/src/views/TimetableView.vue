@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, type CSSProperties } from 'vue'
+import { useRouter } from 'vue-router'
 import AppModal from '@/components/AppModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { useTimetableStore } from '@/stores/timetable'
+import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
+import { useUiStore } from '@/stores/ui'
 import { useClock } from '@/composables/useClock'
 import {
   formatDuration,
@@ -14,6 +18,9 @@ import {
 import { WEEKDAYS, LESSON_COLORS, uid, type Lesson, type Period, type TimetableData } from '@/types'
 
 const tt = useTimetableStore()
+const widgets = useDesktopWidgetsStore()
+const ui = useUiStore()
+const router = useRouter()
 const { now } = useClock()
 
 const weekday = computed(() => (now.value.getDay() === 0 ? 7 : now.value.getDay()))
@@ -141,15 +148,23 @@ async function doImport(): Promise<void> {
   const data = (await window.api.timetable.import()) as TimetableData | null
   if (data) tt.replaceAll(data)
 }
+function addTimetableWidget(): void {
+  const existing = widgets.items.find((item) => item.kind === 'timetable')
+  if (existing) widgets.setEnabled(existing.id, true)
+  else widgets.add('timetable', 'today', '今天的课程')
+  ui.success(existing ? '课表摆件已显示' : '今日课表已添加到桌面')
+}
 </script>
 
 <template>
   <div class="page wide">
     <div class="tt-toolbar">
+      <button class="btn btn-secondary btn-sm widget-button" @click="addTimetableWidget"><AppIcon name="monitor" :size="14" />添加到桌面</button>
       <button class="btn btn-secondary btn-sm" @click="openPeriods">编辑作息</button>
       <span class="spacer" />
       <button class="btn btn-secondary btn-sm" @click="doImport">导入</button>
       <button class="btn btn-secondary btn-sm" @click="doExport">导出</button>
+      <button class="btn btn-secondary btn-sm" @click="router.push('/widgets')">管理摆件</button>
     </div>
 
     <div class="tt-grid card">

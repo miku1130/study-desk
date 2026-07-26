@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   name: string
+  path?: string
   /** 紧凑模式：用于列表卡片和继续阅读条 */
   compact?: boolean
 }>()
@@ -39,6 +40,8 @@ const DEFAULT_THEME: CoverTheme = {
 }
 
 const ext = computed(() => props.name.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? '')
+const isImage = computed(() => ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext.value) && !!props.path)
+const imageUrl = computed(() => (isImage.value && props.path ? window.api.media.url(props.path) : ''))
 const theme = computed(() => THEMES[ext.value] ?? DEFAULT_THEME)
 const cleanName = computed(() => props.name.replace(/\.[^.]+$/, '').trim() || props.name)
 const seal = computed(() => {
@@ -61,15 +64,21 @@ const seal = computed(() => {
       '--cover-accent': theme.accent
     }"
   >
-    <span class="bk-spine" />
-    <span class="bk-texture" />
-    <span class="bk-frame" />
-    <span class="bk-series">STUDY DESK</span>
-    <span class="bk-type">{{ theme.label }}</span>
-    <span class="bk-seal">{{ seal }}</span>
-    <span class="bk-title">{{ cleanName }}</span>
-    <span v-if="!compact" class="bk-rule" />
-    <span v-if="!compact" class="bk-footer">PERSONAL LIBRARY</span>
+    <template v-if="isImage">
+      <img class="bk-image" :src="imageUrl" :alt="cleanName" />
+      <span class="bk-image-label">{{ cleanName }}</span>
+    </template>
+    <template v-else>
+      <span class="bk-spine" />
+      <span class="bk-texture" />
+      <span class="bk-frame" />
+      <span class="bk-series">STUDY DESK</span>
+      <span class="bk-type">{{ theme.label }}</span>
+      <span class="bk-seal">{{ seal }}</span>
+      <span class="bk-title">{{ cleanName }}</span>
+      <span v-if="!compact" class="bk-rule" />
+      <span v-if="!compact" class="bk-footer">PERSONAL LIBRARY</span>
+    </template>
   </div>
 </template>
 
@@ -93,6 +102,27 @@ const seal = computed(() => {
   padding: 11% 10% 9% 18%;
   color: var(--ink);
   user-select: none;
+}
+.bk-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #202522;
+}
+.bk-image-label {
+  position: absolute;
+  inset: auto 7px 7px;
+  overflow: hidden;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(12, 16, 14, 0.68);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bk-spine {
   position: absolute;

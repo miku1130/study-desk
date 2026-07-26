@@ -249,6 +249,37 @@ export interface CountdownData {
   items: Countdown[]
 }
 
+export type DesktopWidgetKind = 'countdown' | 'timetable' | 'memo'
+export type DesktopWidgetSize = 'small' | 'medium' | 'large'
+export type DesktopWidgetFont = 'system' | 'serif' | 'rounded' | 'mono'
+
+export interface DesktopWidgetConfig {
+  id: string
+  kind: DesktopWidgetKind
+  sourceId: string
+  title: string
+  enabled: boolean
+  launchOnStartup: boolean
+  locked: boolean
+  alwaysOnTop: boolean
+  size: DesktopWidgetSize
+  background: string
+  backgroundColor: string
+  overlayOpacity: number
+  surfaceOpacity: number
+  font: DesktopWidgetFont
+  fontColor: string
+  accentColor: string
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+}
+
+export interface DesktopWidgetsData {
+  items: DesktopWidgetConfig[]
+}
+
 export interface TreeSpecies {
   id: string
   name: string

@@ -96,6 +96,7 @@ export interface AppStores {
   water: JsonStore<Record<string, unknown>>
   books: JsonStore<Record<string, unknown>>
   countdowns: JsonStore<Record<string, unknown>>
+  desktopWidgets: JsonStore<Record<string, unknown>>
   garden: JsonStore<Record<string, unknown>>
 }
 
@@ -109,6 +110,7 @@ export function createStores(): AppStores {
     water: new JsonStore('water.json', { days: {} }),
     books: new JsonStore('books.json', { items: [] }),
     countdowns: new JsonStore('countdowns.json', { items: [] }),
+    desktopWidgets: new JsonStore('desktop-widgets.json', { items: [] }),
     garden: new JsonStore('garden.json', {
       coins: 0,
       trees: [],

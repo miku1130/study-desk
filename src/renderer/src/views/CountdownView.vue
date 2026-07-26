@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppModal from '@/components/AppModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import { useCountdownStore, daysLeft } from '@/stores/countdowns'
+import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
+import { useUiStore } from '@/stores/ui'
 import { LESSON_COLORS, uid, type Countdown } from '@/types'
 
 const cd = useCountdownStore()
+const widgets = useDesktopWidgetsStore()
+const ui = useUiStore()
+const router = useRouter()
 
 const showEdit = ref(false)
 const isEdit = ref(false)
@@ -40,6 +47,17 @@ function label(n: number): string {
   if (n > 0) return `还有 ${n} 天`
   if (n === 0) return '就是今天'
   return `已过 ${-n} 天`
+}
+
+function addWidget(c: Countdown): void {
+  const existing = widgets.items.find((item) => item.kind === 'countdown' && item.sourceId === c.id)
+  if (existing) {
+    widgets.setEnabled(existing.id, true)
+    ui.info('这个倒数日摆件已显示')
+  } else {
+    widgets.add('countdown', c.id, c.title)
+    ui.success('倒数日已添加到桌面')
+  }
 }
 
 async function pickBgLocal(): Promise<void> {
@@ -77,6 +95,7 @@ async function onBgUrl(url: string): Promise<void> {
       >
         <div v-if="!c.bg" class="cd-stripe" :style="{ background: c.color }" />
         <div class="cd-inner">
+          <button class="cd-widget" title="添加到桌面" @click.stop="addWidget(c)"><AppIcon name="monitor" :size="14" /></button>
           <p class="cd-title">{{ c.title }}</p>
           <p class="cd-days" :style="{ color: c.bg ? '#fff' : c.color }">
             {{ Math.abs(daysLeft(c.date)) }}<small> 天</small>
@@ -85,6 +104,7 @@ async function onBgUrl(url: string): Promise<void> {
         </div>
       </div>
     </div>
+    <button v-if="cd.sorted.length" class="manage-link" @click="router.push('/widgets')">管理桌面摆件</button>
     <div v-else class="card">
       <EmptyState icon="hourglass" title="还没有倒数日" desc="添加考试、截止日或重要日子，主界面会显示「距 X 还有 N 天」。">
         <button class="btn" @click="openAdd">添加倒数日</button>
@@ -179,6 +199,37 @@ async function onBgUrl(url: string): Promise<void> {
 }
 .cd-inner {
   position: relative;
+}
+.cd-widget {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 29px;
+  height: 29px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  color: var(--text-secondary);
+  opacity: 0;
+}
+.cd-card:hover .cd-widget,
+.cd-widget:focus-visible {
+  opacity: 1;
+}
+.cd-card.has-bg .cd-widget {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+.manage-link {
+  margin-top: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
 }
 .cd-card.has-bg .cd-title,
 .cd-card.has-bg .cd-sub {

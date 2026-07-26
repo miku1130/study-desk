@@ -26,6 +26,10 @@ export interface StudyDeskApi {
   clockWidget: {
     toggle: () => Promise<boolean>
   }
+  desktopWidgets: {
+    close: (id: string) => Promise<boolean>
+    onConfigChanged: (cb: () => void) => () => void
+  }
   store: {
     get: <T = Record<string, unknown>>(name: string) => Promise<T>
     set: (name: string, value: unknown) => Promise<boolean>

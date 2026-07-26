@@ -6,6 +6,7 @@ import { loadStore, saveStore } from '@/lib/persist'
 
 const READING_EXTS = new Set(['pdf', 'epub', 'mobi', 'azw3'])
 const OFFICE_EXTS = new Set(['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'])
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'])
 
 function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path
@@ -19,6 +20,7 @@ function inferCategory(name: string): string {
   const ext = extension(name)
   if (READING_EXTS.has(ext)) return '阅读书库'
   if (OFFICE_EXTS.has(ext)) return '课程资料'
+  if (IMAGE_EXTS.has(ext)) return '图片资料'
   if (ext === 'md' || ext === 'txt') return '笔记文档'
   return '未分类'
 }
@@ -34,6 +36,7 @@ function normalizeStatus(value: unknown, progress: number, name: string): BookSt
   if (progress >= 100) return 'finished'
   if (progress > 0) return 'reading'
   if (OFFICE_EXTS.has(ext) || ext === 'md' || ext === 'txt') return 'reference'
+  if (IMAGE_EXTS.has(ext)) return 'reference'
   return 'unread'
 }
 
@@ -203,8 +206,8 @@ export const useBooksStore = defineStore('books', () => {
   async function addBooks(): Promise<number> {
     const paths = await window.api.dialog.openFiles([
       {
-        name: '文档 / 电子书',
-        extensions: ['pdf', 'epub', 'mobi', 'azw3', 'txt', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'md']
+        name: '文档 / 电子书 / 图片',
+        extensions: ['pdf', 'epub', 'mobi', 'azw3', 'txt', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'md', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']
       }
     ])
     const existing = new Set(items.value.map((b) => b.path))
@@ -221,8 +224,8 @@ export const useBooksStore = defineStore('books', () => {
     if (!b) return false
     const p = await window.api.dialog.openFile([
       {
-        name: '文档 / 电子书',
-        extensions: ['pdf', 'epub', 'mobi', 'azw3', 'txt', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'md']
+        name: '文档 / 电子书 / 图片',
+        extensions: ['pdf', 'epub', 'mobi', 'azw3', 'txt', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'md', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']
       }
     ])
     if (!p) return false

@@ -326,6 +326,7 @@ function reminderPending(item: TodoItem): boolean {
       <select v-model="tagFilter" class="input input-sm select">
         <option v-for="tag in tagOptions" :key="tag" :value="tag">{{ tag }}</option>
       </select>
+      <button class="btn btn-secondary btn-sm widget-entry" @click="router.push('/widgets')"><AppIcon name="monitor" :size="14" />桌面摆件</button>
       <button v-if="tab === 'done'" class="btn btn-secondary btn-sm" @click="clearDone">清除已完成</button>
     </section>
 

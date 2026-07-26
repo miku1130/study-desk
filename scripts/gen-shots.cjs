@@ -122,6 +122,22 @@ const sample = {
       { id: 'c2', title: '英语六级', date: dkey(-30), color: '#77b5e8', bg: '' },
       { id: 'c3', title: '寒假', date: dkey(-45), color: '#67bfa4', bg: '' }
     ]
+  },
+  desktopWidgets: {
+    items: [
+      {
+        id: 'w1', kind: 'countdown', sourceId: 'c1', title: '期末考试', enabled: true,
+        launchOnStartup: true, locked: false, alwaysOnTop: true, size: 'medium', background: '',
+        backgroundColor: '#24312c', overlayOpacity: 0.42, surfaceOpacity: 0.94,
+        font: 'system', fontColor: '#ffffff', accentColor: '#7ed4b5'
+      },
+      {
+        id: 'w2', kind: 'memo', sourceId: '5', title: '灵感便签', enabled: true,
+        launchOnStartup: false, locked: true, alwaysOnTop: true, size: 'small', background: '',
+        backgroundColor: '#3a3428', overlayOpacity: 0.38, surfaceOpacity: 0.96,
+        font: 'serif', fontColor: '#fffdf7', accentColor: '#e4bd68'
+      }
+    ]
   }
 }
 
@@ -147,13 +163,14 @@ ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('online:search', () => [])
 ipcMain.handle('media:download', () => '')
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 3 }))
-ipcMain.handle('app:getVersion', () => '0.2.4')
+ipcMain.handle('app:getVersion', () => '0.3.0')
 ipcMain.handle('autostart:get', () => false)
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
 ipcMain.handle('window:maximize', () => false)
 ipcMain.handle('window:close', () => undefined)
 ipcMain.handle('window:isMaximized', () => false)
+ipcMain.handle('desktop-widget:close', () => true)
 
 app.on('window-all-closed', () => undefined)
 
@@ -168,8 +185,10 @@ const shots = [
   { route: '/todo', theme: 'light', name: 'todo' },
   { route: '/music', theme: 'dark', name: 'music' },
   { route: '/stats', theme: 'light', name: 'stats' },
-  { route: '/settings', theme: 'light', name: 'settings' }
-]
+  { route: '/settings', theme: 'light', name: 'settings' },
+  { route: '/widgets', theme: 'light', name: 'desktop-widgets' },
+  { route: '/desktop-widget/w1', theme: 'dark', name: 'desktop-widget', width: 340, height: 218 }
+].filter((shot) => !process.env.ONLY_SHOTS || process.env.ONLY_SHOTS.split(',').includes(shot.name))
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -183,14 +202,15 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = s.theme
     // 必须可见窗口：隐藏窗口的合成器不光栅化滚动内容层，capturePage 会得到空白内容区
     const win = new BrowserWindow({
-      width: 1180,
-      height: 760,
-      show: true,
+      width: s.width ?? 1180,
+      height: s.height ?? 760,
+      show: process.env.OFFSCREEN_SHOTS !== '1',
       x: 40,
       y: 40,
       backgroundColor: s.theme === 'dark' ? '#202925' : '#f5f5ef',
       webPreferences: {
         preload: join(__dirname, '../out/preload/index.js'),
+        offscreen: process.env.OFFSCREEN_SHOTS === '1',
         sandbox: false,
         contextIsolation: true
       }

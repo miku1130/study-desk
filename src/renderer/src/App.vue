@@ -9,6 +9,7 @@ import UpdatePromptModal from '@/components/UpdatePromptModal.vue'
 import LockView from '@/views/LockView.vue'
 import WidgetView from '@/views/WidgetView.vue'
 import ClockWidgetView from '@/views/ClockWidgetView.vue'
+import DesktopWidgetView from '@/views/DesktopWidgetView.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
 import { useTodoStore } from '@/stores/todos'
@@ -19,6 +20,7 @@ import { useWaterStore } from '@/stores/water'
 import { useBooksStore } from '@/stores/books'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useGardenStore } from '@/stores/garden'
+import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
 import { getGlassSurfaceAlphas } from '@/lib/appearance'
 
@@ -26,6 +28,7 @@ const route = useRoute()
 const isLock = computed(() => route.name === 'lock')
 const isWidget = computed(() => route.name === 'widget')
 const isClockWidget = computed(() => route.name === 'clockwidget')
+const isDesktopWidget = computed(() => route.name === 'desktop-widget')
 const isDashboard = computed(() => route.name === 'dashboard' || route.path === '/')
 
 const settings = useSettingsStore()
@@ -38,6 +41,7 @@ const water = useWaterStore()
 const books = useBooksStore()
 const countdowns = useCountdownStore()
 const garden = useGardenStore()
+const desktopWidgets = useDesktopWidgetsStore()
 
 const appShellStyle = computed<CSSProperties>(() => {
   if (!settings.s.appBg) return {}
@@ -78,12 +82,12 @@ function openSearch(): void {
   showSearch.value = true
 }
 
-// 锁屏 / 浮窗 / 时钟浮窗子窗口跳过全局音效/托盘/奖励，避免重复触发
-if (
-  !window.location.hash.includes('/lock') &&
-  !window.location.hash.includes('/widget') &&
-  !window.location.hash.includes('/clockwidget')
-) {
+// 独立子窗口跳过全局音效、托盘与奖励，避免重复触发。
+const initialHash = window.location.hash
+const isIsolatedWindow =
+  ['#/lock', '#/widget', '#/clockwidget'].includes(initialHash) ||
+  initialHash.startsWith('#/desktop-widget/')
+if (!isIsolatedWindow) {
   useGlobalEffects()
 }
 
@@ -97,6 +101,7 @@ async function loadAll(): Promise<void> {
     water.load(),
     books.load(),
     countdowns.load(),
+    desktopWidgets.load(),
     garden.load(),
     pomodoro.init()
   ])
@@ -106,7 +111,7 @@ onMounted(() => {
   void loadAll()
   window.api.system.onReload(() => void loadAll())
   window.api.todos.onChanged(() => void todos.load())
-  if (!isLock.value && !isWidget.value) {
+  if (!isLock.value && !isWidget.value && !isDesktopWidget.value) {
     window.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
@@ -121,6 +126,7 @@ onMounted(() => {
   <LockView v-if="isLock" />
   <WidgetView v-else-if="isWidget" />
   <ClockWidgetView v-else-if="isClockWidget" />
+  <DesktopWidgetView v-else-if="isDesktopWidget" />
   <div v-else class="app-shell" :style="appShellStyle">
     <div
       v-if="settings.s.appBg"
@@ -154,6 +160,6 @@ onMounted(() => {
     </main>
   </div>
   <SearchPalette v-if="showSearch" @close="showSearch = false" />
-  <UiFeedbackHost v-if="!isLock && !isWidget && !isClockWidget" />
-  <UpdatePromptModal v-if="!isLock && !isWidget && !isClockWidget" />
+  <UiFeedbackHost v-if="!isLock && !isWidget && !isClockWidget && !isDesktopWidget" />
+  <UpdatePromptModal v-if="!isLock && !isWidget && !isClockWidget && !isDesktopWidget" />
 </template>

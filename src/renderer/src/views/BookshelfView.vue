@@ -272,7 +272,7 @@ function setProgress(book: Book, event: Event): void {
       @click="selectedId = books.continueReading.id"
     >
       <div class="cs-cover">
-        <BookCover :name="books.continueReading.name" compact />
+        <BookCover :name="books.continueReading.name" :path="books.continueReading.path" compact />
       </div>
       <div class="cs-main">
         <p class="cs-label">继续阅读</p>
@@ -352,7 +352,7 @@ function setProgress(book: Book, event: Event): void {
             @dblclick="openBook(book)"
           >
             <div class="book-cover">
-              <BookCover :name="book.name" compact />
+              <BookCover :name="book.name" :path="book.path" compact />
               <span class="book-progress">{{ book.progress }}%</span>
               <button
                 class="fav-btn"
@@ -385,7 +385,7 @@ function setProgress(book: Book, event: Event): void {
 
       <aside v-if="selected" class="detail-panel card">
         <div class="detail-cover">
-          <BookCover :name="selected.name" />
+          <BookCover :name="selected.name" :path="selected.path" />
         </div>
         <div class="detail-main">
           <p class="detail-kicker">{{ selected.category }}</p>

@@ -23,6 +23,10 @@ const api = {
   clockWidget: {
     toggle: (): Promise<boolean> => ipcRenderer.invoke('clockwidget:toggle')
   },
+  desktopWidgets: {
+    close: (id: string): Promise<boolean> => ipcRenderer.invoke('desktop-widget:close', id),
+    onConfigChanged: (cb: () => void): (() => void) => on('desktop-widget:config-changed', () => cb())
+  },
   store: {
     get: (name: string): Promise<Record<string, unknown>> => ipcRenderer.invoke('store:get', name),
     set: (name: string, value: unknown): Promise<boolean> =>
