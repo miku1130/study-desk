@@ -28,6 +28,9 @@ export interface StudyDeskApi {
   }
   desktopWidgets: {
     close: (id: string) => Promise<boolean>
+    beginDrag: (id: string) => Promise<{ x: number; y: number; width: number; height: number } | null>
+    move: (id: string, x: number, y: number) => void
+    endDrag: (id: string, x: number, y: number) => Promise<boolean>
     setPointerInteractive: (id: string, interactive: boolean) => Promise<boolean>
     onConfigChanged: (cb: () => void) => () => void
   }

@@ -117,7 +117,7 @@ namespace StudyDesk {
     public static IntPtr ShellView { get; private set; }
     public static IntPtr WorkerW { get; private set; }
 
-    // Win11 raised desktop 使用 Progman，并将窗口插入图标层与壁纸 WorkerW 之间。
+    // Win11 raised desktop 使用 Progman；桌面摆件需位于图标层上方才能接收鼠标。
     public static IntPtr FindDesktopHost() {
       var progman = FindWindow("Progman", null);
       if (progman == IntPtr.Zero) return IntPtr.Zero;
@@ -193,8 +193,7 @@ function Invoke-DesktopLayer([string]$Action, [long]$Handle, [int]$X, [int]$Y, [
     [void][StudyDesk.DesktopLayer]::ScreenToClient($desktopHost, [ref]$point)
     $flags = [StudyDesk.DesktopLayer]::SWP_NOACTIVATE -bor [StudyDesk.DesktopLayer]::SWP_FRAMECHANGED -bor [StudyDesk.DesktopLayer]::SWP_SHOWWINDOW
     $insertAfter = [IntPtr]::Zero
-    if ([StudyDesk.DesktopLayer]::IsRaisedDesktop -and [StudyDesk.DesktopLayer]::ShellView -ne [IntPtr]::Zero) {
-      $insertAfter = [StudyDesk.DesktopLayer]::ShellView
+    if ([StudyDesk.DesktopLayer]::IsRaisedDesktop) {
       $workerW = [StudyDesk.DesktopLayer]::WorkerW
       if ($workerW -ne [IntPtr]::Zero) {
         $zFlags = [StudyDesk.DesktopLayer]::SWP_NOACTIVATE -bor 0x0001 -bor 0x0002

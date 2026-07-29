@@ -31,6 +31,9 @@ import {
   syncDesktopWidgets,
   closeDesktopWidgets,
   setDesktopWidgetPointerInteractive,
+  beginDesktopWidgetDrag,
+  moveDesktopWidget,
+  endDesktopWidgetDrag,
   type DesktopWidgetConfig
 } from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
@@ -439,6 +442,15 @@ function registerIpc(): void {
   })
   ipcMain.handle('desktop-widget:set-pointer-interactive', (_e, id: string, interactive: boolean) =>
     setDesktopWidgetPointerInteractive(id, Boolean(interactive))
+  )
+  ipcMain.handle('desktop-widget:begin-drag', (event, id: string) =>
+    beginDesktopWidgetDrag(id, event.sender.id)
+  )
+  ipcMain.on('desktop-widget:move', (event, id: string, x: number, y: number) => {
+    moveDesktopWidget(id, event.sender.id, Number(x), Number(y))
+  })
+  ipcMain.handle('desktop-widget:end-drag', (event, id: string, x: number, y: number) =>
+    endDesktopWidgetDrag(id, event.sender.id, Number(x), Number(y))
   )
 
   ipcMain.handle('tray:setIcon', (_e, dataUrl: string) => {

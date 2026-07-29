@@ -6,6 +6,7 @@ import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useTodoStore } from '@/stores/todos'
+import { calculateWidgetDragPosition, type DragPoint } from '@/lib/widgetDrag'
 
 const route = useRoute()
 const widgets = useDesktopWidgetsStore()
@@ -51,6 +52,72 @@ function addMemo(text: string): void {
   todos.add(text, 0, '', { kind: 'memo' })
 }
 
+interface DragSession {
+  pointerId: number
+  pointerOrigin: DragPoint
+  windowOrigin: DragPoint
+  latestPosition: DragPoint
+}
+
+let dragSession: DragSession | null = null
+let moveFrame = 0
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+      target.closest('button, input, textarea, select, a, .memo-list, .memo-quick, .widget-actions')
+  )
+}
+
+async function startDrag(event: PointerEvent): Promise<void> {
+  if (event.button !== 0 || !config.value || config.value.locked || isInteractiveTarget(event.target)) return
+  event.preventDefault()
+  const card = event.currentTarget as HTMLElement
+  card.setPointerCapture(event.pointerId)
+  const pointerOrigin = { x: event.screenX, y: event.screenY }
+  const bounds = await window.api.desktopWidgets.beginDrag(config.value.id)
+  if (!bounds || !card.hasPointerCapture(event.pointerId)) return
+  const windowOrigin = { x: bounds.x, y: bounds.y }
+  dragSession = { pointerId: event.pointerId, pointerOrigin, windowOrigin, latestPosition: windowOrigin }
+  card.classList.add('dragging')
+}
+
+function moveDrag(event: PointerEvent): void {
+  const session = dragSession
+  if (!session || session.pointerId !== event.pointerId || !config.value) return
+  session.latestPosition = calculateWidgetDragPosition(session.windowOrigin, session.pointerOrigin, {
+    x: event.screenX,
+    y: event.screenY
+  })
+  if (moveFrame) return
+  moveFrame = requestAnimationFrame(() => {
+    moveFrame = 0
+    if (!dragSession || !config.value) return
+    window.api.desktopWidgets.move(
+      config.value.id,
+      dragSession.latestPosition.x,
+      dragSession.latestPosition.y
+    )
+  })
+}
+
+function endDrag(event: PointerEvent): void {
+  const session = dragSession
+  if (!session || session.pointerId !== event.pointerId || !config.value) return
+  if (moveFrame) {
+    cancelAnimationFrame(moveFrame)
+    moveFrame = 0
+  }
+  dragSession = null
+  const root = event.currentTarget as HTMLElement
+  root.classList.remove('dragging')
+  void window.api.desktopWidgets.endDrag(
+    config.value.id,
+    session.latestPosition.x,
+    session.latestPosition.y
+  )
+}
+
 let pointerInteractive = false
 function handleMouseMove(event: MouseEvent): void {
   if (!config.value?.locked) return
@@ -64,13 +131,20 @@ function handleMouseMove(event: MouseEvent): void {
 document.documentElement.classList.add('desktop-widget-window')
 document.addEventListener('mousemove', handleMouseMove)
 onBeforeUnmount(() => {
+  if (moveFrame) cancelAnimationFrame(moveFrame)
   document.documentElement.classList.remove('desktop-widget-window')
   document.removeEventListener('mousemove', handleMouseMove)
 })
 </script>
 
 <template>
-  <main class="desktop-widget-root">
+  <main
+    class="desktop-widget-root"
+    @pointerdown="startDrag"
+    @pointermove="moveDrag"
+    @pointerup="endDrag"
+    @pointercancel="endDrag"
+  >
     <DesktopWidgetCard
       v-if="config"
       :config="config"
@@ -93,6 +167,10 @@ onBeforeUnmount(() => {
   padding: 6px;
   overflow: hidden;
   background: transparent;
+}
+.desktop-widget-root.dragging :deep(.desktop-widget-card) {
+  cursor: grabbing;
+  user-select: none;
 }
 .widget-loading {
   width: 100%;

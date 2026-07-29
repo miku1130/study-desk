@@ -25,6 +25,12 @@ const api = {
   },
   desktopWidgets: {
     close: (id: string): Promise<boolean> => ipcRenderer.invoke('desktop-widget:close', id),
+    beginDrag: (id: string): Promise<{ x: number; y: number; width: number; height: number } | null> =>
+      ipcRenderer.invoke('desktop-widget:begin-drag', id),
+    move: (id: string, x: number, y: number): void =>
+      ipcRenderer.send('desktop-widget:move', id, x, y),
+    endDrag: (id: string, x: number, y: number): Promise<boolean> =>
+      ipcRenderer.invoke('desktop-widget:end-drag', id, x, y),
     setPointerInteractive: (id: string, interactive: boolean): Promise<boolean> =>
       ipcRenderer.invoke('desktop-widget:set-pointer-interactive', id, interactive),
     onConfigChanged: (cb: () => void): (() => void) => on('desktop-widget:config-changed', () => cb())

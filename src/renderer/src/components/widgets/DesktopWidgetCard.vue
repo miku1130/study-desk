@@ -176,8 +176,11 @@ function submitMemo(): void {
   box-shadow: none;
   color: var(--widget-color);
   font-family: var(--widget-font);
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   container-type: size;
+}
+.desktop-widget-card:not(.locked):not(.preview) {
+  cursor: grab;
 }
 .desktop-widget-card.preview {
   -webkit-app-region: no-drag;

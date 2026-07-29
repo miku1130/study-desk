@@ -22,6 +22,7 @@ export interface DesktopWidgetConfig {
 type BoundsHandler = (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
 
 const desktopWidgetWins = new Map<string, BrowserWindow>()
+const desktopWidgetConfigs = new Map<string, DesktopWidgetConfig>()
 const desktopLayerTasks = new Map<string, Promise<DesktopLayerStatus | null>>()
 let onDesktopWidgetBounds: BoundsHandler | null = null
 let desktopLayerHealthTimer: NodeJS.Timeout | null = null
@@ -169,10 +170,12 @@ function createDesktopWidget(config: DesktopWidgetConfig, index: number): Browse
   win.on('resized', persistBounds)
   win.on('closed', () => {
     desktopWidgetWins.delete(config.id)
+    desktopWidgetConfigs.delete(config.id)
     desktopLayerTasks.delete(config.id)
     if (desktopWidgetWins.size === 0) stopDesktopLayerHealthCheck()
   })
   desktopWidgetWins.set(config.id, win)
+  desktopWidgetConfigs.set(config.id, config)
   startDesktopLayerHealthCheck()
   return win
 }
@@ -183,6 +186,7 @@ export function syncDesktopWidgets(
 ): void {
   if (boundsHandler) onDesktopWidgetBounds = boundsHandler
   const enabled = new Map(configs.filter((item) => item.enabled !== false).map((item) => [item.id, item]))
+  for (const [id, config] of enabled) desktopWidgetConfigs.set(id, config)
 
   for (const [id, win] of desktopWidgetWins) {
     const config = enabled.get(id)
@@ -202,6 +206,7 @@ export function syncDesktopWidgets(
 export function closeDesktopWidgets(): void {
   for (const win of desktopWidgetWins.values()) win.close()
   desktopWidgetWins.clear()
+  desktopWidgetConfigs.clear()
   desktopLayerTasks.clear()
   stopDesktopLayerHealthCheck()
 }
@@ -210,6 +215,42 @@ export function setDesktopWidgetPointerInteractive(id: string, interactive: bool
   const win = desktopWidgetWins.get(id)
   if (!win || win.isDestroyed()) return false
   win.setIgnoreMouseEvents(!interactive, { forward: true })
+  return true
+}
+
+function movableDesktopWidget(id: string, senderId: number): BrowserWindow | null {
+  const win = desktopWidgetWins.get(id)
+  const config = desktopWidgetConfigs.get(id)
+  if (!win || win.isDestroyed() || win.webContents.id !== senderId || config?.locked) return null
+  return win
+}
+
+export function beginDesktopWidgetDrag(
+  id: string,
+  senderId: number
+): { x: number; y: number; width: number; height: number } | null {
+  return movableDesktopWidget(id, senderId)?.getBounds() ?? null
+}
+
+export function moveDesktopWidget(id: string, senderId: number, x: number, y: number): boolean {
+  const win = movableDesktopWidget(id, senderId)
+  if (!win || !Number.isFinite(x) || !Number.isFinite(y)) return false
+  const next = fitToDisplay({ ...win.getBounds(), x: Math.round(x), y: Math.round(y) })
+  win.setPosition(next.x, next.y)
+  return true
+}
+
+export async function endDesktopWidgetDrag(
+  id: string,
+  senderId: number,
+  x: number,
+  y: number
+): Promise<boolean> {
+  const win = movableDesktopWidget(id, senderId)
+  if (!win || !moveDesktopWidget(id, senderId, x, y)) return false
+  const bounds = win.getBounds()
+  await attachDesktopLayer(id, win, bounds)
+  onDesktopWidgetBounds?.(id, bounds)
   return true
 }
 
