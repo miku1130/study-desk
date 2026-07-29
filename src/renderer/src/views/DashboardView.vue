@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import { useClock } from '@/composables/useClock'
 import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import { useStatsStore } from '@/stores/stats'
 import { useMusicStore } from '@/stores/music'
@@ -15,8 +14,8 @@ import { useCountdownStore, daysLeft } from '@/stores/countdowns'
 import { WEEKDAYS } from '@/types'
 
 const router = useRouter()
-const { now } = useClock()
-const { weekday, todayLessons, current, next, nextCountdown } = useTimetableStatus()
+const { now, weekday, todayLessons, remainingLessons, current, next, nextCountdown } =
+  useTimetableStatus()
 const stats = useStatsStore()
 const music = useMusicStore()
 const todos = useTodoStore()
@@ -51,15 +50,6 @@ const todayKey = computed(() => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 })
 const todayStat = computed(() => stats.days[todayKey.value] ?? { pomodoros: 0, focusMinutes: 0 })
-
-const nowMin = computed(() => now.value.getHours() * 60 + now.value.getMinutes())
-function toMin(hm: string): number {
-  const [h, m] = hm.split(':').map(Number)
-  return h * 60 + m
-}
-function isPast(end: string): boolean {
-  return nowMin.value >= toMin(end)
-}
 
 const previewTodos = computed(() =>
   todos.items
@@ -107,12 +97,12 @@ function go(path: string): void {
           <span class="card-title"><AppIcon name="calendar" :size="14" />今日课程</span>
           <span class="badge">{{ WEEKDAYS[weekday - 1] }}</span>
         </header>
-        <ul v-if="todayLessons.length" class="cls-list">
+        <ul v-if="remainingLessons.length" class="cls-list">
           <li
-            v-for="l in todayLessons"
+            v-for="l in remainingLessons"
             :key="l.id"
             class="cls"
-            :class="{ now: current && current.id === l.id, past: isPast(l.period.end) }"
+            :class="{ now: current && current.id === l.id }"
           >
             <span class="cls-time">{{ l.period.start }}</span>
             <span class="cls-dot" :style="{ background: l.color }" />
@@ -121,7 +111,10 @@ function go(path: string): void {
             <span v-if="current && current.id === l.id" class="cls-live">进行中</span>
           </li>
         </ul>
-        <div v-else class="muted pad"><AppIcon name="coffee" :size="14" /> 今日无课，好好休息</div>
+        <div v-else class="muted pad">
+          <AppIcon name="coffee" :size="14" />
+          {{ todayLessons.length ? '今天的课程已全部结束' : '今日无课，好好休息' }}
+        </div>
       </section>
 
       <section class="card focus-card">

@@ -21,6 +21,10 @@ export function timeToMinutes(value: string): number {
   return hours * MINUTES_PER_HOUR + minutes
 }
 
+export function isPeriodRemaining(period: Pick<Period, 'end'>, nowMinutes: number): boolean {
+  return timeToMinutes(period.end) > nowMinutes
+}
+
 export function getTimelineBounds(periods: Period[]): TimelineBounds {
   const ranges = periods
     .map((period) => ({

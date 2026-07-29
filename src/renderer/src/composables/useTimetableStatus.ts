@@ -1,6 +1,7 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
 import { useClock } from './useClock'
 import { useTimetableStore } from '@/stores/timetable'
+import { isPeriodRemaining, timeToMinutes } from '@/lib/timetableLayout'
 import type { Lesson, Period } from '@/types'
 
 export interface LessonWithPeriod extends Lesson {
@@ -11,14 +12,10 @@ export interface TimetableStatus {
   now: Ref<Date>
   weekday: ComputedRef<number>
   todayLessons: ComputedRef<LessonWithPeriod[]>
+  remainingLessons: ComputedRef<LessonWithPeriod[]>
   current: ComputedRef<LessonWithPeriod | null>
   next: ComputedRef<LessonWithPeriod | null>
   nextCountdown: ComputedRef<string>
-}
-
-function toMin(hm: string): number {
-  const [h, m] = hm.split(':').map(Number)
-  return h * 60 + m
 }
 
 export function useTimetableStatus(): TimetableStatus {
@@ -35,27 +32,36 @@ export function useTimetableStatus(): TimetableStatus {
       const p = tt.periods.find((x) => x.id === l.periodId)
       if (p) list.push({ ...l, period: p })
     }
-    return list.sort((a, b) => toMin(a.period.start) - toMin(b.period.start))
+    return list.sort(
+      (a, b) => timeToMinutes(a.period.start) - timeToMinutes(b.period.start)
+    )
   })
+
+  const remainingLessons = computed(() =>
+    todayLessons.value.filter((lesson) => isPeriodRemaining(lesson.period, nowMinutes.value))
+  )
 
   const current = computed<LessonWithPeriod | null>(
     () =>
       todayLessons.value.find(
-        (l) => nowMinutes.value >= toMin(l.period.start) && nowMinutes.value < toMin(l.period.end)
+        (l) =>
+          nowMinutes.value >= timeToMinutes(l.period.start) &&
+          nowMinutes.value < timeToMinutes(l.period.end)
       ) ?? null
   )
 
   const next = computed<LessonWithPeriod | null>(
-    () => todayLessons.value.find((l) => toMin(l.period.start) > nowMinutes.value) ?? null
+    () =>
+      todayLessons.value.find((l) => timeToMinutes(l.period.start) > nowMinutes.value) ?? null
   )
 
   const nextCountdown = computed(() => {
     if (!next.value) return ''
-    const diff = toMin(next.value.period.start) - nowMinutes.value
+    const diff = timeToMinutes(next.value.period.start) - nowMinutes.value
     const h = Math.floor(diff / 60)
     const m = diff % 60
     return h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`
   })
 
-  return { now, weekday, todayLessons, current, next, nextCountdown }
+  return { now, weekday, todayLessons, remainingLessons, current, next, nextCountdown }
 }

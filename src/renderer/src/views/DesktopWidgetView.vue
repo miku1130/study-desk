@@ -2,16 +2,16 @@
 import { computed, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import DesktopWidgetCard, { type WidgetLessonItem } from '@/components/widgets/DesktopWidgetCard.vue'
+import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useCountdownStore } from '@/stores/countdowns'
-import { useTimetableStore } from '@/stores/timetable'
 import { useTodoStore } from '@/stores/todos'
 
 const route = useRoute()
 const widgets = useDesktopWidgetsStore()
 const countdowns = useCountdownStore()
-const timetable = useTimetableStore()
 const todos = useTodoStore()
+const { remainingLessons } = useTimetableStatus()
 
 const widgetId = computed(() => String(route.params.id ?? ''))
 const config = computed(() => widgets.items.find((item) => item.id === widgetId.value) ?? null)
@@ -22,15 +22,11 @@ const memos = computed(() =>
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt)
 )
 const lessons = computed<WidgetLessonItem[]>(() => {
-  const day = new Date().getDay() || 7
-  const periods = new Map(timetable.periods.map((period) => [period.id, period]))
-  return timetable.lessons
-    .filter((lesson) => lesson.day === day && periods.has(lesson.periodId))
-    .map((lesson) => {
-      const period = periods.get(lesson.periodId)!
-      return { ...lesson, start: period.start, end: period.end }
-    })
-    .sort((a, b) => a.start.localeCompare(b.start))
+  return remainingLessons.value.map((lesson) => ({
+    ...lesson,
+    start: lesson.period.start,
+    end: lesson.period.end
+  }))
 })
 
 function close(): void {

@@ -5,19 +5,19 @@ import AppModal from '@/components/AppModal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import DesktopWidgetCard, { type WidgetLessonItem } from '@/components/widgets/DesktopWidgetCard.vue'
 import WidgetAppearanceEditor from '@/components/widgets/WidgetAppearanceEditor.vue'
+import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import { clone } from '@/lib/persist'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
-import { useTimetableStore } from '@/stores/timetable'
 import { useTodoStore } from '@/stores/todos'
 import { useUiStore } from '@/stores/ui'
 import type { DesktopWidgetConfig, DesktopWidgetKind } from '@/types'
 
 const widgets = useDesktopWidgetsStore()
 const countdowns = useCountdownStore()
-const timetable = useTimetableStore()
 const todos = useTodoStore()
 const ui = useUiStore()
+const { remainingLessons } = useTimetableStatus()
 
 const showCreate = ref(false)
 const showEdit = ref(false)
@@ -26,16 +26,12 @@ const editing = ref<DesktopWidgetConfig | null>(null)
 const editingOriginal = ref<DesktopWidgetConfig | null>(null)
 
 const memoOptions = computed(() => todos.items.filter((item) => !item.done && item.kind !== 'task'))
-const periodMap = computed(() => new Map(timetable.periods.map((period) => [period.id, period])))
 const todayLessons = computed<WidgetLessonItem[]>(() => {
-  const day = new Date().getDay() || 7
-  return timetable.lessons
-    .filter((lesson) => lesson.day === day && periodMap.value.has(lesson.periodId))
-    .map((lesson) => {
-      const period = periodMap.value.get(lesson.periodId)!
-      return { ...lesson, start: period.start, end: period.end }
-    })
-    .sort((a, b) => a.start.localeCompare(b.start))
+  return remainingLessons.value.map((lesson) => ({
+    ...lesson,
+    start: lesson.period.start,
+    end: lesson.period.end
+  }))
 })
 
 function countdownFor(config: DesktopWidgetConfig) {

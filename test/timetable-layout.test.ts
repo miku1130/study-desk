@@ -4,6 +4,7 @@ import {
   formatHour,
   getPeriodPosition,
   getTimelineBounds,
+  isPeriodRemaining,
   TIMETABLE_HOUR_HEIGHT
 } from '../src/renderer/src/lib/timetableLayout'
 import type { Period } from '../src/renderer/src/types'
@@ -47,5 +48,11 @@ describe('timetable timeline layout', () => {
   it('formats the course duration for the card metadata', () => {
     expect(formatDuration(45)).toBe('45 分钟')
     expect(formatDuration(90)).toBe('90 分钟')
+  })
+
+  it('keeps current and later lessons while hiding classes whose end time has passed', () => {
+    expect(isPeriodRemaining(period('18:30', '20:00'), 19 * 60)).toBe(true)
+    expect(isPeriodRemaining(period('18:30', '20:00'), 20 * 60)).toBe(false)
+    expect(isPeriodRemaining(period('08:00', '08:45'), 19 * 60)).toBe(false)
   })
 })
