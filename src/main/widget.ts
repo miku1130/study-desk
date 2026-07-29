@@ -1,5 +1,10 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
+import {
+  attachWindowToDesktop,
+  inspectDesktopAttachment,
+  type DesktopLayerStatus
+} from './windowsDesktopLayer'
 
 export interface DesktopWidgetConfig {
   id: string
@@ -17,7 +22,9 @@ export interface DesktopWidgetConfig {
 type BoundsHandler = (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
 
 const desktopWidgetWins = new Map<string, BrowserWindow>()
+const desktopLayerTasks = new Map<string, Promise<DesktopLayerStatus | null>>()
 let onDesktopWidgetBounds: BoundsHandler | null = null
+let desktopLayerHealthTimer: NodeJS.Timeout | null = null
 
 const WIDGET_SIZES = {
   small: { width: 248, height: 176 },
@@ -54,7 +61,7 @@ function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfi
   const locked = Boolean(config.locked)
   win.setMovable(!locked)
   win.setResizable(!locked)
-  // 桌面摆件使用普通窗口层级，切换到其他应用时不会遮挡其内容。
+  // 摆件位于 Explorer 桌面层，不需要置顶，也不会遮挡其他应用。
   win.setAlwaysOnTop(false)
   win.setIgnoreMouseEvents(locked, { forward: true })
   const bounds = win.getBounds()
@@ -67,7 +74,49 @@ function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfi
     bounds.height !== next.height
   ) {
     win.setBounds(next)
+    void attachDesktopLayer(config.id, win, next)
   }
+}
+
+function attachDesktopLayer(
+  id: string,
+  win: BrowserWindow,
+  bounds = win.getBounds()
+): Promise<DesktopLayerStatus | null> {
+  const currentTask = desktopLayerTasks.get(id)
+  if (currentTask) return currentTask
+
+  const task = attachWindowToDesktop(win, bounds)
+    .catch((error) => {
+      console.warn(`[desktop-widget] 挂载桌面层失败 (${id}):`, error)
+      return null
+    })
+    .finally(() => desktopLayerTasks.delete(id))
+  desktopLayerTasks.set(id, task)
+  return task
+}
+
+function stopDesktopLayerHealthCheck(): void {
+  if (!desktopLayerHealthTimer) return
+  clearInterval(desktopLayerHealthTimer)
+  desktopLayerHealthTimer = null
+}
+
+function startDesktopLayerHealthCheck(): void {
+  if (process.platform !== 'win32' || desktopLayerHealthTimer) return
+  desktopLayerHealthTimer = setInterval(() => {
+    for (const [id, win] of desktopWidgetWins) {
+      if (win.isDestroyed() || desktopLayerTasks.has(id)) continue
+      void inspectDesktopAttachment(win)
+        .then((status) => {
+          if (!status.attached && !win.isDestroyed()) void attachDesktopLayer(id, win)
+        })
+        .catch((error) => {
+          console.warn(`[desktop-widget] 检查桌面层失败 (${id}):`, error)
+        })
+    }
+  }, 30_000)
+  desktopLayerHealthTimer.unref()
 }
 
 function createDesktopWidget(config: DesktopWidgetConfig, index: number): BrowserWindow {
@@ -107,15 +156,24 @@ function createDesktopWidget(config: DesktopWidgetConfig, index: number): Browse
   const target = desktopWidgetUrl(config.id)
   if (target.url) win.loadURL(target.url)
   else win.loadFile(target.file!, { hash: target.hash })
-  win.once('ready-to-show', () => win.showInactive())
+  win.once('ready-to-show', () => {
+    void attachDesktopLayer(config.id, win, initialBounds).finally(() => {
+      if (!win.isDestroyed()) win.showInactive()
+    })
+  })
 
   const persistBounds = (): void => {
     if (!win.isDestroyed()) onDesktopWidgetBounds?.(config.id, win.getBounds())
   }
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
-  win.on('closed', () => desktopWidgetWins.delete(config.id))
+  win.on('closed', () => {
+    desktopWidgetWins.delete(config.id)
+    desktopLayerTasks.delete(config.id)
+    if (desktopWidgetWins.size === 0) stopDesktopLayerHealthCheck()
+  })
   desktopWidgetWins.set(config.id, win)
+  startDesktopLayerHealthCheck()
   return win
 }
 
@@ -144,6 +202,8 @@ export function syncDesktopWidgets(
 export function closeDesktopWidgets(): void {
   for (const win of desktopWidgetWins.values()) win.close()
   desktopWidgetWins.clear()
+  desktopLayerTasks.clear()
+  stopDesktopLayerHealthCheck()
 }
 
 export function setDesktopWidgetPointerInteractive(id: string, interactive: boolean): boolean {
