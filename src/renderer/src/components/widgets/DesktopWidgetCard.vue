@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, type CSSProperties } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import TodoAttachmentList from '@/components/todo/TodoAttachmentList.vue'
 import { daysLeft } from '@/stores/countdowns'
 import type { Countdown, DesktopWidgetConfig, TodoItem } from '@/types'
 
@@ -60,6 +61,24 @@ const surfaceStyle = computed<CSSProperties>(() => ({
   opacity: props.config.surfaceOpacity
 }))
 
+const memoImages = computed(() =>
+  (props.memos ?? []).flatMap((memo) =>
+    memo.attachments.filter((attachment) => attachment.kind === 'image')
+  )
+)
+const selectedMemoImage = computed(() =>
+  memoImages.value.find((image) => image.id === props.config.memoImageAttachmentId)
+)
+const pureImageMode = computed(
+  () =>
+    props.config.kind === 'memo' &&
+    props.config.memoDisplayMode === 'image' &&
+    Boolean(selectedMemoImage.value)
+)
+const pureImageUrl = computed(() =>
+  selectedMemoImage.value ? window.api.media.url(selectedMemoImage.value.path) : ''
+)
+
 const countdownNumber = computed(() => Math.abs(daysLeft(props.countdown?.date ?? '')))
 const countdownState = computed(() => {
   const days = daysLeft(props.countdown?.date ?? '')
@@ -94,11 +113,13 @@ function submitMemo(): void {
 <template>
   <article
     class="desktop-widget-card"
-    :class="[`kind-${config.kind}`, `size-${config.size}`, { locked: config.locked, preview }]"
+    :class="[`kind-${config.kind}`, `size-${config.size}`, { locked: config.locked, preview, 'pure-image-mode': pureImageMode }]"
     :style="cardStyle"
   >
-    <span class="widget-surface" :style="surfaceStyle" />
-    <header class="widget-head">
+    <img v-if="pureImageMode" class="memo-pure-image" :src="pureImageUrl" :alt="selectedMemoImage?.name ?? ''" />
+    <template v-else>
+      <span class="widget-surface" :style="surfaceStyle" />
+      <header class="widget-head">
       <span class="widget-kicker">
         <AppIcon :name="config.kind === 'countdown' ? 'hourglass' : config.kind === 'timetable' ? 'calendar' : 'note'" :size="13" />
         {{ config.kind === 'countdown' ? '倒数日' : config.kind === 'timetable' ? '今日课表' : '备忘录' }}
@@ -118,18 +139,18 @@ function submitMemo(): void {
         </button>
       </div>
       <AppIcon v-else-if="config.locked" class="lock-mark" name="lock" :size="13" />
-    </header>
+      </header>
 
-    <section v-if="config.kind === 'countdown'" class="countdown-body">
+      <section v-if="config.kind === 'countdown'" class="countdown-body">
       <p class="widget-title">{{ countdown?.title || config.title || '选择一个倒数日' }}</p>
       <p class="countdown-value">{{ countdownNumber }}<small>天</small></p>
       <div class="widget-footer">
         <span>{{ countdownState }}</span>
         <time>{{ countdown?.date || '尚未设置日期' }}</time>
       </div>
-    </section>
+      </section>
 
-    <section v-else-if="config.kind === 'timetable'" class="timetable-body">
+      <section v-else-if="config.kind === 'timetable'" class="timetable-body">
       <p class="widget-title">{{ config.title || '今天的课程' }}</p>
       <div v-if="lessons?.length" class="lesson-list">
         <div v-for="lesson in lessons" :key="lesson.id" class="lesson-row">
@@ -142,9 +163,9 @@ function submitMemo(): void {
         </div>
       </div>
       <p v-else class="widget-empty">今天没有课程，留点时间给自己。</p>
-    </section>
+      </section>
 
-    <section v-else class="memo-body">
+      <section v-else class="memo-body">
       <p class="widget-title">{{ config.title || '备忘与灵感' }}</p>
       <form v-if="showMemoInput && !config.locked" class="memo-quick" @submit.prevent="submitMemo">
         <input ref="memoInput" v-model="memoDraft" maxlength="120" placeholder="记录此刻想到的事" @keydown.esc="showMemoInput = false" />
@@ -155,10 +176,17 @@ function submitMemo(): void {
           <span class="memo-kind">{{ item.kind === 'idea' ? '灵感' : '备忘' }}</span>
           <p>{{ item.text }}</p>
           <small v-if="item.note">{{ item.note }}</small>
+          <TodoAttachmentList
+            v-if="item.attachments.length"
+            class="widget-memo-attachments"
+            :attachments="item.attachments"
+            mode="widget"
+          />
         </article>
       </div>
       <p v-else class="widget-empty">暂无备忘，点击右上角加号快速记录。</p>
-    </section>
+      </section>
+    </template>
   </article>
 </template>
 
@@ -184,6 +212,20 @@ function submitMemo(): void {
 }
 .desktop-widget-card.preview {
   -webkit-app-region: no-drag;
+}
+.desktop-widget-card.pure-image-mode {
+  padding: 0;
+}
+.memo-pure-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 .widget-surface {
   position: absolute;
@@ -359,6 +401,7 @@ function submitMemo(): void {
   line-height: 1.45;
 }
 .memo-item small { display: block; margin-top: 3px; }
+.widget-memo-attachments { margin-top: 6px; }
 .memo-quick {
   position: relative;
   z-index: 2;

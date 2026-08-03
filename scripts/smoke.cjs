@@ -1,8 +1,15 @@
 // 运行时冒烟验收：加载构建产物，逐路由校验渲染与控制台错误。
-const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron')
+const { app, BrowserWindow, ipcMain, nativeTheme, protocol, net } = require('electron')
 const { join } = require('path')
 const { pathToFileURL } = require('url')
 const { writeFileSync } = require('fs')
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'studymedia', privileges: { secure: true, standard: true, stream: true, supportFetchAPI: true } }
+])
+
+const smokeImage = join(__dirname, '../src/renderer/src/assets/pet/cat-attentive.png')
+const smokeFile = join(__dirname, '../package.json')
 
 function dkey(offset) {
   const d = new Date()
@@ -39,7 +46,13 @@ const sample = {
   todos: {
     items: [
       { id: '1', text: '测试任务', done: false, pomodoros: 0, createdAt: Date.now(), kind: 'task' },
-      { id: 'm1', text: '整理复习提纲', done: false, pomodoros: 0, createdAt: Date.now(), kind: 'memo' },
+      {
+        id: 'm1', text: '整理复习提纲', done: false, pomodoros: 0, createdAt: Date.now(), kind: 'memo',
+        attachments: [
+          { id: 'a-image', kind: 'image', name: '学习图片.png', path: smokeImage, addedAt: Date.now() },
+          { id: 'a-file', kind: 'file', name: 'package.json', path: smokeFile, addedAt: Date.now() }
+        ]
+      },
       { id: 'm2', text: '尝试新的学习方法', done: false, pomodoros: 0, createdAt: Date.now() - 1, kind: 'idea' }
     ]
   },
@@ -80,9 +93,34 @@ const sample = {
         id: 'w2', kind: 'memo', sourceId: '', title: '', enabled: true,
         launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'medium', background: '',
         backgroundColor: '#3a3428', overlayOpacity: 0.4, surfaceOpacity: 1,
-        font: 'handwriting', fontColor: '#fffdf7', accentColor: '#e4bd68'
+        font: 'handwriting', fontColor: '#fffdf7', accentColor: '#e4bd68',
+        memoDisplayMode: 'list', memoImageAttachmentId: ''
+      },
+      {
+        id: 'w3', kind: 'memo', sourceId: '', title: '', enabled: true,
+        launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'medium', background: '',
+        backgroundColor: '#3a3428', overlayOpacity: 0.4, surfaceOpacity: 1,
+        font: 'system', fontColor: '#ffffff', accentColor: '#e4bd68',
+        memoDisplayMode: 'image', memoImageAttachmentId: 'a-image'
       }
     ]
+  },
+  petCompanion: {
+    coins: 120,
+    catId: 'mikan',
+    roomId: 'sunroom',
+    furnitureId: 'oak-desk',
+    unlockedCats: ['mikan'],
+    unlockedRooms: ['sunroom'],
+    unlockedFurniture: ['oak-desk'],
+    keepsakes: [
+      { id: 'gift-1', itemId: 'paper-star', kind: 'gift', source: 'pomodoro', at: Date.now() },
+      { id: 'trash-1', itemId: 'pencil-shavings', kind: 'trash', source: 'pomodoro', at: Date.now() - 3600000 }
+    ],
+    completedSessions: 6,
+    abandonedSessions: 1,
+    activeClass: null,
+    settledClasses: []
   }
 }
 
@@ -91,6 +129,8 @@ ipcMain.handle('store:set', () => true)
 ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('online:search', () => [])
 ipcMain.handle('media:download', () => '')
+ipcMain.handle('shell:openPath', () => '')
+ipcMain.handle('dialog:openFiles', () => [])
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)
@@ -99,6 +139,8 @@ ipcMain.handle('window:minimize', () => undefined)
 ipcMain.handle('window:maximize', () => false)
 ipcMain.handle('window:close', () => undefined)
 ipcMain.handle('window:isMaximized', () => false)
+ipcMain.handle('pet-widget:sync', () => undefined)
+ipcMain.handle('pet-widget:hide', () => undefined)
 ipcMain.handle('desktop-widget:close', () => true)
 ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
 
@@ -113,13 +155,16 @@ const routes = [
   { hash: '/widgets', name: '桌面摆件管理', sel: ['.widgets-page', '.widget-list', '.desktop-widget-card'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/garden', name: '专注花园', sel: ['.garden-page', '.plot-grid', '.quest-card'] },
+  { hash: '/pet', name: '猫咪伴学', sel: ['.pet-page', '.pet-room', '.wardrobe-grid', '.collection-grid'] },
   { hash: '/breathe', name: '深呼吸', sel: ['.breathe', '.orb'] },
   { hash: '/settings', name: '设置', sel: ['.seg', '.swatches'] },
   { hash: '/lock', name: '锁屏专注', sel: ['.lock', '.lock-time'] },
   { hash: '/widget', name: '桌面浮窗', sel: ['.widget', '.w-time'] },
   { hash: '/clockwidget', name: '时钟浮窗', sel: ['.cw', '.cw-clock'] },
+  { hash: '/pet-widget', name: '猫咪伴学挂件', width: 230, height: 238, sel: ['.pet-widget-root', '.widget-cat', '.widget-bubble'] },
   { hash: '/desktop-widget/w1', name: '倒数日桌面摆件', width: 340, height: 218, assertOpaque: true, sel: ['.desktop-widget-root', '.desktop-widget-card', '.countdown-value'] },
-  { hash: '/desktop-widget/w2', name: '备忘录桌面摆件', width: 340, height: 218, sel: ['.desktop-widget-root', '.memo-list', '.memo-item'] }
+  { hash: '/desktop-widget/w2', name: '备忘录桌面摆件', width: 340, height: 218, sel: ['.desktop-widget-root', '.memo-list', '.memo-item'] },
+  { hash: '/desktop-widget/w3', name: '纯图片桌面摆件', width: 340, height: 218, sel: ['.desktop-widget-root', '.desktop-widget-card', '.memo-pure-image'] }
 ]
 
 // 防止销毁窗口后所有窗口关闭触发默认自动退出，中断验收循环
@@ -166,6 +211,8 @@ async function checkRoute(route) {
   } catch (e) {
     errors.push('loadURL: ' + (e && e.message))
   }
+  const verifiesVisibleAnimation = ['/pet', '/lock', '/pet-widget'].includes(route.hash)
+  if (verifiesVisibleAnimation) win.showInactive()
   await wait(1300)
 
   let domOk = false
@@ -208,7 +255,96 @@ async function checkRoute(route) {
       return getComputedStyle(surface).opacity === '0.37' ? '' : '属性未实时预览'
     })()`)
     if (editorResult) errors.push(editorResult)
+
+    const pureModeResult = await win.webContents.executeJavaScript(`(async () => {
+      const memoRow = document.querySelectorAll('.widget-row')[1]
+      const edit = memoRow?.querySelector('button[title="编辑外观"]')
+      if (!edit) return '缺少备忘录外观编辑按钮'
+      edit.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const pureImage = [...document.querySelectorAll('.memo-mode-segmented button')].find((button) => button.textContent?.includes('纯图片'))
+      if (!pureImage || pureImage.disabled) return '纯图片模式不可选择'
+      pureImage.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const thumbnail = document.querySelector('.memo-image-picker button')
+      if (!thumbnail) return '缺少备忘录图片选择器'
+      thumbnail.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      return document.querySelector('.editor-preview .memo-pure-image') ? '' : '纯图片预览未实时更新'
+    })()`)
+    if (pureModeResult) errors.push(pureModeResult)
   }
+
+  if (route.hash === '/pet' && domOk) {
+    const petResult = await win.webContents.executeJavaScript(`(async () => {
+      const room = document.querySelector('.room-background')
+      const cat = document.querySelector('.cat-image .pet-animation-video')
+      if (!room?.complete || !room.naturalWidth) return '房间背景未加载'
+      if (!cat || cat.readyState < 2 || !cat.videoWidth) return '猫咪贴图未加载'
+      await cat.play()
+      const frameHash = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 64
+        canvas.height = 64
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        context.drawImage(cat, 0, 0, 64, 64)
+        return context.getImageData(0, 0, 64, 64).data.reduce((sum, value, index) => sum + value * ((index % 17) + 1), 0)
+      }
+      const firstFrame = frameHash()
+      await new Promise((resolve) => setTimeout(resolve, 180))
+      if (frameHash() === firstFrame) return '猫咪待机动画未播放'
+      document.querySelector('.cat-button')?.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      if (!document.querySelector('.cat-bubble')) return '摸猫反馈未出现'
+      const furnitureTab = [...document.querySelectorAll('.wardrobe-tabs button')].find((button) => button.textContent?.includes('家具'))
+      furnitureTab?.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const lamp = [...document.querySelectorAll('.wardrobe-item')].find((button) => button.textContent?.includes('蘑菇台灯'))
+      lamp?.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      return lamp?.textContent?.includes('使用中') ? '' : '购买并切换家具未生效'
+    })()`)
+    if (petResult) errors.push(petResult)
+  }
+
+  if (route.hash === '/todo' && domOk) {
+    const attachmentResult = await win.webContents.executeJavaScript(`(async () => {
+      const memoTab = [...document.querySelectorAll('.memo-tab')].find((button) => button.textContent?.includes('备忘录'))
+      memoTab?.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const image = document.querySelector('.memo-attachments img')
+      const file = document.querySelector('.memo-attachments .file-open')
+      if (!image || !file) return '备忘录附件未渲染'
+      if (!image.complete) await new Promise((resolve) => image.addEventListener('load', resolve, { once: true }))
+      if (!image.naturalWidth) return '备忘录图片未直接展示'
+      file.click()
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return ''
+    })()`)
+    if (attachmentResult) errors.push(attachmentResult)
+  }
+
+  if ((route.hash === '/lock' || route.hash === '/pet-widget') && domOk) {
+    const animationResult = await win.webContents.executeJavaScript(`(async () => {
+      const image = document.querySelector('.pet-animation-video')
+      if (!image || image.readyState < 2 || !image.videoWidth) return '猫咪动画未加载'
+      await image.play()
+      const frameHash = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 64
+        canvas.height = 64
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        context.drawImage(image, 0, 0, 64, 64)
+        return context.getImageData(0, 0, 64, 64).data.reduce((sum, value, index) => sum + value * ((index % 17) + 1), 0)
+      }
+      const firstFrame = frameHash()
+      await new Promise((resolve) => setTimeout(resolve, 180))
+      return frameHash() === firstFrame ? '猫咪写字动画未播放' : ''
+    })()`)
+    if (animationResult) errors.push(animationResult)
+  }
+
+  if (verifiesVisibleAnimation) win.hide()
 
 
   if (route.hash === '/desktop-widget/w1' && domOk) {
@@ -237,9 +373,26 @@ async function checkRoute(route) {
       input.dispatchEvent(new Event('input', { bubbles: true }))
       document.querySelector('.memo-quick')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await new Promise((resolve) => setTimeout(resolve, 60))
-      return document.querySelectorAll('.memo-item').length === before + 1 ? '' : '快捷记录未保存到列表'
+      if (document.querySelectorAll('.memo-item').length !== before + 1) return '快捷记录未保存到列表'
+      const image = document.querySelector('.widget-memo-attachments img')
+      const file = document.querySelector('.widget-memo-attachments .file-open')
+      if (!image || !file) return '桌面备忘录附件未适配'
+      if (!image.complete) await new Promise((resolve) => image.addEventListener('load', resolve, { once: true }))
+      return image.naturalWidth ? '' : '桌面备忘录图片未加载'
     })()`)
     if (memoResult) errors.push(memoResult)
+  }
+
+  if (route.hash === '/desktop-widget/w3' && domOk) {
+    const pureImageResult = await win.webContents.executeJavaScript(`(async () => {
+      const image = document.querySelector('.memo-pure-image')
+      if (!image) return '纯图片未渲染'
+      if (!image.complete) await new Promise((resolve) => image.addEventListener('load', resolve, { once: true }))
+      if (!image.naturalWidth) return '纯图片未加载'
+      if (document.querySelector('.widget-surface, .widget-head, .memo-body')) return '纯图片模式仍显示卡片内容'
+      return ''
+    })()`)
+    if (pureImageResult) errors.push(pureImageResult)
   }
 
   win.destroy()
@@ -250,6 +403,11 @@ app.whenReady().then(async () => {
   const lines = []
   const log = (s) => lines.push(s)
   try {
+    protocol.handle('studymedia', (request) => {
+      const url = new URL(request.url)
+      const path = url.searchParams.get('p')
+      return path ? net.fetch(pathToFileURL(path).toString()) : new Response('missing path', { status: 400 })
+    })
     nativeTheme.themeSource = 'light'
     const results = []
     for (const r of routes) {

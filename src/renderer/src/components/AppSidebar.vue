@@ -97,13 +97,6 @@ const groups: NavGroup[] = [
         icon: svg('<path d="M10 2h4"/><path d="M12 14l2.5-2.5"/><circle cx="12" cy="14" r="8"/>')
       },
       {
-        to: '/garden',
-        label: '专注花园',
-        icon: svg(
-          '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/>'
-        )
-      },
-      {
         to: '/stats',
         label: '专注统计',
         icon: svg('<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-9"/>')

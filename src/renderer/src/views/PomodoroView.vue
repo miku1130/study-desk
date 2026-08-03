@@ -1,17 +1,48 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
 import { useTodoStore } from '@/stores/todos'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import PetRoom from '@/components/pet/PetRoom.vue'
+import PetCompanionView from '@/views/PetCompanionView.vue'
+import GardenView from '@/views/GardenView.vue'
+import { usePetCompanionStore } from '@/stores/petCompanion'
+import { useTimetableStatus } from '@/composables/useTimetableStatus'
+import type { PetVisualState } from '@/lib/petAssets'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
 const todos = useTodoStore()
 const router = useRouter()
+const route = useRoute()
+const pet = usePetCompanionStore()
+const timetable = useTimetableStatus()
+
+type FocusSpaceTab = 'timer' | 'room' | 'garden'
+const activeTab = computed<FocusSpaceTab>(() => {
+  const tab = String(route.query.tab ?? 'timer')
+  return tab === 'room' || tab === 'garden' ? tab : 'timer'
+})
+const petVisualState = computed<PetVisualState>(() => {
+  if ((pomodoro.phase === 'work' && pomodoro.running) || timetable.current.value) return 'focus'
+  if (pomodoro.phase === 'work') return 'paused'
+  if (pomodoro.phase === 'short' || pomodoro.phase === 'long') return 'break'
+  return 'idle'
+})
+const petStatus = computed(() => {
+  if (timetable.current.value) return `正在陪你上「${timetable.current.value.name}」`
+  if (pomodoro.phase === 'work' && pomodoro.running) return `一起写完这一页 · ${mm.value}:${ss.value}`
+  if (pomodoro.phase === 'work') return '计时暂停，猫还在原地等你'
+  return '猫已经把纸笔摆好了'
+})
+
+function setTab(tab: FocusSpaceTab): void {
+  void router.replace({ path: '/pomodoro', query: tab === 'timer' ? {} : { tab } })
+}
 
 const showUrl = ref(false)
 const urlTarget = ref<'wallpaper' | 'sound'>('wallpaper')
@@ -112,8 +143,22 @@ function testSound(): void {
 </script>
 
 <template>
-  <div class="page narrow">
-    <div class="timer-card card">
+  <div class="page focus-space">
+    <nav class="focus-space-nav" aria-label="专注空间分区">
+      <button :class="{ active: activeTab === 'timer' }" @click="setTab('timer')">
+        <AppIcon name="timer" :size="16" />计时
+      </button>
+      <button :class="{ active: activeTab === 'room' }" @click="setTab('room')">
+        <AppIcon name="sparkle" :size="16" />猫咪小屋
+      </button>
+      <button :class="{ active: activeTab === 'garden' }" @click="setTab('garden')">
+        <AppIcon name="tree" :size="16" />专注花园
+      </button>
+    </nav>
+
+    <div v-if="activeTab === 'timer'" class="timer-pane">
+      <div class="timer-focus-grid">
+        <div class="timer-card card">
       <div v-if="todos.activeItem" class="bound-task">
         <span class="bound-label">正在专注</span>
         <strong>{{ todos.activeItem.text }}</strong>
@@ -161,7 +206,17 @@ function testSound(): void {
       <button class="btn btn-secondary btn-sm clock-summon" @click="toggleClockWidget">
         呼出时钟小浮窗
       </button>
-    </div>
+        </div>
+        <PetRoom
+          :state="petVisualState"
+          :cat-id="pet.catId"
+          :room-id="pet.roomId"
+          :furniture-id="pet.furnitureId"
+          :cat-name="pet.selectedCat.name"
+          :status="petStatus"
+          :keepsake="pet.lastKeepsake"
+        />
+      </div>
 
     <h3 class="section-title">番茄设置</h3>
     <div class="card">
@@ -302,6 +357,9 @@ function testSound(): void {
       @confirm="onUrlConfirm"
       @close="showUrl = false"
     />
+    </div>
+    <PetCompanionView v-else-if="activeTab === 'room'" />
+    <GardenView v-else />
   </div>
 </template>
 
@@ -313,15 +371,50 @@ function testSound(): void {
 </style>
 
 <style scoped>
-.narrow {
-  max-width: 600px;
+.focus-space {
+  max-width: 1180px;
+}
+.focus-space-nav {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+.focus-space-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 690;
+}
+.focus-space-nav button.active {
+  background: var(--surface-raised);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 3px rgba(18, 27, 23, 0.09);
+}
+.timer-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.78fr) minmax(500px, 1.22fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 20px;
 }
 .timer-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 32px;
-  margin-bottom: 18px;
+  margin-bottom: 0;
 }
 .bound-task {
   display: flex;
@@ -453,5 +546,20 @@ function testSound(): void {
 .unit {
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+@media (max-width: 1050px) {
+  .timer-focus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .focus-space-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .focus-space-nav button {
+    padding-inline: 8px;
+  }
 }
 </style>

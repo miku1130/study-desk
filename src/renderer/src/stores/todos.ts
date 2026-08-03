@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { Priority, RepeatMode, TodoData, TodoItem, TodoKind, TodoSubtask } from '@/types'
+import type {
+  Priority,
+  RepeatMode,
+  TodoAttachment,
+  TodoData,
+  TodoItem,
+  TodoKind,
+  TodoSubtask
+} from '@/types'
 import { uid } from '@/types'
 import { loadStore, saveStore } from '@/lib/persist'
+import { attachmentKind, fileNameFromPath } from '@/lib/todoAttachments'
 
 function dateKey(offset = 0): string {
   const d = new Date()
@@ -26,6 +35,25 @@ function normalizeSubtasks(value: unknown): TodoSubtask[] {
       text: String(x.text).trim(),
       done: Boolean(x.done)
     }))
+}
+
+function normalizeAttachments(value: unknown): TodoAttachment[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => item as Record<string, unknown>)
+    .filter((item) => typeof item.path === 'string' && item.path.trim())
+    .map((item) => {
+      const path = String(item.path).trim()
+      const kind = item.kind === 'image' || item.kind === 'file' ? item.kind : attachmentKind(path)
+      return {
+        id: typeof item.id === 'string' && item.id ? item.id : uid(),
+        kind,
+        name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : fileNameFromPath(path),
+        path,
+        addedAt: typeof item.addedAt === 'number' ? item.addedAt : Date.now()
+      }
+    })
+    .slice(0, 20)
 }
 
 function normalizeKind(value: unknown): TodoKind {
@@ -61,6 +89,7 @@ function normalizeItem(raw: Record<string, unknown>): TodoItem {
     pinned: Boolean(raw.pinned),
     estimatePomodoros: Math.max(0, Math.min(12, Number(raw.estimatePomodoros ?? 0) || 0)),
     subtasks: normalizeSubtasks(raw.subtasks),
+    attachments: normalizeAttachments(raw.attachments),
     completedAt: typeof raw.completedAt === 'number' ? raw.completedAt : undefined
   }
 }
@@ -72,6 +101,7 @@ interface AddTodoOptions {
   reminderAt?: string
   estimatePomodoros?: number
   subtasks?: TodoSubtask[]
+  attachments?: TodoAttachment[]
   repeat?: RepeatMode
 }
 
@@ -123,7 +153,8 @@ export const useTodoStore = defineStore('todos', () => {
       reminded: false,
       pinned: false,
       estimatePomodoros: Math.max(0, Math.min(12, Number(options.estimatePomodoros ?? 0) || 0)),
-      subtasks: options.subtasks ?? []
+      subtasks: options.subtasks ?? [],
+      attachments: normalizeAttachments(options.attachments)
     }
     items.value.unshift(item)
     void save()

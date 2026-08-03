@@ -23,6 +23,7 @@ import { HealthReminder } from './health'
 import { TodoReminder } from './reminders'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
+import { closePetWidget, hidePetWidget, setPetWidgetVisible } from './petWidget'
 import {
   openWidget,
   closeWidget,
@@ -284,6 +285,8 @@ function registerIpc(): void {
   })
   ipcMain.handle('window:close', () => mainWindow?.close())
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)
+  ipcMain.handle('pet-widget:sync', (_e, visible: boolean) => setPetWidgetVisible(Boolean(visible)))
+  ipcMain.handle('pet-widget:hide', () => hidePetWidget())
 
   ipcMain.handle('store:get', (_e, name: keyof AppStores) => stores[name]?.all)
   ipcMain.handle('store:set', (_e, name: keyof AppStores, value: Record<string, unknown>) => {
@@ -581,7 +584,7 @@ app.whenReady().then(() => {
     },
     onEvent: (type) => {
       if (type === 'workComplete') notify('专注完成', '休息一下吧～')
-      else notify('休息结束', '开始下一个番茄')
+      else if (type === 'breakComplete') notify('休息结束', '开始下一个番茄')
     }
   })
 
@@ -616,6 +619,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   isQuitting = true
   closeDesktopWidgets()
+  closePetWidget()
 })
 
 app.on('will-quit', () => {

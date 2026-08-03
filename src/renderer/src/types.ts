@@ -53,6 +53,11 @@ export interface AppSettings {
   widget: boolean
   hotkeys: HotkeyConfig
   musicApi: string
+  petWidget: {
+    enabled: boolean
+    duringPomodoro: boolean
+    duringClass: boolean
+  }
 }
 
 export const defaultSettings: AppSettings = {
@@ -78,7 +83,8 @@ export const defaultSettings: AppSettings = {
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' },
-  musicApi: ''
+  musicApi: '',
+  petWidget: { enabled: false, duringPomodoro: true, duringClass: true }
 }
 
 export interface Period {
@@ -133,6 +139,16 @@ export interface TodoSubtask {
   done: boolean
 }
 
+export type TodoAttachmentKind = 'image' | 'file'
+
+export interface TodoAttachment {
+  id: string
+  kind: TodoAttachmentKind
+  name: string
+  path: string
+  addedAt: number
+}
+
 export const REPEATS: { value: RepeatMode; label: string }[] = [
   { value: 'none', label: '不重复' },
   { value: 'daily', label: '每天' },
@@ -172,6 +188,7 @@ export interface TodoItem {
   pinned: boolean
   estimatePomodoros: number
   subtasks: TodoSubtask[]
+  attachments: TodoAttachment[]
   completedAt?: number
 }
 
@@ -251,6 +268,7 @@ export interface CountdownData {
 
 export type DesktopWidgetKind = 'countdown' | 'timetable' | 'memo'
 export type DesktopWidgetSize = 'small' | 'medium' | 'large'
+export type DesktopWidgetMemoMode = 'list' | 'image'
 export type DesktopWidgetFont =
   | 'system'
   | 'serif'
@@ -277,6 +295,8 @@ export interface DesktopWidgetConfig {
   font: DesktopWidgetFont
   fontColor: string
   accentColor: string
+  memoDisplayMode: DesktopWidgetMemoMode
+  memoImageAttachmentId: string
   x?: number
   y?: number
   width?: number
@@ -375,6 +395,39 @@ export interface GardenData {
   quests: DailyQuest[]
   questsDate: string
   questsCompletedTotal: number
+}
+
+export type PetFocusSource = 'pomodoro' | 'class'
+export type PetKeepsakeKind = 'gift' | 'trash'
+
+export interface PetKeepsake {
+  id: string
+  itemId: string
+  kind: PetKeepsakeKind
+  source: PetFocusSource
+  at: number
+}
+
+export interface PetActiveClass {
+  id: string
+  name: string
+  startedAt: number
+  endAt: number
+}
+
+export interface PetCompanionData {
+  coins: number
+  catId: string
+  roomId: string
+  furnitureId: string
+  unlockedCats: string[]
+  unlockedRooms: string[]
+  unlockedFurniture: string[]
+  keepsakes: PetKeepsake[]
+  completedSessions: number
+  abandonedSessions: number
+  activeClass: PetActiveClass | null
+  settledClasses: string[]
 }
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'

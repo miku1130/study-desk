@@ -65,7 +65,9 @@ let moveFrame = 0
 function isInteractiveTarget(target: EventTarget | null): boolean {
   return Boolean(
     target instanceof Element &&
-      target.closest('button, input, textarea, select, a, .memo-list, .memo-quick, .widget-actions')
+      target.closest(
+        'button, input, textarea, select, a, .memo-list, .memo-quick, .widget-actions, .todo-attachments'
+      )
   )
 }
 
@@ -122,10 +124,10 @@ let pointerInteractive = false
 function handleMouseMove(event: MouseEvent): void {
   if (!config.value?.locked) return
   const target = document.elementFromPoint(event.clientX, event.clientY)
-  const overLock = Boolean(target?.closest('.widget-lock-toggle'))
-  if (overLock === pointerInteractive) return
-  pointerInteractive = overLock
-  void window.api.desktopWidgets.setPointerInteractive(config.value.id, overLock)
+  const overInteractive = Boolean(target?.closest('.widget-lock-toggle, .todo-attachment-open'))
+  if (overInteractive === pointerInteractive) return
+  pointerInteractive = overInteractive
+  void window.api.desktopWidgets.setPointerInteractive(config.value.id, overInteractive)
 }
 
 document.documentElement.classList.add('desktop-widget-window')

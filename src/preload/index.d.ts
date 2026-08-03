@@ -26,6 +26,10 @@ export interface StudyDeskApi {
   clockWidget: {
     toggle: () => Promise<boolean>
   }
+  petWidget: {
+    sync: (visible: boolean) => Promise<void>
+    hide: () => Promise<void>
+  }
   desktopWidgets: {
     close: (id: string) => Promise<boolean>
     beginDrag: (id: string) => Promise<{ x: number; y: number; width: number; height: number } | null>

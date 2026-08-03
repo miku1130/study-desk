@@ -4,10 +4,19 @@ import { useRouter } from 'vue-router'
 import AppModal from '@/components/AppModal.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import TodoAttachmentList from '@/components/todo/TodoAttachmentList.vue'
 import { useTodoStore } from '@/stores/todos'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useUiStore } from '@/stores/ui'
-import { PRIORITIES, REPEATS, type Priority, type TodoItem, type TodoKind } from '@/types'
+import {
+  PRIORITIES,
+  REPEATS,
+  type Priority,
+  type TodoAttachment,
+  type TodoItem,
+  type TodoKind
+} from '@/types'
+import { TODO_IMAGE_FILTER, mergeTodoAttachments } from '@/lib/todoAttachments'
 
 const todos = useTodoStore()
 const pomodoro = usePomodoroStore()
@@ -23,6 +32,7 @@ const quickText = ref('')
 const quickKind = ref<TodoKind>('task')
 const quickPriority = ref<Priority>(0)
 const quickDue = ref('')
+const quickAttachments = ref<TodoAttachment[]>([])
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'today', label: '今天' },
@@ -122,11 +132,15 @@ const doneGroups = computed(() => {
 function add(): void {
   if (!quickText.value.trim()) return
   const due = quickKind.value === 'task' ? quickDue.value || (tab.value === 'today' ? todayKey() : '') : ''
-  todos.add(quickText.value, quickPriority.value, due, { kind: quickKind.value })
+  todos.add(quickText.value, quickPriority.value, due, {
+    kind: quickKind.value,
+    attachments: quickKind.value === 'task' ? [] : quickAttachments.value
+  })
   quickText.value = ''
   quickKind.value = 'task'
   quickPriority.value = 0
   quickDue.value = ''
+  quickAttachments.value = []
 }
 
 const showEdit = ref(false)
@@ -147,13 +161,19 @@ const editing = reactive<TodoItem>({
   pinned: false,
   estimatePomodoros: 0,
   subtasks: [],
+  attachments: [],
   completedAt: undefined
 })
 const tagText = ref('')
 const newSubtask = ref('')
 
 function openEdit(item: TodoItem): void {
-  Object.assign(editing, { ...item, tags: [...item.tags], subtasks: item.subtasks.map((s) => ({ ...s })) })
+  Object.assign(editing, {
+    ...item,
+    tags: [...item.tags],
+    subtasks: item.subtasks.map((subtask) => ({ ...subtask })),
+    attachments: item.attachments.map((attachment) => ({ ...attachment }))
+  })
   tagText.value = item.tags.join('，')
   newSubtask.value = ''
   showEdit.value = true
@@ -165,7 +185,12 @@ function saveEdit(): void {
     .split(/[，,\s]+/)
     .map((tag) => tag.trim())
     .filter(Boolean)
-  todos.update({ ...editing, tags: [...editing.tags], subtasks: editing.subtasks.map((s) => ({ ...s })) })
+  todos.update({
+    ...editing,
+    tags: [...editing.tags],
+    subtasks: editing.subtasks.map((subtask) => ({ ...subtask })),
+    attachments: editing.attachments.map((attachment) => ({ ...attachment }))
+  })
   showEdit.value = false
 }
 
@@ -205,6 +230,36 @@ function addEditingSubtask(): void {
 
 function removeEditingSubtask(id: string): void {
   editing.subtasks = editing.subtasks.filter((subtask) => subtask.id !== id)
+}
+
+async function chooseAttachments(target: 'quick' | 'editing', imagesOnly: boolean): Promise<void> {
+  const paths = await window.api.dialog.openFiles(imagesOnly ? TODO_IMAGE_FILTER : undefined)
+  if (!paths.length) return
+  if (target === 'quick') {
+    quickAttachments.value = mergeTodoAttachments(
+      quickAttachments.value,
+      paths,
+      imagesOnly ? 'image' : undefined
+    )
+    return
+  }
+  editing.attachments = mergeTodoAttachments(
+    editing.attachments,
+    paths,
+    imagesOnly ? 'image' : undefined
+  )
+}
+
+function removeQuickAttachment(id: string): void {
+  quickAttachments.value = quickAttachments.value.filter((attachment) => attachment.id !== id)
+}
+
+function removeEditingAttachment(id: string): void {
+  editing.attachments = editing.attachments.filter((attachment) => attachment.id !== id)
+}
+
+function attachmentOpenError(attachment: TodoAttachment): void {
+  ui.info(`未找到附件「${attachment.name}」，请重新选择文件`)
 }
 
 function startFocus(item: TodoItem): void {
@@ -319,6 +374,24 @@ function reminderPending(item: TodoItem): boolean {
         <input v-model="quickDue" type="date" class="input input-sm" />
       </div>
       <button class="btn" @click="add">添加</button>
+      <div v-if="quickKind !== 'task'" class="quick-attachment-panel">
+        <div class="attachment-actions">
+          <button class="btn btn-secondary btn-sm" type="button" @click="chooseAttachments('quick', true)">
+            <AppIcon name="image" :size="14" />添加图片
+          </button>
+          <button class="btn btn-secondary btn-sm" type="button" @click="chooseAttachments('quick', false)">
+            <AppIcon name="paperclip" :size="14" />添加文件
+          </button>
+        </div>
+        <TodoAttachmentList
+          v-if="quickAttachments.length"
+          :attachments="quickAttachments"
+          editable
+          mode="editor"
+          @remove="removeQuickAttachment"
+          @open-error="attachmentOpenError"
+        />
+      </div>
     </section>
 
     <section class="memo-tools">
@@ -354,6 +427,13 @@ function reminderPending(item: TodoItem): boolean {
                 <span v-if="todos.activeId === item.id" class="active-pill">专注中</span>
               </div>
               <p v-if="item.note" class="memo-note">{{ item.note }}</p>
+              <TodoAttachmentList
+                v-if="item.attachments.length"
+                class="memo-attachments"
+                :attachments="item.attachments"
+                mode="list"
+                @open-error="attachmentOpenError"
+              />
               <div v-if="item.subtasks.length" class="sub-progress">
                 <span :style="{ width: subtaskProgress(item) + '%' }" />
               </div>
@@ -415,6 +495,13 @@ function reminderPending(item: TodoItem): boolean {
                   <span class="kind-pill">{{ kindLabel[item.kind] }}</span>
                   <h3>{{ item.text }}</h3>
                 </div>
+                <TodoAttachmentList
+                  v-if="item.attachments.length"
+                  class="memo-attachments"
+                  :attachments="item.attachments"
+                  mode="list"
+                  @open-error="attachmentOpenError"
+                />
                 <div class="memo-tags">
                   <span v-for="tag in item.tags" :key="tag">#{{ tag }}</span>
                 </div>
@@ -448,6 +535,13 @@ function reminderPending(item: TodoItem): boolean {
               <span v-if="todos.activeId === item.id" class="active-pill">专注中</span>
             </div>
             <p v-if="item.note" class="memo-note">{{ item.note }}</p>
+            <TodoAttachmentList
+              v-if="item.attachments.length"
+              class="memo-attachments"
+              :attachments="item.attachments"
+              mode="list"
+              @open-error="attachmentOpenError"
+            />
             <div v-if="item.subtasks.length" class="sub-progress">
               <span :style="{ width: subtaskProgress(item) + '%' }" />
             </div>
@@ -517,6 +611,31 @@ function reminderPending(item: TodoItem): boolean {
           <span>备注正文</span>
           <textarea v-model="editing.note" class="input" rows="4" placeholder="写下上下文、链接、摘录或行动说明..." />
         </label>
+        <section v-if="editing.kind !== 'task'" class="attachment-editor">
+          <div class="attachment-editor-head">
+            <div>
+              <span>图片与文件</span>
+              <small>图片会直接展示，其他文件点击后由系统应用打开</small>
+            </div>
+            <div class="attachment-actions">
+              <button class="btn btn-secondary btn-sm" type="button" @click="chooseAttachments('editing', true)">
+                <AppIcon name="image" :size="14" />图片
+              </button>
+              <button class="btn btn-secondary btn-sm" type="button" @click="chooseAttachments('editing', false)">
+                <AppIcon name="paperclip" :size="14" />文件
+              </button>
+            </div>
+          </div>
+          <TodoAttachmentList
+            v-if="editing.attachments.length"
+            :attachments="editing.attachments"
+            editable
+            mode="editor"
+            @remove="removeEditingAttachment"
+            @open-error="attachmentOpenError"
+          />
+          <p v-else class="attachment-empty">尚未添加附件</p>
+        </section>
         <div class="fld-row">
           <label class="fld">
             <span>优先级</span>
@@ -707,6 +826,26 @@ function reminderPending(item: TodoItem): boolean {
   padding: 12px;
   margin-bottom: 12px;
 }
+.quick-attachment-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--separator);
+}
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.attachment-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .kind-switch {
   display: inline-flex;
   background: var(--bg-input);
@@ -891,6 +1030,9 @@ function reminderPending(item: TodoItem): boolean {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.memo-attachments {
+  margin-top: 9px;
+}
 .sub-progress {
   height: 5px;
   margin-top: 10px;
@@ -1045,6 +1187,36 @@ function reminderPending(item: TodoItem): boolean {
   flex-direction: column;
   gap: 8px;
 }
+.attachment-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+.attachment-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.attachment-editor-head span,
+.attachment-editor-head small {
+  display: block;
+}
+.attachment-editor-head span {
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 750;
+}
+.attachment-editor-head small,
+.attachment-empty {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
 .subtask-add {
   display: flex;
   gap: 8px;
@@ -1081,6 +1253,9 @@ function reminderPending(item: TodoItem): boolean {
   .memo-tools,
   .memo-tabs {
     flex-wrap: wrap;
+  }
+  .quick-attachment-panel {
+    grid-template-columns: 1fr;
   }
 }
 </style>

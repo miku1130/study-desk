@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
+import PetSpriteAnimation from '@/components/pet/PetSpriteAnimation.vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
+import { usePetCompanionStore } from '@/stores/petCompanion'
+import { PET_ROOM_IMAGES } from '@/lib/petAssets'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
+const pet = usePetCompanionStore()
 
 const mmss = computed(
   () => `${String(pomodoro.minutes).padStart(2, '0')}:${String(pomodoro.seconds).padStart(2, '0')}`
@@ -18,7 +22,10 @@ const style = computed(() => settings.s.pomodoro.lockStyle || 'minimal')
 
 const bgStyle = computed(() => {
   const wp = settings.s.pomodoro.wallpaper
-  return wp ? { backgroundImage: `url("${window.api.media.url(wp)}")` } : {}
+  const background = wp
+    ? window.api.media.url(wp)
+    : PET_ROOM_IMAGES[pet.roomId] ?? PET_ROOM_IMAGES.sunroom
+  return { backgroundImage: `url("${background}")` }
 })
 
 // 暂停 / 结束都会让计时停止，主进程随即关闭锁屏窗口（不再被每秒重新弹出）
@@ -35,7 +42,7 @@ function onKey(e: KeyboardEvent): void {
 
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  void pomodoro.init()
+  void Promise.all([pomodoro.init(), pet.load()])
 })
 
 onUnmounted(() => window.removeEventListener('keydown', onKey))
@@ -43,36 +50,43 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="lock" :class="{ wp: !!settings.s.pomodoro.wallpaper }" :style="bgStyle">
-    <div class="lock-inner">
-      <p class="lock-phase">{{ pomodoro.phaseLabel }}</p>
+    <div class="lock-layout">
+      <section class="lock-companion">
+        <p class="companion-bubble">{{ pet.selectedCat.name }}在旁边陪你写</p>
+        <PetSpriteAnimation
+          class="lock-cat"
+          animation="writing"
+          :cat-id="pet.catId"
+          :label="`${pet.selectedCat.name}正在伴学`"
+        />
+      </section>
+      <section class="lock-inner">
+        <p class="lock-phase">{{ pomodoro.phaseLabel }}</p>
 
-      <!-- 极简 -->
-      <p v-if="style === 'minimal'" class="lock-time minimal">{{ mmss }}</p>
+        <p v-if="style === 'minimal'" class="lock-time minimal">{{ mmss }}</p>
 
-      <!-- 翻页钟 -->
-      <div v-else-if="style === 'flip'" class="flip">
-        <span class="flip-card">{{ digits[0] }}</span>
-        <span class="flip-card">{{ digits[1] }}</span>
-        <span class="flip-colon">:</span>
-        <span class="flip-card">{{ digits[2] }}</span>
-        <span class="flip-card">{{ digits[3] }}</span>
-      </div>
+        <div v-else-if="style === 'flip'" class="flip">
+          <span class="flip-card">{{ digits[0] }}</span>
+          <span class="flip-card">{{ digits[1] }}</span>
+          <span class="flip-colon">:</span>
+          <span class="flip-card">{{ digits[2] }}</span>
+          <span class="flip-card">{{ digits[3] }}</span>
+        </div>
 
-      <!-- 像素 LED -->
-      <p v-else-if="style === 'pixel'" class="lock-time pixel">{{ mmss }}</p>
+        <p v-else-if="style === 'pixel'" class="lock-time pixel">{{ mmss }}</p>
 
-      <!-- 呼吸光 -->
-      <div v-else class="breath">
-        <span class="breath-glow" />
-        <span class="breath-time">{{ mmss }}</span>
-      </div>
+        <div v-else class="breath">
+          <span class="breath-glow" />
+          <span class="breath-time">{{ mmss }}</span>
+        </div>
 
-      <p class="lock-meta">今日已完成 {{ pomodoro.completed }} 个番茄 · 专注，别分心</p>
-      <div class="lock-actions">
-        <button class="lock-btn" @click="pause">暂停</button>
-        <button class="lock-btn primary" @click="end">结束专注</button>
-      </div>
-      <p class="lock-hint">按 Esc 暂停并退出</p>
+        <p class="lock-meta">今日 {{ pomodoro.completed }} 个番茄 · 完成后花园会生长，猫会留下礼物</p>
+        <div class="lock-actions">
+          <button class="lock-btn" @click="pause">暂停</button>
+          <button class="lock-btn primary" @click="end">结束专注</button>
+        </div>
+        <p class="lock-hint">按 Esc 暂停并退出</p>
+      </section>
     </div>
   </div>
 </template>
@@ -84,17 +98,58 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 35%, #2b2b40, #050509 70%);
+  background-color: #28362f;
   background-size: cover;
   background-position: center;
   color: #fff;
   user-select: none;
 }
+.lock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 21, 0.34);
+}
+.lock-layout {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - 80px));
+  display: grid;
+  grid-template-columns: minmax(320px, 0.75fr) minmax(620px, 1.25fr);
+  align-items: end;
+  gap: 18px;
+}
+.lock-companion {
+  position: relative;
+  height: min(72vh, 720px);
+  display: flex;
+  align-items: end;
+  justify-content: center;
+}
+.lock-cat {
+  width: 100%;
+  height: 92%;
+  filter: drop-shadow(0 24px 22px rgba(0, 0, 0, 0.28));
+}
+.companion-bubble {
+  position: absolute;
+  z-index: 2;
+  top: 5%;
+  right: 1%;
+  margin: 0;
+  padding: 10px 13px;
+  border-radius: 8px 8px 8px 2px;
+  background: rgba(255, 252, 247, 0.9);
+  color: #25332d;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+}
 .lock-inner {
   position: relative;
   text-align: center;
-  padding: 60px;
-  border-radius: 28px;
+  padding: 46px;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(18px);
 }
@@ -135,7 +190,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #f5f5f7;
-  background: linear-gradient(180deg, #3a3a42, #202027);
+  background: #292b2f;
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -182,8 +237,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   width: 240px;
   height: 240px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--accent), transparent 68%);
-  filter: blur(6px);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 100px color-mix(in srgb, var(--accent) 68%, transparent);
   animation: breathe 8s ease-in-out infinite;
 }
 .breath-time {
@@ -204,7 +259,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     opacity: 0.9;
   }
 }
-
 .lock-meta {
   margin-top: 24px;
   font-size: 15px;
@@ -245,5 +299,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   .breath-glow {
     animation: none;
   }
+}
+@media (max-width: 1050px) {
+  .lock-layout {
+    width: min(920px, calc(100vw - 40px));
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .lock-inner { padding: 34px 28px; }
+  .lock-time.minimal { font-size: 104px; }
+  .flip-card { width: 70px; height: 102px; font-size: 76px; }
 }
 </style>

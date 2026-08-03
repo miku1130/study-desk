@@ -134,7 +134,7 @@ function claim(id: string): void {
 }
 
 function startFocus(): void {
-  router.push('/pomodoro')
+  router.push('/pomodoro?tab=timer')
 }
 </script>
 

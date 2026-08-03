@@ -57,9 +57,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/garden',
-    name: 'garden',
-    component: () => import('@/views/GardenView.vue'),
-    meta: { title: '专注花园' }
+    redirect: { path: '/pomodoro', query: { tab: 'garden' } }
   },
   {
     path: '/breathe',
@@ -90,6 +88,16 @@ const routes: RouteRecordRaw[] = [
     name: 'clockwidget',
     component: () => import('@/views/ClockWidgetView.vue'),
     meta: { title: '时钟浮窗' }
+  },
+  {
+    path: '/pet',
+    redirect: { path: '/pomodoro', query: { tab: 'room' } }
+  },
+  {
+    path: '/pet-widget',
+    name: 'pet-widget',
+    component: () => import('@/views/PetWidgetView.vue'),
+    meta: { title: '猫咪伴学挂件' }
   },
   {
     path: '/desktop-widget/:id',

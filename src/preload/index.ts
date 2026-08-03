@@ -23,6 +23,10 @@ const api = {
   clockWidget: {
     toggle: (): Promise<boolean> => ipcRenderer.invoke('clockwidget:toggle')
   },
+  petWidget: {
+    sync: (visible: boolean): Promise<void> => ipcRenderer.invoke('pet-widget:sync', visible),
+    hide: (): Promise<void> => ipcRenderer.invoke('pet-widget:hide')
+  },
   desktopWidgets: {
     close: (id: string): Promise<boolean> => ipcRenderer.invoke('desktop-widget:close', id),
     beginDrag: (id: string): Promise<{ x: number; y: number; width: number; height: number } | null> =>

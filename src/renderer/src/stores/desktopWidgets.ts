@@ -20,7 +20,9 @@ const DEFAULTS: Omit<DesktopWidgetConfig, 'id' | 'kind' | 'sourceId' | 'title'> 
   surfaceOpacity: 0.94,
   font: 'system',
   fontColor: '#ffffff',
-  accentColor: '#7ed4b5'
+  accentColor: '#7ed4b5',
+  memoDisplayMode: 'list',
+  memoImageAttachmentId: ''
 }
 
 function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWidgetConfig {
@@ -49,6 +51,9 @@ function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWid
     title: typeof raw.title === 'string' ? raw.title : '',
     size,
     font,
+    memoDisplayMode: raw.memoDisplayMode === 'image' ? 'image' : 'list',
+    memoImageAttachmentId:
+      typeof raw.memoImageAttachmentId === 'string' ? raw.memoImageAttachmentId : '',
     overlayOpacity: clamp(raw.overlayOpacity, DEFAULTS.overlayOpacity),
     surfaceOpacity: clamp(raw.surfaceOpacity, DEFAULTS.surfaceOpacity),
     enabled: raw.enabled !== false,

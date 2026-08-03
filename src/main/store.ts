@@ -84,7 +84,8 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   autostart: false,
   widget: false,
   hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' },
-  musicApi: ''
+  musicApi: '',
+  petWidget: { enabled: false, duringPomodoro: true, duringClass: true }
 }
 
 export interface AppStores {
@@ -98,6 +99,7 @@ export interface AppStores {
   countdowns: JsonStore<Record<string, unknown>>
   desktopWidgets: JsonStore<Record<string, unknown>>
   garden: JsonStore<Record<string, unknown>>
+  petCompanion: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -124,6 +126,20 @@ export function createStores(): AppStores {
       quests: [],
       questsDate: '',
       questsCompletedTotal: 0
+    }),
+    petCompanion: new JsonStore('pet-companion.json', {
+      coins: 12,
+      catId: 'mikan',
+      roomId: 'sunroom',
+      furnitureId: 'oak-desk',
+      unlockedCats: ['mikan'],
+      unlockedRooms: ['sunroom'],
+      unlockedFurniture: ['oak-desk'],
+      keepsakes: [],
+      completedSessions: 0,
+      abandonedSessions: 0,
+      activeClass: null,
+      settledClasses: []
     })
   }
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { DesktopWidgetConfig, DesktopWidgetFont, DesktopWidgetSize } from '@/types'
+import { computed } from 'vue'
+import type { DesktopWidgetConfig, DesktopWidgetFont, DesktopWidgetSize, TodoItem } from '@/types'
 
-const props = defineProps<{ modelValue: DesktopWidgetConfig }>()
+const props = defineProps<{ modelValue: DesktopWidgetConfig; memos?: TodoItem[] }>()
 const emit = defineEmits<{ 'update:modelValue': [value: DesktopWidgetConfig] }>()
 
 const sizes: Array<{ value: DesktopWidgetSize; label: string }> = [
@@ -19,8 +20,20 @@ const fonts: Array<{ value: DesktopWidgetFont; label: string }> = [
   { value: 'display', label: '站酷庆科黄油体' }
 ]
 
+const memoImages = computed(() =>
+  (props.memos ?? []).flatMap((memo) =>
+    memo.attachments
+      .filter((attachment) => attachment.kind === 'image')
+      .map((attachment) => ({ ...attachment, memoText: memo.text }))
+  )
+)
+
 function patch(value: Partial<DesktopWidgetConfig>): void {
   emit('update:modelValue', { ...props.modelValue, ...value })
+}
+
+function imageUrl(path: string): string {
+  return window.api.media.url(path)
 }
 
 async function pickBackground(): Promise<void> {
@@ -28,6 +41,16 @@ async function pickBackground(): Promise<void> {
     { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }
   ])
   if (path) patch({ background: path })
+}
+
+function useImageMode(): void {
+  const selected = memoImages.value.find(
+    (image) => image.id === props.modelValue.memoImageAttachmentId
+  )
+  patch({
+    memoDisplayMode: 'image',
+    memoImageAttachmentId: selected?.id ?? memoImages.value[0]?.id ?? ''
+  })
 }
 </script>
 
@@ -43,6 +66,34 @@ async function pickBackground(): Promise<void> {
       <div class="segmented">
         <button v-for="item in sizes" :key="item.value" :class="{ active: modelValue.size === item.value }" @click="patch({ size: item.value, width: undefined, height: undefined })">
           {{ item.label }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="modelValue.kind === 'memo'" class="field">
+      <span>显示模式</span>
+      <div class="segmented memo-mode-segmented">
+        <button :class="{ active: modelValue.memoDisplayMode === 'list' }" @click="patch({ memoDisplayMode: 'list' })">
+          内容卡片
+        </button>
+        <button :class="{ active: modelValue.memoDisplayMode === 'image' }" :disabled="!memoImages.length" @click="useImageMode">
+          纯图片
+        </button>
+      </div>
+    </div>
+
+    <div v-if="modelValue.kind === 'memo' && modelValue.memoDisplayMode === 'image' && memoImages.length" class="field">
+      <span>桌面图片</span>
+      <div class="memo-image-picker">
+        <button
+          v-for="image in memoImages"
+          :key="image.id"
+          :class="{ active: modelValue.memoImageAttachmentId === image.id }"
+          :title="`${image.memoText} - ${image.name}`"
+          @click="patch({ memoImageAttachmentId: image.id })"
+        >
+          <img :src="imageUrl(image.path)" :alt="image.name" />
+          <span>{{ image.name }}</span>
         </button>
       </div>
     </div>
@@ -93,6 +144,13 @@ async function pickBackground(): Promise<void> {
 .segmented { display: grid; grid-template-columns: repeat(3, 1fr); padding: 3px; border-radius: 7px; background: var(--surface-muted); }
 .segmented button { min-height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--text-secondary); }
 .segmented button.active { background: var(--surface-raised); color: var(--accent-strong); box-shadow: 0 1px 5px rgba(20, 28, 24, 0.1); }
+.segmented button:disabled { opacity: 0.42; cursor: not-allowed; }
+.memo-mode-segmented { grid-template-columns: repeat(2, 1fr); }
+.memo-image-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.memo-image-picker button { min-width: 0; overflow: hidden; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-muted); color: var(--text-secondary); text-align: left; }
+.memo-image-picker button.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.memo-image-picker img { width: 100%; aspect-ratio: 1; display: block; border-radius: 4px; object-fit: cover; }
+.memo-image-picker span { display: block; overflow: hidden; margin-top: 4px; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .color-grid input { width: 100%; height: 34px; padding: 3px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--surface-muted); }
 .row { display: flex; gap: 8px; }

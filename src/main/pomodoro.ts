@@ -13,7 +13,7 @@ export interface PomodoroState {
 
 interface PomodoroHooks {
   onUpdate?: (state: PomodoroState) => void
-  onEvent?: (type: 'workComplete' | 'breakComplete') => void
+  onEvent?: (type: 'workComplete' | 'breakComplete' | 'workAbandoned') => void
 }
 
 interface PomodoroCfg {
@@ -72,6 +72,7 @@ export class PomodoroEngine {
   }
 
   reset(): void {
+    if (this.workWasStarted()) this.emitEvent('workAbandoned')
     this.clear()
     this.state = {
       phase: 'idle',
@@ -110,7 +111,8 @@ export class PomodoroEngine {
 
   private complete(skipped: boolean): void {
     const finished = this.state.phase
-    if (finished === 'work') {
+    const abandonedWork = skipped && this.workWasStarted()
+    if (finished === 'work' && !skipped) {
       this.state.completed += 1
       this.recordStat()
     }
@@ -131,11 +133,24 @@ export class PomodoroEngine {
       this.clear()
     }
 
-    if (!skipped && finished !== 'idle') {
-      this.hooks.onEvent?.(finished === 'work' ? 'workComplete' : 'breakComplete')
-      this.broadcast('pomodoro:event', finished === 'work' ? 'workComplete' : 'breakComplete')
+    if (abandonedWork) this.emitEvent('workAbandoned')
+    else if (!skipped && finished !== 'idle') {
+      this.emitEvent(finished === 'work' ? 'workComplete' : 'breakComplete')
     }
     this.emit()
+  }
+
+  private workWasStarted(): boolean {
+    return (
+      this.state.phase === 'work' &&
+      this.state.total > 0 &&
+      (this.state.running || this.state.remaining < this.state.total)
+    )
+  }
+
+  private emitEvent(type: 'workComplete' | 'breakComplete' | 'workAbandoned'): void {
+    this.hooks.onEvent?.(type)
+    this.broadcast('pomodoro:event', type)
   }
 
   private recordStat(): void {

@@ -99,4 +99,33 @@ describe('PomodoroEngine', () => {
     expect(engine.getState().phase).toBe('idle')
     expect(engine.getState().running).toBe(false)
   })
+
+  it('skipping started work records an abandoned event without awarding a completion', () => {
+    const { settings, stats, daysData } = makeStores()
+    const events: unknown[][] = []
+    const engine = new PomodoroEngine(settings as never, stats as never, (c, ...a) =>
+      events.push([c, ...a])
+    )
+    engine.start()
+    vi.advanceTimersByTime(2000)
+    engine.skip()
+
+    expect(engine.getState().completed).toBe(0)
+    expect(Object.values(daysData)).toHaveLength(0)
+    expect(events.some(([c, t]) => c === 'pomodoro:event' && t === 'workAbandoned')).toBe(true)
+  })
+
+  it('resetting progressed work records one abandoned event', () => {
+    const { settings, stats } = makeStores()
+    const events: unknown[][] = []
+    const engine = new PomodoroEngine(settings as never, stats as never, (c, ...a) =>
+      events.push([c, ...a])
+    )
+    engine.start()
+    vi.advanceTimersByTime(2000)
+    engine.pause()
+    engine.reset()
+
+    expect(events.filter(([c, t]) => c === 'pomodoro:event' && t === 'workAbandoned')).toHaveLength(1)
+  })
 })
