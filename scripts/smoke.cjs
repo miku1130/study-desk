@@ -166,6 +166,40 @@ ipcMain.handle('study-room:cheer', () => true)
 ipcMain.handle('study-room:discover-start', () => undefined)
 ipcMain.handle('study-room:discover-stop', () => undefined)
 
+// 猫咪动画自检：待机是逐帧视频，写字是立绘 + CSS 位移，两种都必须真的在动
+const CAT_ANIMATION_PROBE = `(async (scope) => {
+  const root = scope ? document.querySelector(scope) : document
+  if (!root) return '找不到 ' + scope
+  const video = root.querySelector('.pet-animation-video')
+  if (video) {
+    if (video.readyState < 2 || !video.videoWidth) return '猫咪待机视频未加载'
+    await video.play()
+    const frameHash = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = 64
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      context.drawImage(video, 0, 0, 64, 64)
+      return context.getImageData(0, 0, 64, 64).data.reduce((sum, value, index) => sum + value * ((index % 17) + 1), 0)
+    }
+    const first = frameHash()
+    await new Promise((resolve) => setTimeout(resolve, 180))
+    return frameHash() === first ? '猫咪待机动画未播放' : ''
+  }
+  const still = root.querySelector('.pet-animation-still')
+  if (!still) return '猫咪贴图未渲染'
+  if (!still.complete || !still.naturalWidth) return '猫咪立绘未加载'
+  const running = [still, still.parentElement]
+    .filter(Boolean)
+    .flatMap((el) => el.getAnimations())
+    .filter((a) => a.playState === 'running')
+  if (running.length < 2) return '猫咪立绘动画缺失（呼吸与笔触应各有一条）'
+  const before = running.map((a) => Number(a.currentTime) || 0)
+  await new Promise((resolve) => setTimeout(resolve, 180))
+  const after = running.map((a) => Number(a.currentTime) || 0)
+  return after.some((value, index) => value > before[index]) ? '' : '猫咪立绘动画时间未推进'
+})`
+
 const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
@@ -301,21 +335,9 @@ async function checkRoute(route) {
   if (route.hash === '/pet' && domOk) {
     const petResult = await win.webContents.executeJavaScript(`(async () => {
       const room = document.querySelector('.room-background')
-      const cat = document.querySelector('.cat-image .pet-animation-video')
       if (!room?.complete || !room.naturalWidth) return '房间背景未加载'
-      if (!cat || cat.readyState < 2 || !cat.videoWidth) return '猫咪贴图未加载'
-      await cat.play()
-      const frameHash = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = 64
-        canvas.height = 64
-        const context = canvas.getContext('2d', { willReadFrequently: true })
-        context.drawImage(cat, 0, 0, 64, 64)
-        return context.getImageData(0, 0, 64, 64).data.reduce((sum, value, index) => sum + value * ((index % 17) + 1), 0)
-      }
-      const firstFrame = frameHash()
-      await new Promise((resolve) => setTimeout(resolve, 180))
-      if (frameHash() === firstFrame) return '猫咪待机动画未播放'
+      const animationError = await (${CAT_ANIMATION_PROBE})('.cat-image')
+      if (animationError) return animationError
       document.querySelector('.cat-button')?.click()
       await new Promise((resolve) => setTimeout(resolve, 80))
       if (!document.querySelector('.cat-bubble')) return '摸猫反馈未出现'
@@ -348,22 +370,7 @@ async function checkRoute(route) {
   }
 
   if ((route.hash === '/lock' || route.hash === '/pet-widget') && domOk) {
-    const animationResult = await win.webContents.executeJavaScript(`(async () => {
-      const image = document.querySelector('.pet-animation-video')
-      if (!image || image.readyState < 2 || !image.videoWidth) return '猫咪动画未加载'
-      await image.play()
-      const frameHash = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = 64
-        canvas.height = 64
-        const context = canvas.getContext('2d', { willReadFrequently: true })
-        context.drawImage(image, 0, 0, 64, 64)
-        return context.getImageData(0, 0, 64, 64).data.reduce((sum, value, index) => sum + value * ((index % 17) + 1), 0)
-      }
-      const firstFrame = frameHash()
-      await new Promise((resolve) => setTimeout(resolve, 180))
-      return frameHash() === firstFrame ? '猫咪写字动画未播放' : ''
-    })()`)
+    const animationResult = await win.webContents.executeJavaScript(`(${CAT_ANIMATION_PROBE})('')`)
     if (animationResult) errors.push(animationResult)
   }
 

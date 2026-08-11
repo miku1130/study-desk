@@ -175,7 +175,8 @@ ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
 
 const roomMember = (id, nickname, catId, over) => ({
   id, nickname, catId, host: false, phase: 'work', running: true, remaining: 1124,
-  todayFocusMinutes: 75, todayPomodoros: 3, roomFocusSeconds: 1560, roomPomodoros: 2,
+  todayFocusMinutes: 75, todayPomodoros: 3, todayRoomFocusSeconds: 2760,
+  roomFocusSeconds: 1560, roomPomodoros: 2,
   cheers: 4, joinedAt: Date.now() - 3600000, online: true, ...over
 })
 ipcMain.handle('study-room:get-state', () => ({

@@ -208,6 +208,52 @@ describe('parseMessage', () => {
     expect(parseMessage('[1,2,3]')).toBeNull()
     expect(parseMessage('   ')).toBeNull()
   })
+
+  it('focus 缺 todayRoomFocusSeconds 时默认为 0（兼容未升级客户端）', () => {
+    const line = JSON.stringify({
+      t: 'focus',
+      focus: { phase: 'work', running: true, remaining: 60, todayFocusMinutes: 1, todayPomodoros: 0 }
+    })
+    const message = parseMessage(line)
+    expect(message?.t).toBe('focus')
+    if (message?.t === 'focus') expect(message.focus.todayRoomFocusSeconds).toBe(0)
+  })
+
+  it('todayRoomFocusSeconds 会被清洗：负数与非数字归 0，超限封顶 24 小时', () => {
+    const parsedSeconds = (todayRoomFocusSeconds: unknown): number => {
+      const line = JSON.stringify({
+        t: 'focus',
+        focus: {
+          phase: 'work',
+          running: true,
+          remaining: 60,
+          todayFocusMinutes: 1,
+          todayPomodoros: 0,
+          todayRoomFocusSeconds
+        }
+      })
+      const message = parseMessage(line)
+      if (message?.t !== 'focus') throw new Error('focus 消息解析失败')
+      return message.focus.todayRoomFocusSeconds
+    }
+    expect(parsedSeconds(3600)).toBe(3600)
+    expect(parsedSeconds(-5)).toBe(0)
+    expect(parsedSeconds('abc')).toBe(0)
+    expect(parsedSeconds(999_999_999)).toBe(24 * 3600)
+  })
+
+  it('roster 成员快照原样携带 todayRoomFocusSeconds', () => {
+    const line = JSON.stringify({
+      t: 'roster',
+      room: { roomId: 'r1', name: '自习室' },
+      members: [{ id: 'm1', nickname: '小明', todayRoomFocusSeconds: 777 }]
+    })
+    const message = parseMessage(line)
+    expect(message?.t).toBe('roster')
+    if (message?.t === 'roster') {
+      expect(message.members[0].todayRoomFocusSeconds).toBe(777)
+    }
+  })
 })
 
 describe('broadcastAddressesFrom', () => {

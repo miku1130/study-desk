@@ -3,6 +3,7 @@ import { StudyRoomService } from '../src/main/studyRoom/service'
 import type { StudyRoomDeps } from '../src/main/studyRoom/service'
 import { decodeRoomCode } from '../src/main/studyRoom/protocol'
 import type { StudyRoomFocusReport } from '../src/main/studyRoom/protocol'
+import { localDateKey } from '../src/main/time'
 
 const NETWORK_TEST_TIMEOUT = 20_000
 
@@ -11,7 +12,8 @@ const idleFocus: StudyRoomFocusReport = {
   running: false,
   remaining: 0,
   todayFocusMinutes: 0,
-  todayPomodoros: 0
+  todayPomodoros: 0,
+  todayRoomFocusSeconds: 0
 }
 
 const workFocus: StudyRoomFocusReport = {
@@ -19,7 +21,8 @@ const workFocus: StudyRoomFocusReport = {
   running: true,
   remaining: 900,
   todayFocusMinutes: 42,
-  todayPomodoros: 3
+  todayPomodoros: 3,
+  todayRoomFocusSeconds: 0
 }
 
 function sleep(ms: number): Promise<void> {
@@ -44,12 +47,18 @@ afterEach(async () => {
 interface Peer {
   service: StudyRoomService
   channels: Array<[string, ...unknown[]]>
+  /** 假 store 的底层数据，可预置也可断言持久化结果 */
+  data: Record<string, unknown>
   setFocus: (focus: StudyRoomFocusReport) => void
 }
 
 /** 一个完整的自习室端：真实 StudyRoomService，只把 store / 广播 / 通知替换成内存桩 */
-function makePeer(nickname: string, catId = 'mikan'): Peer {
-  const data: Record<string, unknown> = { nickname, goalMinutes: 60 }
+function makePeer(
+  nickname: string,
+  catId = 'mikan',
+  storeSeed: Record<string, unknown> = {}
+): Peer {
+  const data: Record<string, unknown> = { nickname, goalMinutes: 60, ...storeSeed }
   const channels: Array<[string, ...unknown[]]> = []
   let focus: StudyRoomFocusReport = { ...idleFocus }
   const deps: StudyRoomDeps = {
@@ -72,6 +81,7 @@ function makePeer(nickname: string, catId = 'mikan'): Peer {
   return {
     service,
     channels,
+    data,
     setFocus: (next) => {
       focus = next
     }
@@ -260,6 +270,60 @@ describe('自习室端到端（两个真实 StudyRoomService 互联）', () => {
       expect(result.ok).toBe(false)
       expect(guest.service.getState().status).not.toBe('connecting')
       expect(guest.service.getState().room).toBeNull()
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '访客的 todayRoomFocusSeconds 会透传到房主名册，但不影响房内计时与集体目标',
+    async () => {
+      const host = makePeer('班长')
+      expect((await host.service.host({ name: '三楼自习室', goalMinutes: 60 })).ok).toBe(true)
+
+      // 访客本机已累计 1234 秒（今天），加入时随 hello 上报
+      const guest = makePeer('同桌', 'sesame', {
+        todayRoomFocus: { date: localDateKey(), seconds: 1234 }
+      })
+      expect(
+        await guest.service.join({ address: '127.0.0.1', port: hostedPort(host.service) })
+      ).toEqual({ ok: true })
+      await until(() => host.service.getState().members.length === 2)
+
+      const seenByHost = host.service.getState().members.find((m) => m.nickname === '同桌')
+      expect(seenByHost?.todayRoomFocusSeconds).toBe(1234)
+      // 今日累计只做展示：不改本次房内计时，也不推动集体目标
+      expect(seenByHost?.roomFocusSeconds).toBe(0)
+      expect(host.service.getState().room?.focusMinutes).toBe(0)
+
+      // 访客也能从房主广播的名册里看到自己的这项数据
+      await until(() =>
+        guest.service
+          .getState()
+          .members.some((m) => m.id === guest.service.getState().selfId && m.todayRoomFocusSeconds === 1234)
+      )
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    'leave 后再 host：todayRoomFocusSeconds 不归零，而 roomFocusSeconds 从零开始',
+    async () => {
+      const peer = makePeer('班长')
+      peer.setFocus(workFocus)
+      expect((await peer.service.host({ name: '第一间', goalMinutes: 60 })).ok).toBe(true)
+
+      // 在房内保持「running 的 work」超过 1 秒，离开时结算并强制落盘
+      await sleep(1200)
+      peer.service.leave()
+      const saved = peer.data.todayRoomFocus as { date: string; seconds: number }
+      expect(saved.date).toBe(localDateKey())
+      expect(saved.seconds).toBeGreaterThanOrEqual(1)
+
+      // 换一间房：今日累计继承，本房计时归零——这正是两个指标的区别
+      expect((await peer.service.host({ name: '第二间', goalMinutes: 60 })).ok).toBe(true)
+      const self = peer.service.getState().members[0]
+      expect(self.todayRoomFocusSeconds).toBeGreaterThanOrEqual(saved.seconds)
+      expect(self.roomFocusSeconds).toBe(0)
     },
     NETWORK_TEST_TIMEOUT
   )

@@ -458,6 +458,9 @@ export interface StudyRoomMember {
   remaining: number
   todayFocusMinutes: number
   todayPomodoros: number
+  /** 今天在自习室里累计的专注秒数（跨房间、跨重连，由成员本地按日累计） */
+  todayRoomFocusSeconds: number
+  /** 本次在当前自习室的专注秒数，由房主计时，用于集体目标与排行 */
   roomFocusSeconds: number
   roomPomodoros: number
   cheers: number

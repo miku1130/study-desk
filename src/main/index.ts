@@ -273,7 +273,9 @@ function studyRoomFocus(): StudyRoomFocusReport {
     running: state.running,
     remaining: state.remaining,
     todayFocusMinutes: Number(today.focusMinutes) || 0,
-    todayPomodoros: Number(today.pomodoros) || 0
+    todayPomodoros: Number(today.pomodoros) || 0,
+    // 占位：真实值由 StudyRoomService 用自己按日累计的本地计时覆盖
+    todayRoomFocusSeconds: 0
   }
 }
 

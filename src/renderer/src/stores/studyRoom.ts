@@ -28,6 +28,20 @@ interface CheerFeedEntry {
 }
 
 /**
+ * 专注时长的统一展示格式：不足 1 分钟显示秒，不足 1 小时显示分，
+ * 1 小时以上显示「X 小时 Y 分」（Y 为 0 时只显示小时）。分钟口径的字段请先乘 60 换算成秒。
+ */
+export function formatFocusDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  if (total < 60) return `${total} 秒`
+  const minutes = Math.floor(total / 60)
+  if (minutes < 60) return `${minutes} 分`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest > 0 ? `${hours} 小时 ${rest} 分` : `${hours} 小时`
+}
+
+/**
  * 局域网自习室的渲染层镜像。
  *
  * 主进程（`window.api.studyRoom`）是唯一权威状态源：本 store 不维护名册业务逻辑，

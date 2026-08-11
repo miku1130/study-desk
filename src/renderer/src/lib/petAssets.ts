@@ -2,7 +2,6 @@ import catAttentive from '@/assets/pet/cat-attentive.png'
 import catWriting from '@/assets/pet/cat-writing.png'
 import catSleeping from '@/assets/pet/cat-sleeping.png'
 import catGift from '@/assets/pet/cat-gift.png'
-import catWritingAnimation from '@/assets/pet/cat-writing-animation.webm'
 import catIdleMikanAnimation from '@/assets/pet/cat-idle-mikan-animation.webm'
 import catIdleCloudAnimation from '@/assets/pet/cat-idle-cloud-animation.webm'
 import catIdleSesameAnimation from '@/assets/pet/cat-idle-sesame-animation.webm'
@@ -30,8 +29,6 @@ export const PET_CAT_IMAGES: Record<PetVisualState, string> = {
   break: catSleeping,
   gift: catGift
 }
-
-export const PET_CAT_WRITING_ANIMATION = catWritingAnimation
 
 export const PET_CAT_IDLE_ANIMATIONS: Record<string, string> = {
   mikan: catIdleMikanAnimation,

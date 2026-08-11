@@ -4,7 +4,7 @@ import AppModal from '@/components/AppModal.vue'
 import RoomLobby from '@/components/studyroom/RoomLobby.vue'
 import RoomSeatCard from '@/components/studyroom/RoomSeatCard.vue'
 import RoomCheerBar from '@/components/studyroom/RoomCheerBar.vue'
-import { useStudyRoomStore } from '@/stores/studyRoom'
+import { formatFocusDuration, useStudyRoomStore } from '@/stores/studyRoom'
 import { useUiStore } from '@/stores/ui'
 
 const store = useStudyRoomStore()
@@ -14,15 +14,9 @@ const onlineCount = computed(() => store.members.filter((member) => member.onlin
 const roomMinutes = computed(() => Math.floor(store.roomFocusMinutes))
 const progressPct = computed(() => Math.min(100, Math.round(store.goalProgress * 100)))
 const goalReached = computed(() => store.goalProgress >= 1)
-const selfRoomTime = computed(() => formatDuration(store.self?.roomFocusSeconds ?? 0))
-
-function formatDuration(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds))
-  if (total < 60) return `${total} 秒`
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  return hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`
-}
+const selfTodayRoomTime = computed(() =>
+  formatFocusDuration(store.self?.todayRoomFocusSeconds ?? 0)
+)
 
 async function copyRoomCode(): Promise<void> {
   const code = store.room?.code
@@ -154,9 +148,9 @@ onUnmounted(() => {
           <p class="mini-label">房间累计专注</p>
           <p class="mini-value">{{ roomMinutes }} <small>分钟</small></p>
         </div>
-        <div class="card mini">
-          <p class="mini-label">我的房内专注</p>
-          <p class="mini-value mini-duration">{{ selfRoomTime }}</p>
+        <div class="card mini" title="今天在自习室里的累计专注，换房间、断线重连都会接着记">
+          <p class="mini-label">我今天在自习室</p>
+          <p class="mini-value mini-duration">{{ selfTodayRoomTime }}</p>
         </div>
       </div>
 

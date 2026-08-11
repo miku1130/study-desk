@@ -182,7 +182,8 @@ ipcMain.handle('dialog:openFiles', () => [])
 // SHOT_ROOM=live 时预览「已加入自习室」的实况视图，否则预览大厅
 const roomMember = (id, nickname, catId, over) => ({
   id, nickname, catId, host: false, phase: 'work', running: true, remaining: 1124,
-  todayFocusMinutes: 75, todayPomodoros: 3, roomFocusSeconds: 1560, roomPomodoros: 2,
+  todayFocusMinutes: 75, todayPomodoros: 3, todayRoomFocusSeconds: 2760,
+  roomFocusSeconds: 1560, roomPomodoros: 2,
   cheers: 4, joinedAt: Date.now() - 3600000, online: true, ...over
 })
 const liveRoomState = {

@@ -27,6 +27,7 @@ export interface StudyRoomMemberDTO {
   remaining: number
   todayFocusMinutes: number
   todayPomodoros: number
+  todayRoomFocusSeconds: number
   roomFocusSeconds: number
   roomPomodoros: number
   cheers: number

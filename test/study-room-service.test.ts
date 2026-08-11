@@ -23,6 +23,7 @@ import type {
   StudyRoomMessage,
   StudyRoomSummary
 } from '../src/main/studyRoom/protocol'
+import { localDateKey } from '../src/main/time'
 
 const NETWORK_TEST_TIMEOUT = 15_000
 
@@ -31,7 +32,8 @@ const idleFocus: StudyRoomFocusReport = {
   running: false,
   remaining: 0,
   todayFocusMinutes: 0,
-  todayPomodoros: 0
+  todayPomodoros: 0,
+  todayRoomFocusSeconds: 0
 }
 
 const workFocus: StudyRoomFocusReport = {
@@ -39,7 +41,8 @@ const workFocus: StudyRoomFocusReport = {
   running: true,
   remaining: 1200,
   todayFocusMinutes: 10,
-  todayPomodoros: 1
+  todayPomodoros: 1,
+  todayRoomFocusSeconds: 0
 }
 
 function sleep(ms: number): Promise<void> {
@@ -70,19 +73,25 @@ interface ServiceHarness {
   service: StudyRoomService
   sent: Array<[string, ...unknown[]]>
   notices: Array<[string, string]>
+  /** 假 store 的底层数据，可预置也可断言持久化结果 */
+  data: Record<string, unknown>
+  /** store.set 调用流水，用于断言落盘节流 */
+  stored: Array<[string, unknown]>
   setFocus: (focus: StudyRoomFocusReport) => void
 }
 
-function makeService(nickname = '房主'): ServiceHarness {
-  const data: Record<string, unknown> = { nickname, goalMinutes: 120 }
+function makeService(nickname = '房主', storeSeed: Record<string, unknown> = {}): ServiceHarness {
+  const data: Record<string, unknown> = { nickname, goalMinutes: 120, ...storeSeed }
   const sent: Array<[string, ...unknown[]]> = []
   const notices: Array<[string, string]> = []
+  const stored: Array<[string, unknown]> = []
   let focus: StudyRoomFocusReport = { ...idleFocus }
   const deps: StudyRoomDeps = {
     store: {
       get: (key: string) => data[key],
       set: (key: string, value: unknown) => {
         data[key] = value
+        stored.push([key, value])
       }
     } as never,
     send: (channel, ...args) => {
@@ -101,6 +110,8 @@ function makeService(nickname = '房主'): ServiceHarness {
     service,
     sent,
     notices,
+    data,
+    stored,
     setFocus: (next) => {
       focus = next
     }
@@ -444,6 +455,180 @@ describe('StudyRoomService（真实回环 TCP）', () => {
       const rehosted = await second.service.host({ name: '第二局', goalMinutes: 60 })
       expect(rehosted.ok).toBe(true)
       expect(second.service.getState().status).toBe('hosting')
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+})
+
+describe('todayRoomFocusSeconds（本地按日累计）', () => {
+  it(
+    '在房内且专注时随采样累计，单次采样不超过封顶秒数',
+    async () => {
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const h = makeService()
+      h.setFocus(workFocus)
+      await h.service.host({ name: '专注房', goalMinutes: 120 })
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(0)
+
+      nowSpy.mockReturnValue(base + 5000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(5)
+
+      // 伪造超长间隔（999 秒），单次只应计入封顶秒数
+      nowSpy.mockReturnValue(base + 5000 + 999_000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(
+        5 + STUDY_ROOM_MAX_FOCUS_STEP_SEC
+      )
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '3 秒节流吃掉的每秒 tick 依然被累计（节流只限上报，不限计时）',
+    async () => {
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const h = makeService()
+      h.setFocus(workFocus)
+      await h.service.host({ name: '专注房', goalMinutes: 120 })
+
+      // 第 2、3 秒的 tick 会命中 focus 上报节流提前返回，但计时不能丢
+      for (let sec = 1; sec <= 3; sec++) {
+        nowSpy.mockReturnValue(base + sec * 1000)
+        h.service.reportFocus()
+      }
+      nowSpy.mockReturnValue(base + 4000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(4)
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '不在自习室（idle 状态）时不累计',
+    async () => {
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const h = makeService()
+      h.setFocus(workFocus)
+      h.service.reportFocus()
+      nowSpy.mockReturnValue(base + 10_000)
+      h.service.reportFocus()
+
+      await h.service.host({ name: '专注房', goalMinutes: 120 })
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(0)
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '在房内但没在专注（running=false 或 phase=idle）时不累计',
+    async () => {
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const h = makeService()
+      h.setFocus({ ...workFocus, running: false })
+      await h.service.host({ name: '专注房', goalMinutes: 120 })
+
+      nowSpy.mockReturnValue(base + 5000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(0)
+
+      h.setFocus(idleFocus)
+      nowSpy.mockReturnValue(base + 10_000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(0)
+
+      // 切回「running 的 work」后，从下一段间隔开始累计
+      h.setFocus(workFocus)
+      nowSpy.mockReturnValue(base + 15_000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(0)
+      nowSpy.mockReturnValue(base + 20_000)
+      h.service.reportFocus()
+      expect(memberOf(h.service, '房主').todayRoomFocusSeconds).toBe(5)
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '存储里是昨天的记录则归零，是今天的则继承并继续累计',
+    async () => {
+      const yesterday = localDateKey(new Date(Date.now() - 24 * 3600 * 1000))
+      const a = makeService('房主', { todayRoomFocus: { date: yesterday, seconds: 500 } })
+      await a.service.host({ name: '昨日房', goalMinutes: 120 })
+      expect(memberOf(a.service, '房主').todayRoomFocusSeconds).toBe(0)
+
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const b = makeService('房主', { todayRoomFocus: { date: localDateKey(), seconds: 321 } })
+      b.setFocus(workFocus)
+      await b.service.host({ name: '今日房', goalMinutes: 120 })
+      expect(memberOf(b.service, '房主').todayRoomFocusSeconds).toBe(321)
+
+      nowSpy.mockReturnValue(base + 5000)
+      b.service.reportFocus()
+      expect(memberOf(b.service, '房主').todayRoomFocusSeconds).toBe(326)
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '落盘节流：累计满 15 秒才写盘，状态翻转与 leave 强制写盘',
+    async () => {
+      const base = Date.now()
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(base)
+      const h = makeService()
+      h.setFocus(workFocus)
+      await h.service.host({ name: '专注房', goalMinutes: 120 })
+      const writes = (): Array<[string, unknown]> =>
+        h.stored.filter(([key]) => key === 'todayRoomFocus')
+
+      nowSpy.mockReturnValue(base + 5000)
+      h.service.reportFocus()
+      nowSpy.mockReturnValue(base + 10_000)
+      h.service.reportFocus()
+      expect(writes()).toHaveLength(0)
+
+      nowSpy.mockReturnValue(base + 15_000)
+      h.service.reportFocus()
+      expect(writes()).toHaveLength(1)
+      expect(writes()[0][1]).toEqual({ date: localDateKey(), seconds: 15 })
+
+      // 暂停（状态翻转）：把 3 秒零头立即落盘
+      nowSpy.mockReturnValue(base + 18_000)
+      h.setFocus({ ...workFocus, running: false })
+      h.service.reportFocus()
+      expect(writes()).toHaveLength(2)
+      expect(writes()[1][1]).toEqual({ date: localDateKey(), seconds: 18 })
+
+      // leave 强制落盘一次
+      h.service.leave()
+      expect(writes()).toHaveLength(3)
+      expect(h.data.todayRoomFocus).toEqual({ date: localDateKey(), seconds: 18 })
+    },
+    NETWORK_TEST_TIMEOUT
+  )
+
+  it(
+    '成员上报的 todayRoomFocusSeconds 原样进名册，不影响房内计时与集体目标',
+    async () => {
+      const { service } = makeService()
+      await service.host({ name: '晚自习', goalMinutes: 60 })
+      const guest = await joinAsGuest(service, '小明', {
+        ...workFocus,
+        todayRoomFocusSeconds: 4321
+      })
+      // hello 里带的值直接进入名册
+      expect(memberOf(service, '小明').todayRoomFocusSeconds).toBe(4321)
+
+      guest.send({ t: 'focus', focus: { ...workFocus, todayRoomFocusSeconds: 9999 } })
+      await until(() => memberOf(service, '小明').todayRoomFocusSeconds === 9999)
+      // 巨大的自报值既不改房内计时，也不推动集体目标
+      expect(memberOf(service, '小明').roomFocusSeconds).toBeLessThanOrEqual(15)
+      expect(service.getState().room?.focusMinutes).toBe(0)
     },
     NETWORK_TEST_TIMEOUT
   )

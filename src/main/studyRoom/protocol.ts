@@ -265,6 +265,12 @@ export interface StudyRoomFocusReport {
   remaining: number
   todayFocusMinutes: number
   todayPomodoros: number
+  /**
+   * 今天在自习室里累计的专注秒数（跨房间、跨重连）。
+   * 由每位成员自己在本地按日累计后上报，房主只做展示转发；
+   * 集体目标与排行仍以房主自己计时的 roomFocusSeconds 为准，避免被伪造。
+   */
+  todayRoomFocusSeconds: number
 }
 
 export interface StudyRoomMemberSnapshot extends StudyRoomFocusReport {
@@ -328,7 +334,8 @@ function parseFocus(value: unknown): StudyRoomFocusReport {
     running: Boolean(raw.running),
     remaining: num(raw.remaining, 0, 24 * 3600),
     todayFocusMinutes: num(raw.todayFocusMinutes, 0, 24 * 60),
-    todayPomodoros: num(raw.todayPomodoros, 0, 999)
+    todayPomodoros: num(raw.todayPomodoros, 0, 999),
+    todayRoomFocusSeconds: num(raw.todayRoomFocusSeconds, 0, 24 * 3600)
   }
 }
 

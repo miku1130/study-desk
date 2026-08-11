@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import PetSpriteAnimation from '@/components/pet/PetSpriteAnimation.vue'
-import { useStudyRoomStore } from '@/stores/studyRoom'
+import { formatFocusDuration, useStudyRoomStore } from '@/stores/studyRoom'
 import type { StudyRoomCheerEvent, StudyRoomMember } from '@/types'
 
 const props = defineProps<{
@@ -39,21 +39,21 @@ const cheerEmoji = computed(() =>
 )
 const cheerFrom = computed(() => props.cheer?.fromNickname ?? '')
 
-const roomTimeText = computed(() => formatSeatDuration(props.member.roomFocusSeconds))
+const todayRoomText = computed(() => formatFocusDuration(props.member.todayRoomFocusSeconds))
+const todayTotalText = computed(() => formatFocusDuration(props.member.todayFocusMinutes * 60))
+const durationTitle = computed(() =>
+  [
+    `今天在自习室：${todayRoomText.value}（跨房间累计）`,
+    `今日总专注：${todayTotalText.value}（含自习室外的番茄钟）`,
+    `本次在这间房：${formatFocusDuration(props.member.roomFocusSeconds)}`
+  ].join('\n')
+)
 
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds))
   const mm = String(Math.floor(total / 60)).padStart(2, '0')
   const ss = String(total % 60).padStart(2, '0')
   return `${mm}:${ss}`
-}
-
-function formatSeatDuration(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds))
-  if (total < 60) return `${total}秒`
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  return hours > 0 ? `${hours}时${minutes}分` : `${minutes}分`
 }
 </script>
 
@@ -84,6 +84,7 @@ function formatSeatDuration(seconds: number): string {
         :animation="catAnimation"
         :cat-id="member.catId"
         :label="`${member.nickname} 的猫`"
+        lite
       />
     </div>
 
@@ -92,10 +93,19 @@ function formatSeatDuration(seconds: number): string {
       <span class="seat-dot" />{{ seatState.text }}
     </p>
 
-    <footer class="seat-stats">
-      <span class="stat" :title="`本次在房内专注 ${roomTimeText}`">⏳ {{ roomTimeText }}</span>
-      <span class="stat" title="今日番茄">🍅 {{ member.todayPomodoros }}</span>
-      <span class="stat" title="收到的加油">👏 {{ member.cheers }}</span>
+    <footer class="seat-stats" :title="durationTitle">
+      <div class="seat-duration seat-duration-primary">
+        <span class="seat-duration-label">今日自习室</span>
+        <span class="seat-duration-value">{{ todayRoomText }}</span>
+      </div>
+      <div class="seat-duration">
+        <span class="seat-duration-label">今日总专注</span>
+        <span class="seat-duration-value">{{ todayTotalText }}</span>
+      </div>
+      <div class="seat-extras">
+        <span class="stat" title="今日番茄">🍅 {{ member.todayPomodoros }}</span>
+        <span class="stat" title="收到的加油">👏 {{ member.cheers }}</span>
+      </div>
     </footer>
   </article>
 </template>
@@ -357,10 +367,55 @@ function formatSeatDuration(seconds: number): string {
 
 .seat-stats {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 5px;
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
+}
+
+.seat-duration {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.seat-duration-label {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.seat-duration-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.seat-duration-primary .seat-duration-label {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.seat-duration-primary .seat-duration-value {
+  color: var(--accent-strong);
+  font-size: 13.5px;
+  font-weight: 780;
+}
+
+.seat-extras {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 1px;
   color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 650;
@@ -371,12 +426,6 @@ function formatSeatDuration(seconds: number): string {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  min-width: 0;
   white-space: nowrap;
-}
-
-.stat:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 </style>

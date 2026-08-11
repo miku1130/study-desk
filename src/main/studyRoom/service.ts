@@ -5,6 +5,7 @@
 import * as net from 'node:net'
 import * as os from 'node:os'
 import type { JsonStore } from '../store'
+import { localDateKey } from '../time'
 import { StudyRoomBeacon, StudyRoomScanner } from './discovery'
 import {
   MessageDecoder,
@@ -53,6 +54,11 @@ const STATE_PUSH_MIN_INTERVAL_MS = 500
 const FOCUS_REPORT_MIN_INTERVAL_MS = 3000
 const GOAL_MIN_MINUTES = 15
 const GOAL_MAX_MINUTES = 1440
+/** 今日自习累计的持久化键：{ date: 'YYYY-MM-DD', seconds: number } */
+const TODAY_FOCUS_STORE_KEY = 'todayRoomFocus'
+/** todayRoomFocusSeconds 每攒够这么多新秒数才落盘一次，避免每秒 tick 都写盘 */
+const TODAY_FOCUS_FLUSH_SEC = 15
+const TODAY_FOCUS_MAX_SEC = 24 * 3600
 
 export type StudyRoomStatus = 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
 
@@ -129,7 +135,20 @@ export class StudyRoomService {
   private lastSelfCheerAt = 0
   private disposed = false
 
-  constructor(private readonly deps: StudyRoomDeps) {}
+  /** 今天在自习室里累计的专注秒数（跨房间、跨重连），由自己本地维护并持久化 */
+  private todayRoomFocusSeconds = 0
+  /** todayRoomFocusSeconds 所属的本地日期键，跨天时归零 */
+  private todayRoomFocusDate = localDateKey()
+  /** 上一次自我采样的时刻；0 表示尚未采样 */
+  private lastSelfSampleAt = 0
+  /** 上一次采样时是否处于「在自习室内且 running 的 work 阶段」 */
+  private lastSelfCounting = false
+  /** 距上次落盘后新累计的秒数，攒够 TODAY_FOCUS_FLUSH_SEC 才写盘 */
+  private unsavedTodayFocusSec = 0
+
+  constructor(private readonly deps: StudyRoomDeps) {
+    this.todayRoomFocusSeconds = this.restoreTodayRoomFocus()
+  }
 
   getState(): StudyRoomState {
     const members =
@@ -175,7 +194,7 @@ export class StudyRoomService {
     const { server, port } = listened
     const now = Date.now()
     const nickname = sanitizeNickname(this.deps.store.get('nickname'))
-    const focus = this.deps.getFocus()
+    const focus = this.selfFocus()
     this.server = server
     this.selfId = createId('m')
     this.room = {
@@ -213,6 +232,8 @@ export class StudyRoomService {
     this.goalNotified = false
     this.lastFocusReportAt = 0
     this.lastReportedSignature = ''
+    // 进房后重新铆定采样起点：从现在起「在房 + 专注」的时段才计入今日累计
+    this.sampleTodayRoomFocus(focus)
     server.on('connection', (socket) => this.acceptConnection(socket))
     server.on('error', () => {
       /* 监听建立后的偶发错误不致命，成员链路各自兜底 */
@@ -280,7 +301,7 @@ export class StudyRoomService {
           v: STUDY_ROOM_PROTOCOL_VERSION,
           nickname: sanitizeNickname(this.deps.store.get('nickname')),
           catId: this.deps.getCatId(),
-          focus: this.deps.getFocus()
+          focus: this.selfFocus()
         })
       })
       socket.on('data', (chunk: Buffer) => {
@@ -374,7 +395,9 @@ export class StudyRoomService {
   /** 番茄钟 tick / 状态变化时调用；同阶段 3 秒内只上报一次，阶段变化立即上报 */
   reportFocus(): void {
     if (this.status !== 'hosting' && this.status !== 'joined') return
-    const focus = this.deps.getFocus()
+    // selfFocus 内部会先结算今日自习累计——必须发生在下面的节流之前，
+    // 否则被节流吃掉的每秒 tick 将永远计不上时长
+    const focus = this.selfFocus()
     const signature = `${focus.phase}|${focus.running}`
     const now = Date.now()
     if (
@@ -404,7 +427,7 @@ export class StudyRoomService {
       // 同步增量基线，避免随后的 focus 上报按 todayPomodoros 差值重复计数
       link.lastTodayPomodoros = Math.max(
         link.lastTodayPomodoros + 1,
-        this.deps.getFocus().todayPomodoros
+        this.selfFocus().todayPomodoros
       )
       this.refreshRoster()
       return
@@ -419,6 +442,8 @@ export class StudyRoomService {
   dispose(): void {
     if (this.disposed) return
     this.leave()
+    // leave 内已按需结算；这里兜底强制落盘一次（含空闲时退出的场景）
+    this.persistTodayRoomFocus()
     this.stopDiscovery()
     this.disposed = true
     if (this.statePushTimer) {
@@ -583,6 +608,8 @@ export class StudyRoomService {
     link.member.remaining = focus.remaining
     link.member.todayFocusMinutes = focus.todayFocusMinutes
     link.member.todayPomodoros = focus.todayPomodoros
+    // 成员自己按日累计的自习时长：原样透传展示，不参与集体目标与房内计时
+    link.member.todayRoomFocusSeconds = focus.todayRoomFocusSeconds
   }
 
   /** 房主侧统一执行加油：白名单、冷却、计数、广播，对房主自己同样生效 */
@@ -751,6 +778,8 @@ export class StudyRoomService {
     this.clientLastDataAt = Date.now()
     this.lastFocusReportAt = 0
     this.lastReportedSignature = ''
+    // 进房后重新铆定采样起点：从现在起「在房 + 专注」的时段才计入今日累计
+    this.sampleTodayRoomFocus(this.deps.getFocus())
     this.clientWatchTimer = setInterval(() => {
       if (Date.now() - this.clientLastDataAt > GUEST_DROP_TIMEOUT_MS) this.handleServerClosed()
     }, GUEST_WATCH_INTERVAL_MS)
@@ -815,10 +844,89 @@ export class StudyRoomService {
   }
 
   /* ------------------------------------------------------------------ *
+   * 今日自习专注累计（todayRoomFocusSeconds）
+   * 本地按日累计、跨房间持久化；只做展示透传，不参与集体目标与排行。
+   * ------------------------------------------------------------------ */
+
+  /** 从本地存储恢复今天的自习累计；日期不是今天视为 0（跨天自动归零） */
+  private restoreTodayRoomFocus(): number {
+    const saved = this.deps.store.get(TODAY_FOCUS_STORE_KEY) as
+      | { date?: unknown; seconds?: unknown }
+      | undefined
+    if (!saved || typeof saved !== 'object' || saved.date !== this.todayRoomFocusDate) return 0
+    const seconds = Number(saved.seconds)
+    if (!Number.isFinite(seconds)) return 0
+    return Math.min(TODAY_FOCUS_MAX_SEC, Math.max(0, Math.floor(seconds)))
+  }
+
+  /**
+   * 自己的专注画像：deps.getFocus() 里的 todayRoomFocusSeconds 只是占位值，
+   * 必须先结算采样、再用本地维护的按日累计覆盖，才能用于上报 / 写名册。
+   */
+  private selfFocus(): StudyRoomFocusReport {
+    const focus = this.deps.getFocus()
+    this.sampleTodayRoomFocus(focus)
+    return { ...focus, todayRoomFocusSeconds: this.todayRoomFocusSeconds }
+  }
+
+  /**
+   * 结算一段自习专注：与房主侧 applyFocusReport 同一套防漂移做法——
+   * 只有「上一次采样时处于在房内 + running 的 work 阶段」的时段才计入，
+   * 且单步不超过 STUDY_ROOM_MAX_FOCUS_STEP_SEC。
+   */
+  private sampleTodayRoomFocus(focus: StudyRoomFocusReport): void {
+    const now = Date.now()
+    const today = localDateKey()
+    if (today !== this.todayRoomFocusDate) {
+      // 跨天：昨天的累计只属于昨天，从 0 开始记新的一天
+      this.todayRoomFocusDate = today
+      this.todayRoomFocusSeconds = 0
+      this.persistTodayRoomFocus()
+    }
+    if (this.lastSelfCounting && this.lastSelfSampleAt > 0) {
+      const gapSec = Math.floor((now - this.lastSelfSampleAt) / 1000)
+      if (gapSec > 0) {
+        const step = Math.min(gapSec, STUDY_ROOM_MAX_FOCUS_STEP_SEC)
+        this.todayRoomFocusSeconds = Math.min(this.todayRoomFocusSeconds + step, TODAY_FOCUS_MAX_SEC)
+        this.unsavedTodayFocusSec += step
+        if (this.unsavedTodayFocusSec >= TODAY_FOCUS_FLUSH_SEC) this.persistTodayRoomFocus()
+      }
+    }
+    const counting =
+      (this.status === 'hosting' || this.status === 'joined') &&
+      focus.running &&
+      focus.phase === 'work'
+    // 专注状态翻转（开始 / 暂停 / 换阶段 / 离房）时，把零头也落盘
+    if (counting !== this.lastSelfCounting && this.unsavedTodayFocusSec > 0) {
+      this.persistTodayRoomFocus()
+    }
+    this.lastSelfSampleAt = now
+    this.lastSelfCounting = counting
+  }
+
+  private persistTodayRoomFocus(): void {
+    this.unsavedTodayFocusSec = 0
+    this.deps.store.set(TODAY_FOCUS_STORE_KEY, {
+      date: this.todayRoomFocusDate,
+      seconds: this.todayRoomFocusSeconds
+    })
+  }
+
+  /** 离开自习室前结算最后一段并强制落盘；离房后不在房内，停止累计 */
+  private settleTodayRoomFocusOnExit(): void {
+    if (this.status !== 'hosting' && this.status !== 'joined') return
+    this.sampleTodayRoomFocus(this.deps.getFocus())
+    this.lastSelfCounting = false
+    this.persistTodayRoomFocus()
+  }
+
+  /* ------------------------------------------------------------------ *
    * 公共内部
    * ------------------------------------------------------------------ */
 
   private resetToIdle(): void {
+    // 所有离房路径（主动离开 / 解散 / 房主失联）都汇聚到这里，先结算再清状态
+    this.settleTodayRoomFocusOnExit()
     this.status = 'idle'
     this.selfId = ''
     this.room = null
