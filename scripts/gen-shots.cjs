@@ -173,6 +173,48 @@ ipcMain.handle('window:isMaximized', () => false)
 ipcMain.handle('desktop-widget:close', () => true)
 ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
 
+const roomMember = (id, nickname, catId, over) => ({
+  id, nickname, catId, host: false, phase: 'work', running: true, remaining: 1124,
+  todayFocusMinutes: 75, todayPomodoros: 3, roomFocusSeconds: 1560, roomPomodoros: 2,
+  cheers: 4, joinedAt: Date.now() - 3600000, online: true, ...over
+})
+ipcMain.handle('study-room:get-state', () => ({
+  status: 'joined',
+  selfId: 'm2',
+  nickname: '小桌',
+  room: {
+    roomId: 'r1', name: '三楼晚自习', code: 'C0M84-0AVQF', hostNickname: '班长',
+    memberCount: 4, maxMembers: 24, goalMinutes: 180, focusMinutes: 122,
+    createdAt: Date.now() - 5400000
+  },
+  members: [
+    roomMember('m1', '班长', 'mikan', { host: true, roomFocusSeconds: 2280, roomPomodoros: 3, cheers: 7 }),
+    roomMember('m2', '小桌', 'sesame', { roomFocusSeconds: 1980, cheers: 5 }),
+    roomMember('m3', '同桌阿七', 'cloud', { roomFocusSeconds: 1620, roomPomodoros: 2, cheers: 3 }),
+    roomMember('m4', '晚风', 'mikan', { phase: 'short', running: true, remaining: 214, roomFocusSeconds: 900, roomPomodoros: 1, cheers: 2 })
+  ],
+  error: ''
+}))
+ipcMain.handle('study-room:get-cheers', () => [
+  { id: 'fighting', emoji: '💪', label: '加油' },
+  { id: 'clap', emoji: '👏', label: '鼓掌' },
+  { id: 'star', emoji: '⭐', label: '点赞' },
+  { id: 'flower', emoji: '🌸', label: '送花' },
+  { id: 'tea', emoji: '🍵', label: '递杯茶' },
+  { id: 'heart', emoji: '💗', label: '打气' },
+  { id: 'sparkle', emoji: '✨', label: '厉害' },
+  { id: 'rocket', emoji: '🚀', label: '冲刺' }
+])
+ipcMain.handle('study-room:validate-name', (_e, _kind, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:set-nickname', (_e, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:host', () => ({ ok: true }))
+ipcMain.handle('study-room:join', () => ({ ok: true }))
+ipcMain.handle('study-room:leave', () => undefined)
+ipcMain.handle('study-room:set-goal', () => true)
+ipcMain.handle('study-room:cheer', () => true)
+ipcMain.handle('study-room:discover-start', () => undefined)
+ipcMain.handle('study-room:discover-stop', () => undefined)
+
 app.on('window-all-closed', () => undefined)
 
 const shots = [
@@ -185,6 +227,7 @@ const shots = [
   { route: '/countdown', theme: 'light', name: 'countdown' },
   { route: '/todo', theme: 'light', name: 'todo' },
   { route: '/music', theme: 'dark', name: 'music' },
+  { route: '/study-room', theme: 'light', name: 'study-room', height: 1000 },
   { route: '/stats', theme: 'light', name: 'stats' },
   { route: '/settings', theme: 'light', name: 'settings' },
   { route: '/widgets', theme: 'light', name: 'desktop-widgets' },

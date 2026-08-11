@@ -90,6 +90,31 @@ const api = {
     onEvent: (cb: (type: string) => void): (() => void) =>
       on('pomodoro:event', (t) => cb(t as string))
   },
+  studyRoom: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke('study-room:get-state'),
+    getCheers: (): Promise<unknown[]> => ipcRenderer.invoke('study-room:get-cheers'),
+    validateName: (kind: 'nickname' | 'room', text: string): Promise<unknown> =>
+      ipcRenderer.invoke('study-room:validate-name', kind, text),
+    setNickname: (nickname: string): Promise<unknown> =>
+      ipcRenderer.invoke('study-room:set-nickname', nickname),
+    host: (options: { name: string; goalMinutes: number }): Promise<unknown> =>
+      ipcRenderer.invoke('study-room:host', options),
+    join: (target: { address?: string; port?: number; code?: string }): Promise<unknown> =>
+      ipcRenderer.invoke('study-room:join', target),
+    leave: (): Promise<void> => ipcRenderer.invoke('study-room:leave'),
+    setGoal: (goalMinutes: number): Promise<boolean> =>
+      ipcRenderer.invoke('study-room:set-goal', goalMinutes),
+    cheer: (toId: string, cheerId: string): Promise<boolean> =>
+      ipcRenderer.invoke('study-room:cheer', toId, cheerId),
+    startDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-start'),
+    stopDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-stop'),
+    onState: (cb: (state: unknown) => void): (() => void) => on('study-room:state', (s) => cb(s)),
+    onRooms: (cb: (rooms: unknown) => void): (() => void) => on('study-room:rooms', (r) => cb(r)),
+    onCheer: (cb: (event: unknown) => void): (() => void) =>
+      on('study-room:cheer-event', (e) => cb(e)),
+    onNotice: (cb: (notice: unknown) => void): (() => void) =>
+      on('study-room:notice', (n) => cb(n))
+  },
   bell: {
     onRing: (cb: (kind: string) => void): (() => void) => on('bell:ring', (k) => cb(k as string))
   },

@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '桌面摆件' }
   },
   {
+    path: '/study-room',
+    name: 'study-room',
+    component: () => import('@/views/StudyRoomView.vue'),
+    meta: { title: '自习室' }
+  },
+  {
     path: '/stats',
     name: 'stats',
     component: () => import('@/views/StatsView.vue'),

@@ -11,6 +11,81 @@ export interface PomodoroStateDTO {
   completed: number
 }
 
+export interface StudyRoomCheerDTO {
+  id: string
+  emoji: string
+  label: string
+}
+
+export interface StudyRoomMemberDTO {
+  id: string
+  nickname: string
+  catId: string
+  host: boolean
+  phase: 'idle' | 'work' | 'short' | 'long'
+  running: boolean
+  remaining: number
+  todayFocusMinutes: number
+  todayPomodoros: number
+  roomFocusSeconds: number
+  roomPomodoros: number
+  cheers: number
+  joinedAt: number
+  online: boolean
+}
+
+export interface StudyRoomSummaryDTO {
+  roomId: string
+  name: string
+  code: string
+  hostNickname: string
+  memberCount: number
+  maxMembers: number
+  goalMinutes: number
+  focusMinutes: number
+  createdAt: number
+}
+
+export interface StudyRoomStateDTO {
+  status: 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
+  selfId: string
+  nickname: string
+  room: StudyRoomSummaryDTO | null
+  members: StudyRoomMemberDTO[]
+  error: string
+}
+
+export interface StudyRoomDiscoveredDTO {
+  room: StudyRoomSummaryDTO
+  address: string
+  port: number
+}
+
+export interface StudyRoomCheerEventDTO {
+  id: string
+  cheerId: string
+  fromId: string
+  fromNickname: string
+  toId: string
+  at: number
+}
+
+export interface StudyRoomNoticeDTO {
+  kind: 'join' | 'leave' | 'goal' | 'closed' | 'error'
+  text: string
+}
+
+export interface StudyRoomNameCheckDTO {
+  ok: boolean
+  value: string
+  reason: string
+}
+
+export interface StudyRoomResultDTO {
+  ok: boolean
+  error?: string
+}
+
 export interface StudyDeskApi {
   window: {
     minimize: () => Promise<void>
@@ -81,6 +156,23 @@ export interface StudyDeskApi {
     getState: () => Promise<PomodoroStateDTO>
     onTick: (cb: (state: PomodoroStateDTO) => void) => () => void
     onEvent: (cb: (type: string) => void) => () => void
+  }
+  studyRoom: {
+    getState: () => Promise<StudyRoomStateDTO>
+    getCheers: () => Promise<StudyRoomCheerDTO[]>
+    validateName: (kind: 'nickname' | 'room', text: string) => Promise<StudyRoomNameCheckDTO>
+    setNickname: (nickname: string) => Promise<StudyRoomNameCheckDTO>
+    host: (options: { name: string; goalMinutes: number }) => Promise<StudyRoomResultDTO>
+    join: (target: { address?: string; port?: number; code?: string }) => Promise<StudyRoomResultDTO>
+    leave: () => Promise<void>
+    setGoal: (goalMinutes: number) => Promise<boolean>
+    cheer: (toId: string, cheerId: string) => Promise<boolean>
+    startDiscovery: () => Promise<void>
+    stopDiscovery: () => Promise<void>
+    onState: (cb: (state: StudyRoomStateDTO) => void) => () => void
+    onRooms: (cb: (rooms: StudyRoomDiscoveredDTO[]) => void) => () => void
+    onCheer: (cb: (event: StudyRoomCheerEventDTO) => void) => () => void
+    onNotice: (cb: (notice: StudyRoomNoticeDTO) => void) => () => void
   }
   bell: {
     onRing: (cb: (kind: string) => void) => () => void

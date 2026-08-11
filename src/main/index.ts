@@ -38,6 +38,8 @@ import {
   type DesktopWidgetConfig
 } from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
+import { StudyRoomService } from './studyRoom/service'
+import type { StudyRoomFocusReport } from './studyRoom/protocol'
 import { autoUpdater } from 'electron-updater'
 
 protocol.registerSchemesAsPrivileged([
@@ -59,6 +61,7 @@ let scheduler: BellScheduler
 let waterReminder: WaterReminder
 let healthReminder: HealthReminder
 let todoReminder: TodoReminder
+let studyRoom: StudyRoomService
 
 function setAutostart(openAtLogin: boolean): void {
   // Development runs use Electron's executable directly. Registering it without
@@ -259,6 +262,21 @@ function notify(title: string, body: string): void {
   if (Notification.isSupported()) new Notification({ title, body }).show()
 }
 
+/** 自习室对外展示的专注画像：番茄钟当前状态 + 今日统计 */
+function studyRoomFocus(): StudyRoomFocusReport {
+  const state = engine.getState()
+  const days =
+    (stores.stats.get('days') as Record<string, { pomodoros: number; focusMinutes: number }>) || {}
+  const today = days[localDateKey()] ?? { pomodoros: 0, focusMinutes: 0 }
+  return {
+    phase: state.phase,
+    running: state.running,
+    remaining: state.remaining,
+    todayFocusMinutes: Number(today.focusMinutes) || 0,
+    todayPomodoros: Number(today.pomodoros) || 0
+  }
+}
+
 function setupUpdater(): void {
   autoUpdater.on('checking-for-update', () => sendToAll('update:status', { state: 'checking' }))
   autoUpdater.on('update-available', (i) =>
@@ -416,6 +434,33 @@ function registerIpc(): void {
   ipcMain.handle('pomodoro:reset', () => engine.reset())
   ipcMain.handle('pomodoro:skip', () => engine.skip())
   ipcMain.handle('pomodoro:getState', () => engine.getState())
+
+  ipcMain.handle('study-room:get-state', () => studyRoom.getState())
+  ipcMain.handle('study-room:get-cheers', () => studyRoom.getCheers())
+  ipcMain.handle('study-room:validate-name', (_e, kind: 'nickname' | 'room', text: string) =>
+    studyRoom.validateName(kind, String(text ?? ''))
+  )
+  ipcMain.handle('study-room:set-nickname', (_e, nickname: string) =>
+    studyRoom.setNickname(String(nickname ?? ''))
+  )
+  ipcMain.handle('study-room:host', (_e, options: { name: string; goalMinutes: number }) =>
+    studyRoom.host({
+      name: String(options?.name ?? ''),
+      goalMinutes: Number(options?.goalMinutes ?? 0)
+    })
+  )
+  ipcMain.handle('study-room:join', (_e, target: { address?: string; port?: number; code?: string }) =>
+    studyRoom.join(target ?? {})
+  )
+  ipcMain.handle('study-room:leave', () => studyRoom.leave())
+  ipcMain.handle('study-room:set-goal', (_e, goalMinutes: number) =>
+    studyRoom.setGoal(Number(goalMinutes))
+  )
+  ipcMain.handle('study-room:cheer', (_e, toId: string, cheerId: string) =>
+    studyRoom.cheer(String(toId ?? ''), String(cheerId ?? ''))
+  )
+  ipcMain.handle('study-room:discover-start', () => studyRoom.startDiscovery())
+  ipcMain.handle('study-room:discover-stop', () => studyRoom.stopDiscovery())
 
   ipcMain.handle('lockscreen:close', () => closeLock())
 
@@ -581,11 +626,21 @@ app.whenReady().then(() => {
       const cfg = stores.settings.get('pomodoro') as { lockscreen: boolean }
       if (cfg?.lockscreen && state.phase === 'work' && state.running) openLock()
       else closeLock()
+      studyRoom?.reportFocus()
     },
     onEvent: (type) => {
       if (type === 'workComplete') notify('专注完成', '休息一下吧～')
       else if (type === 'breakComplete') notify('休息结束', '开始下一个番茄')
+      if (type === 'workComplete') studyRoom?.notePomodoroComplete()
     }
+  })
+
+  studyRoom = new StudyRoomService({
+    store: stores.studyRoom,
+    send: sendToAll,
+    notify,
+    getCatId: () => String(stores.petCompanion.get('catId') ?? 'mikan'),
+    getFocus: studyRoomFocus
   })
 
   scheduler = new BellScheduler(stores.settings, stores.timetable, sendToAll, notify)
@@ -618,6 +673,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  studyRoom?.dispose()
   closeDesktopWidgets()
   closePetWidget()
 })

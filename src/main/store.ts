@@ -100,6 +100,7 @@ export interface AppStores {
   desktopWidgets: JsonStore<Record<string, unknown>>
   garden: JsonStore<Record<string, unknown>>
   petCompanion: JsonStore<Record<string, unknown>>
+  studyRoom: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -140,6 +141,12 @@ export function createStores(): AppStores {
       abandonedSessions: 0,
       activeClass: null,
       settledClasses: []
+    }),
+    studyRoom: new JsonStore('study-room.json', {
+      nickname: '',
+      lastRoomName: '',
+      goalMinutes: 120,
+      soundEnabled: true
     })
   }
 }

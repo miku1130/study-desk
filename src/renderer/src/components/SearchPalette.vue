@@ -41,6 +41,7 @@ const pages: Item[] = (
     ['备忘录中心', '/todo'],
     ['学习资料库', '/bookshelf'],
     ['倒数日', '/countdown'],
+    ['自习室', '/study-room'],
     ['专注统计', '/stats'],
     ['设置', '/settings']
   ] as [string, string][]

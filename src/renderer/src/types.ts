@@ -440,6 +440,78 @@ export interface PomodoroState {
   completed: number
 }
 
+export type StudyRoomStatus = 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
+
+export interface StudyRoomCheer {
+  id: string
+  emoji: string
+  label: string
+}
+
+export interface StudyRoomMember {
+  id: string
+  nickname: string
+  catId: string
+  host: boolean
+  phase: PomodoroPhase
+  running: boolean
+  remaining: number
+  todayFocusMinutes: number
+  todayPomodoros: number
+  roomFocusSeconds: number
+  roomPomodoros: number
+  cheers: number
+  joinedAt: number
+  online: boolean
+}
+
+export interface StudyRoomSummary {
+  roomId: string
+  name: string
+  code: string
+  hostNickname: string
+  memberCount: number
+  maxMembers: number
+  goalMinutes: number
+  focusMinutes: number
+  createdAt: number
+}
+
+export interface StudyRoomState {
+  status: StudyRoomStatus
+  selfId: string
+  nickname: string
+  room: StudyRoomSummary | null
+  members: StudyRoomMember[]
+  error: string
+}
+
+export interface StudyRoomDiscovered {
+  room: StudyRoomSummary
+  address: string
+  port: number
+}
+
+export interface StudyRoomCheerEvent {
+  id: string
+  cheerId: string
+  fromId: string
+  fromNickname: string
+  toId: string
+  at: number
+}
+
+export interface StudyRoomNotice {
+  kind: 'join' | 'leave' | 'goal' | 'closed' | 'error'
+  text: string
+}
+
+export interface StudyRoomNameCheck {
+  ok: boolean
+  value: string
+  reason: string
+}
+
 export const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 export const LESSON_COLORS = [

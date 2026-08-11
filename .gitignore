@@ -9,3 +9,15 @@ release-check
 shot-*.png
 smoke-report.txt
 smoke-out.txt
+
+# 与本项目无关的本地目录，切勿入库
+napcat-qq-login
+
+# 猫咪动画的制作中间产物（代码只引用同名 .webm 与已入库的 png）
+src/renderer/src/assets/pet/_interp-test
+src/renderer/src/assets/pet/*-animation.png
+src/renderer/src/assets/pet/*-animation.webp
+src/renderer/src/assets/pet/*-poster.png
+src/renderer/src/assets/pet/*-sprite.png
+src/renderer/src/assets/pet/*-atlas.png
+src/renderer/src/assets/pet/*-atlas-v2.png

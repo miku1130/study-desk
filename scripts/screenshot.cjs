@@ -179,6 +179,57 @@ ipcMain.handle('fs:exists', () => true)
 ipcMain.handle('shell:openPath', () => '')
 ipcMain.handle('dialog:openFiles', () => [])
 
+// SHOT_ROOM=live 时预览「已加入自习室」的实况视图，否则预览大厅
+const roomMember = (id, nickname, catId, over) => ({
+  id, nickname, catId, host: false, phase: 'work', running: true, remaining: 1124,
+  todayFocusMinutes: 75, todayPomodoros: 3, roomFocusSeconds: 1560, roomPomodoros: 2,
+  cheers: 4, joinedAt: Date.now() - 3600000, online: true, ...over
+})
+const liveRoomState = {
+  status: 'joined',
+  selfId: 'm2',
+  nickname: '小桌',
+  room: {
+    roomId: 'r1', name: '三楼晚自习', code: 'C0M84-0AVQF', hostNickname: '班长',
+    memberCount: 6, maxMembers: 24, goalMinutes: 180, focusMinutes: 122,
+    createdAt: Date.now() - 5400000
+  },
+  members: [
+    roomMember('m1', '班长', 'mikan', { host: true, roomFocusSeconds: 2280, roomPomodoros: 3, cheers: 7 }),
+    roomMember('m2', '小桌', 'sesame', { roomFocusSeconds: 1980, cheers: 5 }),
+    roomMember('m3', '同桌阿七', 'cloud', { roomFocusSeconds: 1620, roomPomodoros: 2, cheers: 3 }),
+    roomMember('m4', '晚风', 'mikan', { phase: 'short', running: true, remaining: 214, roomFocusSeconds: 900, roomPomodoros: 1, cheers: 2 }),
+    roomMember('m5', '路灯下的猫', 'sesame', { phase: 'idle', running: false, remaining: 0, roomFocusSeconds: 480, roomPomodoros: 0, cheers: 1 }),
+    roomMember('m6', '同学', 'cloud', { phase: 'idle', running: false, remaining: 0, roomFocusSeconds: 120, roomPomodoros: 0, cheers: 0, online: false })
+  ],
+  error: ''
+}
+const lobbyRoomState = {
+  status: 'idle', selfId: '', nickname: '小桌', room: null, members: [], error: ''
+}
+ipcMain.handle('study-room:get-state', () =>
+  process.env.SHOT_ROOM === 'live' ? liveRoomState : lobbyRoomState
+)
+ipcMain.handle('study-room:get-cheers', () => [
+  { id: 'fighting', emoji: '💪', label: '加油' },
+  { id: 'clap', emoji: '👏', label: '鼓掌' },
+  { id: 'star', emoji: '⭐', label: '点赞' },
+  { id: 'flower', emoji: '🌸', label: '送花' },
+  { id: 'tea', emoji: '🍵', label: '递杯茶' },
+  { id: 'heart', emoji: '💗', label: '打气' },
+  { id: 'sparkle', emoji: '✨', label: '厉害' },
+  { id: 'rocket', emoji: '🚀', label: '冲刺' }
+])
+ipcMain.handle('study-room:validate-name', (_e, _kind, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:set-nickname', (_e, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:host', () => ({ ok: true }))
+ipcMain.handle('study-room:join', () => ({ ok: true }))
+ipcMain.handle('study-room:leave', () => undefined)
+ipcMain.handle('study-room:set-goal', () => true)
+ipcMain.handle('study-room:cheer', () => true)
+ipcMain.handle('study-room:discover-start', () => undefined)
+ipcMain.handle('study-room:discover-stop', () => undefined)
+
 app.whenReady().then(async () => {
   nativeTheme.themeSource = theme
   protocol.handle('studymedia', (request) => {

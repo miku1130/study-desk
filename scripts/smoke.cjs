@@ -143,6 +143,28 @@ ipcMain.handle('pet-widget:sync', () => undefined)
 ipcMain.handle('pet-widget:hide', () => undefined)
 ipcMain.handle('desktop-widget:close', () => true)
 ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
+ipcMain.handle('study-room:get-state', () => ({
+  status: 'idle', selfId: '', nickname: '小桌', room: null, members: [], error: ''
+}))
+ipcMain.handle('study-room:get-cheers', () => [
+  { id: 'fighting', emoji: '💪', label: '加油' },
+  { id: 'clap', emoji: '👏', label: '鼓掌' },
+  { id: 'star', emoji: '⭐', label: '点赞' },
+  { id: 'flower', emoji: '🌸', label: '送花' },
+  { id: 'tea', emoji: '🍵', label: '递杯茶' },
+  { id: 'heart', emoji: '💗', label: '打气' },
+  { id: 'sparkle', emoji: '✨', label: '厉害' },
+  { id: 'rocket', emoji: '🚀', label: '冲刺' }
+])
+ipcMain.handle('study-room:validate-name', (_e, _kind, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:set-nickname', (_e, text) => ({ ok: true, value: String(text ?? ''), reason: '' }))
+ipcMain.handle('study-room:host', () => ({ ok: true }))
+ipcMain.handle('study-room:join', () => ({ ok: true }))
+ipcMain.handle('study-room:leave', () => undefined)
+ipcMain.handle('study-room:set-goal', () => true)
+ipcMain.handle('study-room:cheer', () => true)
+ipcMain.handle('study-room:discover-start', () => undefined)
+ipcMain.handle('study-room:discover-stop', () => undefined)
 
 const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
@@ -153,6 +175,7 @@ const routes = [
   { hash: '/bookshelf', name: '学习资料库', sel: ['.library-tools', '.library-stats'] },
   { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
   { hash: '/widgets', name: '桌面摆件管理', sel: ['.widgets-page', '.widget-list', '.desktop-widget-card'] },
+  { hash: '/study-room', name: '自习室', sel: ['.study-room-page', '.study-room-lobby', '.code-input'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/garden', name: '专注花园', sel: ['.garden-page', '.plot-grid', '.quest-card'] },
   { hash: '/pet', name: '猫咪伴学', sel: ['.pet-page', '.pet-room', '.wardrobe-grid', '.collection-grid'] },
