@@ -4,10 +4,15 @@
  */
 import * as net from 'node:net'
 import * as os from 'node:os'
+import { randomUUID } from 'node:crypto'
 import type { JsonStore } from '../store'
 import { localDateKey } from '../time'
 import { StudyRoomBeacon, StudyRoomScanner } from './discovery'
-import { OnlineRoomClient, type OnlineLobbyEntry } from './onlineClient'
+import {
+  OnlineRoomClient,
+  type LeaderboardRange,
+  type OnlineSnapshot
+} from './onlineClient'
 import {
   MessageDecoder,
   STUDY_ROOM_CHEERS,
@@ -157,17 +162,6 @@ export class StudyRoomService {
   }
 
   getState(): StudyRoomState {
-    if (this.online) {
-      const status = this.online.getStatus()
-      return {
-        status: status === 'idle' ? 'idle' : status === 'online' ? 'online' : status,
-        selfId: this.online.getSelfId(),
-        nickname: sanitizeNickname(this.deps.store.get('nickname'), ''),
-        room: this.online.getRoom(),
-        members: this.online.getMembers(),
-        error: this.online.getError()
-      }
-    }
     const members =
       this.status === 'hosting'
         ? [...this.links.values()].map((link) => ({ ...link.member }))
@@ -186,53 +180,119 @@ export class StudyRoomService {
    * 公网模式：服务器是权威，本地只做镜像
    * ------------------------------------------------------------------ */
 
+  /**
+   * 匿名身份。排行榜要跨会话累计，就必须有个稳定标识；
+   * 昵称是用户随手填的，拿它当凭证等于谁都能顶替榜首，所以只作展示。
+   */
+  private ensureDeviceId(): string {
+    const saved = this.deps.store.get('deviceId')
+    if (typeof saved === 'string' && saved.length >= 8) return saved
+    const id = randomUUID()
+    this.deps.store.set('deviceId', id)
+    return id
+  }
+
   private ensureOnline(): OnlineRoomClient {
     if (this.online) return this.online
     // 进公网模式前先退干净局域网连接，避免两套链路同时上报专注状态
     if (this.status !== 'idle') this.leave()
     const configured = this.deps.store.get('serverUrl')
+    const deviceId = this.ensureDeviceId()
+    // 公网模式下 deviceId 就是自己的座位标识，渲染层据此判断加油是不是冲我来的
+    this.selfId = deviceId
     this.online = new OnlineRoomClient({
       url: typeof configured === 'string' && configured ? configured : DEFAULT_STUDY_ROOM_SERVER,
+      deviceId,
       getNickname: () => sanitizeNickname(this.deps.store.get('nickname'), ''),
       getCatId: () => this.deps.getCatId(),
       getFocus: () => this.selfFocus(),
-      onChanged: () => {
-        this.deps.send('study-room:lobby', this.online?.getLobby() ?? [])
-        this.pushState()
-      },
+      onChanged: () => this.pushOnline(),
       onNotice: (kind, text) => this.deps.send('study-room:notice', { kind, text }),
       onCheer: (cheerId, fromId, fromNickname, toId) =>
-        this.emitCheer(cheerId, fromId, fromNickname, toId, Date.now()),
-      onGoal: (goalMinutes) =>
-        this.deps.notify('自习室目标达成', `大家共同专注满 ${goalMinutes} 分钟，太棒了！`)
+        this.emitCheer(cheerId, fromId, fromNickname, toId, Date.now())
     })
     return this.online
   }
 
-  /** 订阅公网大厅；进入自习室页面时调用 */
-  watchLobby(on: boolean): void {
+  private pushOnline(): void {
+    if (this.disposed) return
+    this.deps.send('study-room:online', this.online?.snapshot() ?? null)
+  }
+
+  getOnlineSnapshot(): OnlineSnapshot | null {
+    return this.online?.snapshot() ?? null
+  }
+
+  /** 连上服务器并订阅公开自习室列表 */
+  onlineConnect(): void {
+    this.ensureOnline().refreshMyRooms()
+  }
+
+  watchBrowse(on: boolean): void {
     if (!on && !this.online) return
-    this.ensureOnline().watchLobby(on)
+    this.ensureOnline().watchBrowse(on)
   }
 
-  getLobby(): OnlineLobbyEntry[] {
-    return this.online?.getLobby() ?? []
+  setIntro(intro: string): void {
+    this.ensureOnline().setIntro(intro)
   }
 
-  hostOnline(name: string, goalMinutes: number): TextCheckResult {
-    const check = validateRoomName(name)
-    if (!check.ok) return check
-    this.deps.store.set('lastRoomName', check.value)
-    this.ensureOnline().createRoom(check.value, clampGoal(goalMinutes))
-    return check
+  checkIn(kind: 'wake' | 'sleep', time: string): void {
+    this.ensureOnline().checkInAt(kind, time)
   }
 
-  joinOnline(roomId: string): void {
-    this.ensureOnline().joinRoom(String(roomId ?? ''))
+  /* ---- 自习室：成员关系层 ---- */
+
+  createRoom(name: string, intro: string, goalMinutes: number): void {
+    this.deps.store.set('lastRoomName', name)
+    this.ensureOnline().createRoom(name, intro, clampGoal(goalMinutes))
   }
 
-  quickJoinOnline(): void {
-    this.ensureOnline().quickJoin()
+  joinStudyRoom(params: { roomId?: string; code?: string }): void {
+    this.ensureOnline().joinRoom(params)
+  }
+
+  quitStudyRoom(roomId: string): void {
+    this.ensureOnline().quitRoom(roomId)
+  }
+
+  dissolveStudyRoom(roomId: string): void {
+    this.ensureOnline().dissolveRoom(roomId)
+  }
+
+  updateStudyRoom(
+    roomId: string,
+    patch: { name?: string; intro?: string; goalMinutes?: number }
+  ): void {
+    this.ensureOnline().updateRoom(roomId, patch)
+  }
+
+  /* ---- 房间：今天来不来学 ---- */
+
+  enterRoom(roomId: string): void {
+    this.ensureOnline().enterRoom(roomId)
+  }
+
+  exitRoom(): void {
+    this.online?.exitRoom()
+  }
+
+  setRoomRange(range: LeaderboardRange): void {
+    this.online?.setRange(range)
+  }
+
+  /* ---- 许愿墙 ---- */
+
+  addWish(text: string): void {
+    this.ensureOnline().addWish(text)
+  }
+
+  reportWish(id: number): void {
+    this.online?.reportWish(id)
+  }
+
+  deleteWish(id: number): void {
+    this.online?.deleteWish(id)
   }
 
   /** 彻底断开公网连接并回到本地空闲态 */
@@ -240,6 +300,7 @@ export class StudyRoomService {
     if (!this.online) return
     this.online.dispose()
     this.online = null
+    this.pushOnline()
     this.pushState()
   }
 
@@ -410,11 +471,11 @@ export class StudyRoomService {
 
   leave(): void {
     if (this.online) {
+      // 公网模式下这只是离开今天的房间，成员身份不动
       if (this.online.isInRoom()) {
-        this.online.leaveRoom()
-        this.notice('leave', '已离开自习室')
+        this.online.exitRoom()
+        this.notice('leave', '已离开房间，仍然是这个自习室的成员')
       }
-      this.pushState()
       return
     }
     if (this.status === 'hosting') {
@@ -440,8 +501,9 @@ export class StudyRoomService {
 
   setGoal(goalMinutes: number): boolean {
     if (this.online) {
-      if (!this.online.isInRoom()) return false
-      this.online.setGoal(clampGoal(goalMinutes))
+      const room = this.online.snapshot().room
+      if (!room) return false
+      this.online.updateRoom(room.id, { goalMinutes: clampGoal(goalMinutes) })
       return true
     }
     if (this.status !== 'hosting' || !this.room) return false

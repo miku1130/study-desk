@@ -1,5 +1,9 @@
 /**
- * 端到端冒烟：起真实 WebSocket 连接，跑一遍建房 / 随机加入 / 广播 / 房主顺延。
+ * 端到端冒烟：起真实 WebSocket 连接，跑一遍完整链路。
+ *
+ * 重点验证「加入自习室」与「进入房间」是两件事：
+ * 退出房间之后仍然是成员，只有显式退出自习室才解除关系。
+ *
  * 用法：先 npm start，再 node scripts/smoke.mjs
  */
 import { WebSocket } from 'ws'
@@ -8,11 +12,11 @@ const URL = process.env.SMOKE_URL ?? 'ws://127.0.0.1:3100/ws'
 const results = []
 
 function check(name, ok, detail = '') {
-  results.push({ name, ok, detail })
+  results.push({ name, ok })
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  ${detail}` : ''}`)
 }
 
-function connect(nickname) {
+function connect(nickname, deviceId) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(URL)
     const inbox = []
@@ -26,16 +30,16 @@ function connect(nickname) {
     })
     socket.on('error', reject)
     socket.on('open', () => {
-      socket.send(JSON.stringify({ t: 'hello', v: 1, nickname, catId: 'mikan' }))
+      socket.send(JSON.stringify({ t: 'hello', v: 1, nickname, catId: 'mikan', deviceId }))
       resolve({
-        socket,
         send: (payload) => socket.send(JSON.stringify(payload)),
         close: () => socket.close(),
-        wait: (match, timeout = 3000) => {
+        drain: () => inbox.splice(0, inbox.length),
+        wait: (match, timeout = 4000) => {
           const found = inbox.findIndex(match)
           if (found >= 0) return Promise.resolve(inbox.splice(found, 1)[0])
           return new Promise((res, rej) => {
-            const timer = setTimeout(() => rej(new Error(`等待消息超时：${match}`)), timeout)
+            const timer = setTimeout(() => rej(new Error('等待消息超时')), timeout)
             waiters.push({
               match,
               resolve: (m) => {
@@ -51,63 +55,126 @@ function connect(nickname) {
 }
 
 async function main() {
-  const host = await connect('房主')
-  await host.wait((m) => m.t === 'welcome')
-  check('握手返回 welcome', true)
+  const stamp = Date.now().toString(36).slice(-5)
+  const ownerDevice = `smoke-owner-${stamp}`
+  const guestDevice = `smoke-guest-${stamp}`
 
-  host.send({ t: 'create', name: '冒烟自习室', goalMinutes: 60 })
-  const joined = await host.wait((m) => m.t === 'joined')
-  check('建房成功', Boolean(joined.roomId), joined.roomId)
+  const owner = await connect('冒烟主人', ownerDevice)
+  const hello = await owner.wait((m) => m.t === 'welcome')
+  check('握手返回 welcome', hello.deviceId === ownerDevice)
 
-  const hostRoster = await host.wait((m) => m.t === 'roster')
-  check('房主收到 roster', hostRoster.members.length === 1)
-  check('房主标记正确', hostRoster.room.hostId === hostRoster.members[0].id)
+  // 个人简介
+  owner.send({ t: 'profile', intro: '一战成硕' })
+  const profile = await owner.wait((m) => m.t === 'profile')
+  check('可以设置个人简介', profile.intro === '一战成硕')
 
-  const guest = await connect('同学')
+  owner.send({ t: 'profile', intro: '加我微信 abc123' })
+  const rejected = await owner.wait((m) => m.t === 'error')
+  check('简介里的推广内容被拦下', !!rejected.message)
+
+  // 作息打卡
+  owner.send({ t: 'checkin', kind: 'wake', time: '07:21' })
+  const checkin = await owner.wait((m) => m.t === 'checkin')
+  check('起床打卡', checkin.wakeAt === '07:21')
+  owner.send({ t: 'checkin', kind: 'wake', time: '09:99' })
+  await owner.wait((m) => m.t === 'error')
+  check('非法时间被拒', true)
+
+  // 建自习室
+  owner.send({ t: 'room:create', name: `冒烟自习室${stamp}`, intro: '一起上岸', goalMinutes: 120 })
+  const created = await owner.wait((m) => m.t === 'room:created')
+  check('建自习室成功', !!created.roomId && !!created.code, `加入码 ${created.code}`)
+  const roomId = created.roomId
+
+  // 握手时已经推过一次空的 rooms:mine，这里必须匹配到含新房间的那条
+  const mine = await owner.wait((m) => m.t === 'rooms:mine' && m.rooms.some((r) => r.id === roomId))
+  check('建成后出现在我的自习室里', mine.rooms.some((r) => r.id === roomId))
+
+  // 进入房间
+  owner.send({ t: 'room:enter', roomId })
+  await owner.wait((m) => m.t === 'room:entered')
+  const detail = await owner.wait((m) => m.t === 'room:detail')
+  check('进入房间拿到详情', detail.room.id === roomId)
+  check('主人标记正确', detail.room.isOwner === true)
+  check('主人自动是成员', detail.room.isMember === true)
+  check('在座人数为 1', detail.room.attendeeCount === 1)
+  check('简介带出来了', detail.room.intro === '一起上岸')
+  check('打卡时间进了名册', detail.members[0]?.wakeAt === '07:21')
+
+  // 别人用加入码加入自习室
+  const guest = await connect('冒烟同学', guestDevice)
   await guest.wait((m) => m.t === 'welcome')
-  guest.send({ t: 'quickJoin' })
-  const guestJoined = await guest.wait((m) => m.t === 'joined')
-  check('随机加入进了已有房间而不是新建', guestJoined.created === false)
-  check('随机加入落在同一房间', guestJoined.roomId === joined.roomId)
+  guest.send({ t: 'room:join', code: created.code })
+  const joined = await guest.wait((m) => m.t === 'room:joined')
+  check('用加入码加入自习室', joined.roomId === roomId)
 
-  const rosterAfterJoin = await host.wait((m) => m.t === 'roster' && m.members.length === 2)
-  check('房主侧收到成员加入广播', rosterAfterJoin.members.length === 2)
-  check(
-    '座位按进房顺序',
-    rosterAfterJoin.members[0].nickname === '房主' && rosterAfterJoin.members[1].nickname === '同学'
+  const guestRooms = await guest.wait(
+    (m) => m.t === 'rooms:mine' && m.rooms.some((r) => r.id === roomId)
   )
+  check('加入后出现在对方的自习室列表', guestRooms.rooms.some((r) => r.id === roomId))
 
-  // 大厅
-  const watcher = await connect('围观')
-  await watcher.wait((m) => m.t === 'welcome')
-  watcher.send({ t: 'lobby' })
-  const lobby = await watcher.wait((m) => m.t === 'lobby')
-  check('大厅能看到房间', lobby.rooms.length === 1, `人数=${lobby.rooms[0]?.memberCount}`)
+  guest.send({ t: 'room:enter', roomId })
+  await guest.wait((m) => m.t === 'room:entered')
+  const twoUp = await owner.wait((m) => m.t === 'room:detail' && m.room.attendeeCount === 2, 5000)
+  check('主人侧看到对方进入房间', twoUp.room.attendeeCount === 2)
+  check('成员数也是 2', twoUp.room.memberCount === 2)
 
-  // 加油
-  host.send({ t: 'cheer', cheerId: 'fighting', toId: '' })
-  const cheered = await guest.wait((m) => m.t === 'cheered')
-  check('加油被转发给房内成员', cheered.cheerId === 'fighting')
+  // 专注计时
+  const focus = { phase: 'work', running: true, remaining: 1500, todayPomodoros: 0, todayFocusMinutes: 0 }
+  guest.send({ t: 'focus', focus })
+  await new Promise((r) => setTimeout(r, 2500))
+  guest.send({ t: 'focus', focus })
+  const focused = await guest.wait(
+    (m) => m.t === 'room:detail' && m.members.some((x) => x.deviceId === guestDevice && x.seconds > 0),
+    6000
+  )
+  const guestRow = focused.members.find((x) => x.deviceId === guestDevice)
+  check('专注时长计入房内榜', guestRow.seconds >= 2, `${guestRow.seconds}s`)
+  check('连续天数是真实值', guestRow.streakDays >= 1, `连续 ${guestRow.streakDays} 天`)
+  check('累计天数是真实值', guestRow.totalDays >= 1, `共 ${guestRow.totalDays} 天`)
 
-  host.send({ t: 'cheer', cheerId: 'buy-now-http://x.com', toId: '' })
-  const rejected = await host.wait((m) => m.t === 'error')
-  check('白名单外的加油被拒', rejected.code === 'INVALID_NAME')
+  // 许愿墙
+  guest.send({ t: 'wish:add', roomId, text: '希望今年顺利上岸' })
+  const wishes = await guest.wait((m) => m.t === 'wish:list')
+  check('可以发愿', wishes.wishes.some((w) => w.text === '希望今年顺利上岸'))
+  check('自己的愿望被标记', wishes.wishes[0].mine === true)
 
-  // 房主顺延
-  host.close()
-  const hostNotice = await guest.wait((m) => m.t === 'notice' && m.kind === 'host', 5000)
-  check('房主离开后广播顺延通知', hostNotice.text.includes('新房主'), hostNotice.text)
+  guest.send({ t: 'wish:add', roomId, text: '加我qq 1234567' })
+  const wishBlocked = await guest.wait((m) => m.t === 'error')
+  check('带联系方式的愿望发不出去', !!wishBlocked.message)
 
-  const rosterAfterLeave = await guest.wait((m) => m.t === 'roster' && m.members.length === 1, 5000)
-  check('顺延后房主指向剩余成员', rosterAfterLeave.room.hostId === rosterAfterLeave.members[0].id)
-  check('房间名与目标保留', rosterAfterLeave.room.name === '冒烟自习室' && rosterAfterLeave.room.goalMinutes === 60)
+  // 关键区分：退出房间 ≠ 退出自习室
+  // 先清主人侧积压，否则「1 人在座」会匹配到刚建房时那条旧详情
+  owner.drain()
+  guest.send({ t: 'room:exit' })
+  await guest.wait((m) => m.t === 'room:exited')
+  guest.drain()
+  guest.send({ t: 'rooms:mine' })
+  const stillMember = await guest.wait((m) => m.t === 'rooms:mine')
+  check('退出房间后仍然是自习室成员', stillMember.rooms.some((r) => r.id === roomId))
 
-  // 空房销毁：服务端应主动把空列表推给正在看大厅的人
+  const backToOne = await owner.wait((m) => m.t === 'room:detail' && m.room.attendeeCount === 1, 5000)
+  check('主人侧在座人数回到 1', backToOne.room.attendeeCount === 1)
+  check('但成员数仍然是 2', backToOne.room.memberCount === 2)
+
+  // 显式退出自习室才解除关系
+  guest.send({ t: 'room:quit', roomId })
+  await guest.wait((m) => m.t === 'room:quit')
+  const afterQuit = await guest.wait((m) => m.t === 'rooms:mine')
+  check('退出自习室后不再是成员', !afterQuit.rooms.some((r) => r.id === roomId))
+
+  // 主人解散。先清掉积压消息，否则会匹配到握手时那条空列表
+  owner.drain()
+  owner.send({ t: 'room:dissolve', roomId })
+  const afterDissolve = await owner.wait((m) => m.t === 'rooms:mine', 5000)
+  check('主人可以解散自习室', !afterDissolve.rooms.some((r) => r.id === roomId))
+
+  owner.send({ t: 'room:enter', roomId })
+  const gone = await owner.wait((m) => m.t === 'error', 5000)
+  check('解散后房间进不去了', !!gone.message)
+
+  owner.close()
   guest.close()
-  const lobbyAfter = await watcher.wait((m) => m.t === 'lobby' && m.rooms.length === 0, 5000)
-  check('最后一人离开后房间从大厅消失', lobbyAfter.rooms.length === 0)
-
-  watcher.close()
 
   const failed = results.filter((r) => !r.ok)
   console.log(`\n${results.length - failed.length}/${results.length} 通过`)

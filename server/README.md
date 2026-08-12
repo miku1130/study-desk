@@ -8,9 +8,10 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/rooms.ts` | 房间与大厅的全部规则。不依赖 socket，时间与随机数由外部注入，因此可直接单测 |
+| `src/stats.ts` | SQLite 持久层：档案、每日专注、自习室与成员关系、打卡、许愿墙。不碰 socket，可直接单测 |
+| `src/presence.ts` | 内存态的「此刻谁在房里」。成员关系是持久的，在座与否是临时的，两者必须分开 |
 | `src/index.ts` | WebSocket 接入、消息路由、广播合并、心跳、优雅关闭 |
-| `scripts/smoke.mjs` | 端到端冒烟，起真实连接跑一遍建房 / 随机加入 / 房主顺延 |
+| `scripts/smoke.mjs` | 端到端冒烟，起真实连接跑一遍建室 / 进出房 / 打卡 / 许愿 / 解散 |
 
 文本清洗、加油白名单、猫咪白名单直接复用客户端的 `src/main/studyRoom/protocol.ts`，
 两端共用同一份规则，避免出现「客户端说能用、服务端却拒绝」。
@@ -32,8 +33,8 @@ SMOKE_URL=wss://study.lemon21.cn/ws node scripts/smoke.mjs
 
 ## 部署
 
-产物是**零依赖单文件**——`ws` 已经打进 bundle，服务器上不需要 `npm install`。
-这一点是刻意的：目标机器的 npm registry 配置有问题，装依赖会失败。
+`ws` 已经打进 bundle，服务器上只需要装 `better-sqlite3`——它是原生模块，打不进单文件。
+目标机器是 Node 20，装 `better-sqlite3@^11`；12.x 的预编译包在 Node 20 上会段错误。
 
 打包必须是 CJS 格式。`ws` 是 CommonJS，打成 ESM 后它内部的 `require('events')`
 会变成不被支持的动态 require，进程起不来。
@@ -47,10 +48,13 @@ ssh root@<host> "pm2 restart study-room"
 首次部署：
 
 ```bash
-ssh root@<host> "mkdir -p /opt/study-room"
+ssh root@<host> "mkdir -p /opt/study-room && cd /opt/study-room && npm i better-sqlite3@^11"
 scp dist/server.cjs root@<host>:/opt/study-room/
 ssh root@<host> "cd /opt/study-room && PORT=3100 HOST=127.0.0.1 pm2 start server.cjs --name study-room --time && pm2 save"
 ```
+
+数据落在 `/opt/study-room/data/study-room.db`（可用 `STUDY_ROOM_DB` 改路径）。
+备份直接拷这个文件即可，服务运行中拷贝请先 `pm2 stop study-room`。
 
 代码放 `/opt` 而不是站点目录：nginx 的 `try_files` 会把站点目录下的文件当静态资源直接返回，
 源码放进去等于对外公开。

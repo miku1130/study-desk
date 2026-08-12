@@ -3,12 +3,27 @@ export interface FileFilterDTO {
   extensions: string[]
 }
 
+export type PomodoroModeDTO = 'countdown' | 'countup' | 'untimed'
+
 export interface PomodoroStateDTO {
   phase: 'idle' | 'work' | 'short' | 'long'
+  mode: PomodoroModeDTO
   remaining: number
+  /** 已过去的秒数；正向计时与不计时靠它显示 */
+  elapsed: number
   total: number
   running: boolean
   completed: number
+  targetId: string
+  targetName: string
+}
+
+export interface PomodoroStartOptionsDTO {
+  mode?: PomodoroModeDTO
+  /** 自定义单次时长（分钟），仅倒计时有意义 */
+  minutes?: number
+  targetId?: string
+  targetName?: string
 }
 
 export interface StudyRoomCheerDTO {
@@ -54,6 +69,89 @@ export interface StudyRoomStateDTO {
   room: StudyRoomSummaryDTO | null
   members: StudyRoomMemberDTO[]
   error: string
+}
+
+export type StudyRoomRangeDTO = 'today' | 'week' | 'month'
+
+export interface StudyRoomBriefDTO {
+  id: string
+  code?: string
+  name: string
+  intro: string
+  memberCount: number
+  attendeeCount: number
+  focusingCount?: number
+  isOwner?: boolean
+}
+
+export interface StudyRoomMemberViewDTO {
+  deviceId: string
+  nickname: string
+  catId: string
+  intro: string
+  seconds: number
+  streakDays: number
+  totalDays: number
+  wakeAt: string
+  sleepAt: string
+  rank: number
+  online: boolean
+  focusing: boolean
+}
+
+export interface StudyRoomDetailDTO {
+  id: string
+  code: string
+  name: string
+  intro: string
+  goalMinutes: number
+  memberCount: number
+  attendeeCount: number
+  focusingCount: number
+  isOwner: boolean
+  isMember: boolean
+  range: StudyRoomRangeDTO
+  members: StudyRoomMemberViewDTO[]
+}
+
+export interface StudyRoomWishDTO {
+  id: number
+  nickname: string
+  catId: string
+  text: string
+  createdAt: number
+  mine: boolean
+}
+
+/** 公网自习室的完整镜像；room 为空表示今天还没进任何房间 */
+export interface StudyRoomOnlineDTO {
+  status: 'idle' | 'connecting' | 'online' | 'error'
+  error: string
+  deviceId: string
+  intro: string
+  checkin: { wakeAt: string; sleepAt: string }
+  myRooms: StudyRoomBriefDTO[]
+  browse: StudyRoomBriefDTO[]
+  room: StudyRoomDetailDTO | null
+  wishes: StudyRoomWishDTO[]
+}
+
+export interface StudyRoomLeaderboardRowDTO {
+  deviceId: string
+  nickname: string
+  catId: string
+  seconds: number
+  rank: number
+  streakDays: number
+  totalDays: number
+}
+
+export interface StudyRoomLeaderboardDTO {
+  range: StudyRoomRangeDTO
+  rows: StudyRoomLeaderboardRowDTO[]
+  /** 自己的名次；未上榜时 rank 为 0 */
+  self: StudyRoomLeaderboardRowDTO | null
+  updatedAt: number
 }
 
 /** 备份导入导出结果；canceled 表示用户主动放弃，不算失败 */
@@ -166,11 +264,13 @@ export interface StudyDeskApi {
     onChanged: (cb: () => void) => () => void
   }
   pomodoro: {
-    start: () => Promise<void>
+    start: (options?: PomodoroStartOptionsDTO) => Promise<void>
     pause: () => Promise<void>
     toggle: () => Promise<void>
     reset: () => Promise<void>
     skip: () => Promise<void>
+    /** 正向计时与不计时没有自然终点，由用户主动结束 */
+    finish: () => Promise<void>
     getState: () => Promise<PomodoroStateDTO>
     onTick: (cb: (state: PomodoroStateDTO) => void) => () => void
     onEvent: (cb: (type: string) => void) => () => void
@@ -187,15 +287,29 @@ export interface StudyDeskApi {
     cheer: (toId: string, cheerId: string) => Promise<boolean>
     startDiscovery: () => Promise<void>
     stopDiscovery: () => Promise<void>
-    watchLobby: (on: boolean) => Promise<void>
-    getLobby: () => Promise<StudyRoomLobbyEntryDTO[]>
-    hostOnline: (options: { name: string; goalMinutes: number }) => Promise<StudyRoomNameCheckDTO>
-    joinOnline: (roomId: string) => Promise<void>
-    quickJoin: () => Promise<void>
+    onlineConnect: () => Promise<void>
+    onlineSnapshot: () => Promise<StudyRoomOnlineDTO | null>
+    watchBrowse: (on: boolean) => Promise<void>
     goOffline: () => Promise<void>
+    setIntro: (intro: string) => Promise<void>
+    checkIn: (kind: 'wake' | 'sleep', time: string) => Promise<void>
+    createRoom: (options: { name: string; intro: string; goalMinutes: number }) => Promise<void>
+    joinStudyRoom: (params: { roomId?: string; code?: string }) => Promise<void>
+    quitStudyRoom: (roomId: string) => Promise<void>
+    dissolveStudyRoom: (roomId: string) => Promise<void>
+    updateStudyRoom: (
+      roomId: string,
+      patch: { name?: string; intro?: string; goalMinutes?: number }
+    ) => Promise<void>
+    enterRoom: (roomId: string) => Promise<void>
+    exitRoom: () => Promise<void>
+    setRange: (range: StudyRoomRangeDTO) => Promise<void>
+    addWish: (text: string) => Promise<void>
+    reportWish: (id: number) => Promise<void>
+    deleteWish: (id: number) => Promise<void>
+    onOnline: (cb: (snapshot: StudyRoomOnlineDTO | null) => void) => () => void
     onState: (cb: (state: StudyRoomStateDTO) => void) => () => void
     onRooms: (cb: (rooms: StudyRoomDiscoveredDTO[]) => void) => () => void
-    onLobby: (cb: (rooms: StudyRoomLobbyEntryDTO[]) => void) => () => void
     onCheer: (cb: (event: StudyRoomCheerEventDTO) => void) => () => void
     onNotice: (cb: (notice: StudyRoomNoticeDTO) => void) => () => void
   }

@@ -49,7 +49,7 @@ const todayKey = computed(() => {
   const p = (n: number): string => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 })
-const todayStat = computed(() => stats.days[todayKey.value] ?? { pomodoros: 0, focusMinutes: 0 })
+const todayStat = computed(() => stats.daily[todayKey.value] ?? { pomodoros: 0, focusMinutes: 0 })
 
 const previewTodos = computed(() =>
   todos.items

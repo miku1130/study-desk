@@ -13,6 +13,7 @@ import { usePetCompanionStore } from '@/stores/petCompanion'
 import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import type { PetVisualState } from '@/lib/petAssets'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
+import type { PomodoroMode } from '@/types'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
@@ -53,12 +54,59 @@ function toggleClockWidget(): void {
 
 const C = 2 * Math.PI * 100
 
-const displaySeconds = computed(() =>
-  pomodoro.phase === 'idle' ? settings.s.pomodoro.workMin * 60 : pomodoro.remaining
+const MODE_OPTIONS: Array<{ key: PomodoroMode; label: string; hint: string }> = [
+  { key: 'countdown', label: '倒计时', hint: '到点自动进入休息，标准番茄钟' },
+  { key: 'countup', label: '正计时', hint: '不设终点，专注多久记多久' },
+  { key: 'untimed', label: '不计时', hint: '不盯着数字，只记开始和结束' }
+]
+const DURATION_PRESETS = [15, 25, 45, 60, 90]
+
+/** 空闲时随便切；已经开始的一段沿用起步时选的方式 */
+const selectedMode = computed<PomodoroMode>(() =>
+  pomodoro.phase === 'idle' ? (settings.s.pomodoro.mode ?? 'countdown') : pomodoro.mode
 )
+const plannedMinutes = computed(
+  () => settings.s.pomodoro.lastMinutes || settings.s.pomodoro.workMin || 25
+)
+const customMinutes = ref(plannedMinutes.value)
+
+function pickMode(mode: PomodoroMode): void {
+  if (pomodoro.phase !== 'idle') return
+  settings.s.pomodoro.mode = mode
+  settings.save()
+}
+
+function pickMinutes(minutes: number): void {
+  const value = Math.min(600, Math.max(1, Math.floor(minutes || 1)))
+  customMinutes.value = value
+  settings.s.pomodoro.lastMinutes = value
+  settings.save()
+}
+
+async function onPlay(): Promise<void> {
+  if (pomodoro.phase !== 'idle') {
+    await pomodoro.toggle()
+    return
+  }
+  await pomodoro.start({
+    mode: selectedMode.value,
+    minutes: plannedMinutes.value,
+    targetId: todos.activeItem?.id ?? '',
+    targetName: todos.activeItem?.text ?? ''
+  })
+}
+
+const displaySeconds = computed(() => {
+  if (pomodoro.phase === 'idle') {
+    return selectedMode.value === 'countdown' ? plannedMinutes.value * 60 : 0
+  }
+  return pomodoro.displaySeconds
+})
+/** 不计时模式的意义就是别盯着数字，所以只在休息段显示时间 */
+const hideDigits = computed(() => selectedMode.value === 'untimed' && pomodoro.phase === 'work')
 const mm = computed(() => String(Math.floor(displaySeconds.value / 60)).padStart(2, '0'))
 const ss = computed(() => String(displaySeconds.value % 60).padStart(2, '0'))
-const dashoffset = computed(() => C * (1 - pomodoro.progress))
+const dashoffset = computed(() => (pomodoro.total > 0 ? C * (1 - pomodoro.progress) : C))
 
 function save(): void {
   const p = settings.s.pomodoro
@@ -172,9 +220,51 @@ function testSound(): void {
       <button v-else class="bound-empty" @click="router.push('/todo')">
         绑定一个任务，完成的番茄会自动记到它头上 →
       </button>
+
+      <div class="mode-picker" role="group" aria-label="计时方式">
+        <button
+          v-for="item in MODE_OPTIONS"
+          :key="item.key"
+          type="button"
+          class="mode-btn"
+          :class="{ active: selectedMode === item.key }"
+          :disabled="pomodoro.phase !== 'idle'"
+          :title="pomodoro.phase === 'idle' ? item.hint : '这一段结束后才能换计时方式'"
+          @click="pickMode(item.key)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+
+      <div v-if="selectedMode === 'countdown' && pomodoro.phase === 'idle'" class="dur-picker">
+        <button
+          v-for="min in DURATION_PRESETS"
+          :key="min"
+          type="button"
+          class="dur-chip"
+          :class="{ active: plannedMinutes === min }"
+          @click="pickMinutes(min)"
+        >
+          {{ min }}
+        </button>
+        <input
+          v-model.number="customMinutes"
+          class="input input-sm dur-custom"
+          type="number"
+          min="1"
+          max="600"
+          aria-label="自定义分钟数"
+          @change="pickMinutes(customMinutes)"
+        />
+        <span class="unit">分</span>
+      </div>
+      <p v-else-if="pomodoro.phase === 'idle'" class="mode-hint">
+        {{ MODE_OPTIONS.find((m) => m.key === selectedMode)?.hint }}
+      </p>
+
       <div class="ring-wrap">
         <svg viewBox="0 0 220 220" class="ring">
-          <circle class="ring-bg" cx="110" cy="110" r="100" />
+          <circle class="ring-bg" :class="{ open: pomodoro.total === 0 && pomodoro.running }" cx="110" cy="110" r="100" />
           <circle
             class="ring-fg"
             cx="110"
@@ -187,7 +277,8 @@ function testSound(): void {
         </svg>
         <div class="ring-center">
           <p class="phase" :class="pomodoro.phase">{{ pomodoro.phaseLabel }}</p>
-          <p class="time">{{ mm }}:{{ ss }}</p>
+          <p v-if="hideDigits" class="time untimed">在学</p>
+          <p v-else class="time">{{ mm }}:{{ ss }}</p>
           <p class="cycles">今日 {{ pomodoro.completed }} 个番茄</p>
         </div>
       </div>
@@ -195,11 +286,26 @@ function testSound(): void {
         <button class="btn-icon lg" aria-label="重置" title="重置" @click="pomodoro.reset()">
           <AppIcon name="rotate-ccw" :size="18" />
         </button>
-        <button class="btn play" @click="pomodoro.toggle()">
+        <button class="btn play" @click="onPlay">
           <AppIcon :name="pomodoro.running ? 'pause' : 'play'" :size="15" :stroke-width="2.1" />
           {{ pomodoro.running ? '暂停' : '开始' }}
         </button>
-        <button class="btn-icon lg" aria-label="跳过" title="跳过当前阶段" @click="pomodoro.skip()">
+        <button
+          v-if="pomodoro.needsManualFinish"
+          class="btn-icon lg"
+          aria-label="结束本段"
+          title="结束这一段并记账"
+          @click="pomodoro.finish()"
+        >
+          <AppIcon name="check" :size="18" />
+        </button>
+        <button
+          v-else
+          class="btn-icon lg"
+          aria-label="跳过"
+          title="跳过当前阶段"
+          @click="pomodoro.skip()"
+        >
           <AppIcon name="skip-forward" :size="18" />
         </button>
       </div>
@@ -471,6 +577,67 @@ function testSound(): void {
   color: var(--accent);
   border-color: var(--accent);
 }
+.mode-picker {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+.mode-btn {
+  min-height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 680;
+}
+.mode-btn.active {
+  background: var(--surface-raised);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 3px rgba(18, 27, 23, 0.09);
+}
+.mode-btn:disabled {
+  opacity: 0.55;
+}
+.dur-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.dur-chip {
+  min-width: 42px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dur-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.dur-custom {
+  width: 66px;
+  text-align: center;
+}
+.mode-hint {
+  margin-bottom: 14px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
 .ring-wrap {
   position: relative;
   width: 260px;
@@ -484,6 +651,22 @@ function testSound(): void {
   fill: none;
   stroke: var(--active);
   stroke-width: 14;
+}
+/* 没有终点的模式画不出进度，用一圈呼吸表示还在走 */
+.ring-bg.open {
+  stroke: var(--accent);
+  animation: ring-breathe 4s ease-in-out infinite;
+}
+@keyframes ring-breathe {
+  50% {
+    opacity: 0.42;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-bg.open {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 .ring-fg {
   fill: none;
@@ -513,6 +696,11 @@ function testSound(): void {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+.time.untimed {
+  font-size: 40px;
+  letter-spacing: 0.08em;
+  color: var(--accent-strong);
 }
 .cycles {
   font-size: 12.5px;

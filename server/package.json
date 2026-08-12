@@ -6,13 +6,15 @@
   "type": "module",
   "main": "dist/server.cjs",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server.cjs --external:bufferutil --external:utf-8-validate",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server.cjs --external:bufferutil --external:utf-8-validate --external:better-sqlite3",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/ws": "^8.5.13",
     "esbuild": "^0.24.0"
   }

@@ -431,7 +431,17 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('pomodoro:start', () => engine.start())
+  ipcMain.handle('pomodoro:start', (_e, options?: unknown) => {
+    const raw = (options ?? {}) as Record<string, unknown>
+    const mode = raw.mode
+    engine.start({
+      mode: mode === 'countup' || mode === 'untimed' || mode === 'countdown' ? mode : undefined,
+      minutes: Number(raw.minutes) > 0 ? Number(raw.minutes) : undefined,
+      targetId: typeof raw.targetId === 'string' ? raw.targetId : '',
+      targetName: typeof raw.targetName === 'string' ? raw.targetName : ''
+    })
+  })
+  ipcMain.handle('pomodoro:finish', () => engine.finish())
   ipcMain.handle('pomodoro:pause', () => engine.pause())
   ipcMain.handle('pomodoro:toggle', () => engine.toggle())
   ipcMain.handle('pomodoro:reset', () => engine.reset())
@@ -465,16 +475,50 @@ function registerIpc(): void {
   ipcMain.handle('study-room:discover-start', () => studyRoom.startDiscovery())
   ipcMain.handle('study-room:discover-stop', () => studyRoom.stopDiscovery())
 
-  ipcMain.handle('study-room:watch-lobby', (_e, on: boolean) => studyRoom.watchLobby(Boolean(on)))
-  ipcMain.handle('study-room:get-lobby', () => studyRoom.getLobby())
-  ipcMain.handle('study-room:host-online', (_e, options: { name: string; goalMinutes: number }) =>
-    studyRoom.hostOnline(String(options?.name ?? ''), Number(options?.goalMinutes ?? 0))
-  )
-  ipcMain.handle('study-room:join-online', (_e, roomId: string) =>
-    studyRoom.joinOnline(String(roomId ?? ''))
-  )
-  ipcMain.handle('study-room:quick-join', () => studyRoom.quickJoinOnline())
+  // 公网自习室。注意「自习室」是成员关系，「房间」是今天来不来学，两组接口不要混用
+  ipcMain.handle('study-room:online-connect', () => studyRoom.onlineConnect())
+  ipcMain.handle('study-room:online-snapshot', () => studyRoom.getOnlineSnapshot())
+  ipcMain.handle('study-room:watch-browse', (_e, on: boolean) => studyRoom.watchBrowse(Boolean(on)))
   ipcMain.handle('study-room:go-offline', () => studyRoom.goOffline())
+  ipcMain.handle('study-room:set-intro', (_e, intro: string) =>
+    studyRoom.setIntro(String(intro ?? ''))
+  )
+  ipcMain.handle('study-room:checkin', (_e, kind: unknown, time: string) =>
+    studyRoom.checkIn(kind === 'sleep' ? 'sleep' : 'wake', String(time ?? ''))
+  )
+  ipcMain.handle(
+    'study-room:create',
+    (_e, options: { name: string; intro: string; goalMinutes: number }) =>
+      studyRoom.createRoom(
+        String(options?.name ?? ''),
+        String(options?.intro ?? ''),
+        Number(options?.goalMinutes ?? 0)
+      )
+  )
+  ipcMain.handle('study-room:join-room', (_e, params: { roomId?: string; code?: string }) =>
+    studyRoom.joinStudyRoom({ roomId: params?.roomId, code: params?.code })
+  )
+  ipcMain.handle('study-room:quit-room', (_e, roomId: string) =>
+    studyRoom.quitStudyRoom(String(roomId ?? ''))
+  )
+  ipcMain.handle('study-room:dissolve', (_e, roomId: string) =>
+    studyRoom.dissolveStudyRoom(String(roomId ?? ''))
+  )
+  ipcMain.handle(
+    'study-room:update-room',
+    (_e, roomId: string, patch: { name?: string; intro?: string; goalMinutes?: number }) =>
+      studyRoom.updateStudyRoom(String(roomId ?? ''), patch ?? {})
+  )
+  ipcMain.handle('study-room:enter', (_e, roomId: string) =>
+    studyRoom.enterRoom(String(roomId ?? ''))
+  )
+  ipcMain.handle('study-room:exit', () => studyRoom.exitRoom())
+  ipcMain.handle('study-room:set-range', (_e, range: unknown) =>
+    studyRoom.setRoomRange(range === 'week' || range === 'month' ? range : 'today')
+  )
+  ipcMain.handle('study-room:wish-add', (_e, text: string) => studyRoom.addWish(String(text ?? '')))
+  ipcMain.handle('study-room:wish-report', (_e, id: number) => studyRoom.reportWish(Number(id)))
+  ipcMain.handle('study-room:wish-delete', (_e, id: number) => studyRoom.deleteWish(Number(id)))
 
   ipcMain.handle('lockscreen:close', () => closeLock())
 

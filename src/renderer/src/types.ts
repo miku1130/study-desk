@@ -20,6 +20,10 @@ export interface PomodoroConfig {
   wallpaper: string
   sound: string
   volume: number
+  /** 上次选的计时方式，下次打开沿用 */
+  mode: PomodoroMode
+  /** 上次选的单次时长（分钟），仅倒计时用得上 */
+  lastMinutes: number
 }
 
 export interface HotkeyConfig {
@@ -76,7 +80,9 @@ export const defaultSettings: AppSettings = {
     lockStyle: 'minimal',
     wallpaper: '',
     sound: '',
-    volume: 0.8
+    volume: 0.8,
+    mode: 'countdown',
+    lastMinutes: 25
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
@@ -204,7 +210,10 @@ export interface DayStat {
 }
 
 export interface StatsData {
+  /** 旧版按日聚合，保留以兼容历史数据 */
   days: Record<string, DayStat>
+  /** 专注明细，新版统计以此为准 */
+  sessions?: FocusSession[]
 }
 
 export interface WaterData {
@@ -432,12 +441,32 @@ export interface PetCompanionData {
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'
 
+/** 计时方式：标准倒计时 / 正向计时 / 只记开始结束不显示数字 */
+export type PomodoroMode = 'countdown' | 'countup' | 'untimed'
+
 export interface PomodoroState {
   phase: PomodoroPhase
+  mode: PomodoroMode
   remaining: number
+  /** 已过去的秒数，正向计时与不计时靠它显示 */
+  elapsed: number
   total: number
   running: boolean
   completed: number
+  targetId: string
+  targetName: string
+}
+
+/** 一次专注的明细；统计页的所有聚合都从这里算出来 */
+export interface FocusSession {
+  id: string
+  startAt: number
+  endAt: number
+  minutes: number
+  mode: PomodoroMode
+  targetId: string
+  targetName: string
+  completed: boolean
 }
 
 export type StudyRoomStatus =
@@ -494,6 +523,91 @@ export interface StudyRoomState {
   room: StudyRoomSummary | null
   members: StudyRoomMember[]
   error: string
+}
+
+export type StudyRoomRange = 'today' | 'week' | 'month'
+
+/** 自习室摘要；memberCount 是成员数，attendeeCount 是此刻在座人数 */
+export interface StudyRoomBrief {
+  id: string
+  code?: string
+  name: string
+  intro: string
+  memberCount: number
+  attendeeCount: number
+  focusingCount?: number
+  isOwner?: boolean
+}
+
+export interface StudyRoomMemberView {
+  deviceId: string
+  nickname: string
+  catId: string
+  intro: string
+  seconds: number
+  streakDays: number
+  totalDays: number
+  wakeAt: string
+  sleepAt: string
+  rank: number
+  online: boolean
+  focusing: boolean
+}
+
+export interface StudyRoomDetail {
+  id: string
+  code: string
+  name: string
+  intro: string
+  goalMinutes: number
+  memberCount: number
+  attendeeCount: number
+  focusingCount: number
+  isOwner: boolean
+  isMember: boolean
+  range: StudyRoomRange
+  members: StudyRoomMemberView[]
+}
+
+export interface StudyRoomWish {
+  id: number
+  nickname: string
+  catId: string
+  text: string
+  createdAt: number
+  mine: boolean
+}
+
+/** 公网自习室的完整镜像 */
+export interface StudyRoomOnline {
+  status: 'idle' | 'connecting' | 'online' | 'error'
+  error: string
+  deviceId: string
+  intro: string
+  checkin: { wakeAt: string; sleepAt: string }
+  myRooms: StudyRoomBrief[]
+  browse: StudyRoomBrief[]
+  room: StudyRoomDetail | null
+  wishes: StudyRoomWish[]
+}
+
+export interface StudyRoomLeaderboardRow {
+  deviceId: string
+  nickname: string
+  catId: string
+  seconds: number
+  rank: number
+  /** 当前连续专注天数 */
+  streakDays: number
+  /** 累计专注过的天数 */
+  totalDays: number
+}
+
+export interface StudyRoomLeaderboard {
+  range: StudyRoomRange
+  rows: StudyRoomLeaderboardRow[]
+  self: StudyRoomLeaderboardRow | null
+  updatedAt: number
 }
 
 /** 公网大厅条目；不含昵称，公开自由文本只保留房间名一处 */

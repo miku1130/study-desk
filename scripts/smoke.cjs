@@ -165,6 +165,37 @@ ipcMain.handle('study-room:set-goal', () => true)
 ipcMain.handle('study-room:cheer', () => true)
 ipcMain.handle('study-room:discover-start', () => undefined)
 ipcMain.handle('study-room:discover-stop', () => undefined)
+ipcMain.handle('study-room:online-snapshot', () => ({
+  status: 'online',
+  error: '',
+  deviceId: 'smoke-device',
+  intro: '一起上岸',
+  checkin: { wakeAt: '07:20', sleepAt: '' },
+  myRooms: [
+    { id: 'r1', code: 'SMOKE001', name: '考研自习室', intro: '安静刷题', memberCount: 3, attendeeCount: 1, focusingCount: 1, isOwner: true }
+  ],
+  browse: [
+    { id: 'r2', name: '早八自习室', intro: '', memberCount: 8, attendeeCount: 4, focusingCount: 2, isOwner: false }
+  ],
+  room: null,
+  wishes: []
+}))
+ipcMain.handle('study-room:online-connect', () => undefined)
+ipcMain.handle('study-room:watch-browse', () => undefined)
+ipcMain.handle('study-room:go-offline', () => undefined)
+ipcMain.handle('study-room:set-intro', () => undefined)
+ipcMain.handle('study-room:checkin', () => undefined)
+ipcMain.handle('study-room:create', () => undefined)
+ipcMain.handle('study-room:join-room', () => undefined)
+ipcMain.handle('study-room:quit-room', () => undefined)
+ipcMain.handle('study-room:dissolve', () => undefined)
+ipcMain.handle('study-room:update-room', () => undefined)
+ipcMain.handle('study-room:enter', () => undefined)
+ipcMain.handle('study-room:exit', () => undefined)
+ipcMain.handle('study-room:set-range', () => undefined)
+ipcMain.handle('study-room:wish-add', () => undefined)
+ipcMain.handle('study-room:wish-report', () => undefined)
+ipcMain.handle('study-room:wish-delete', () => undefined)
 
 // 猫咪动画自检：待机是逐帧视频，写字是立绘 + CSS 位移，两种都必须真的在动
 const CAT_ANIMATION_PROBE = `(async (scope) => {
@@ -209,7 +240,7 @@ const routes = [
   { hash: '/bookshelf', name: '学习资料库', sel: ['.library-tools', '.library-stats'] },
   { hash: '/countdown', name: '倒数日', sel: ['.cd-head'] },
   { hash: '/widgets', name: '桌面摆件管理', sel: ['.widgets-page', '.widget-list', '.desktop-widget-card'] },
-  { hash: '/study-room', name: '自习室', sel: ['.study-room-page', '.study-room-lobby', '.code-input'] },
+  { hash: '/study-room', name: '自习室', sel: ['.study-room-page', '.online-lobby', '.code-input'] },
   { hash: '/stats', name: '专注统计', sel: ['.chart'] },
   { hash: '/garden', name: '专注花园', sel: ['.garden-page', '.plot-grid', '.quest-card'] },
   { hash: '/pet', name: '猫咪伴学', sel: ['.pet-page', '.pet-room', '.wardrobe-grid', '.collection-grid'] },

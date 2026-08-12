@@ -30,6 +30,10 @@ export const PET_CAT_IMAGES: Record<PetVisualState, string> = {
   gift: catGift
 }
 
+/**
+ * 逐帧待机视频已停用：多猫同屏要同时解码多路视频，循环接缝也会顿一下。
+ * 现在统一用单帧立绘加轻微 CSS 晃动，这里保留引用只为素材不丢。
+ */
 export const PET_CAT_IDLE_ANIMATIONS: Record<string, string> = {
   mikan: catIdleMikanAnimation,
   cloud: catIdleCloudAnimation,

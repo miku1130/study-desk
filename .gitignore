@@ -10,6 +10,10 @@ shot-*.png
 smoke-report.txt
 smoke-out.txt
 
+# 单测与冒烟跑出来的临时 SQLite
+server/.tmp-smoke.db*
+server/data
+
 # 与本项目无关的本地目录，切勿入库
 napcat-qq-login
 

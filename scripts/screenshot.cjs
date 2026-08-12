@@ -91,7 +91,13 @@ const sample = {
       [dkey(2)]: { pomodoros: 5, focusMinutes: 125 },
       [dkey(1)]: { pomodoros: 7, focusMinutes: 175 },
       [dkey(0)]: { pomodoros: 3, focusMinutes: 75 }
-    }
+    },
+    sessions: [
+      { id: 's1', startAt: Date.now() - 3 * 3600_000, endAt: Date.now() - 2.2 * 3600_000, minutes: 48, mode: 'countdown', targetId: '1', targetName: '完成高数第三章习题', completed: true },
+      { id: 's2', startAt: Date.now() - 6 * 3600_000, endAt: Date.now() - 5.5 * 3600_000, minutes: 27, mode: 'countup', targetId: '2', targetName: '背 30 个英语单词', completed: true },
+      { id: 's3', startAt: Date.now() - 26 * 3600_000, endAt: Date.now() - 25 * 3600_000, minutes: 62, mode: 'countdown', targetId: '3', targetName: '复习数据结构', completed: false },
+      { id: 's4', startAt: Date.now() - 30 * 3600_000, endAt: Date.now() - 29.5 * 3600_000, minutes: 25, mode: 'untimed', targetId: '', targetName: '', completed: true }
+    ]
   },
   music: {
     tracks: [
@@ -159,13 +165,17 @@ const sample = {
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
 ipcMain.handle('store:set', () => true)
-ipcMain.handle('pomodoro:getState', () => ({
-  phase: 'work',
-  remaining: 1124,
-  total: 1500,
-  running: true,
-  completed: 3
-}))
+ipcMain.handle('pomodoro:getState', () =>
+  process.env.SHOT_TIMER === 'idle'
+    ? {
+        phase: 'idle', mode: 'countdown', remaining: 0, elapsed: 0, total: 0,
+        running: false, completed: 3, targetId: '', targetName: ''
+      }
+    : {
+        phase: 'work', mode: 'countdown', remaining: 1124, elapsed: 376, total: 1500,
+        running: true, completed: 3, targetId: '', targetName: ''
+      }
+)
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)
 ipcMain.handle('tray:setIcon', () => undefined)
@@ -230,6 +240,48 @@ ipcMain.handle('study-room:set-goal', () => true)
 ipcMain.handle('study-room:cheer', () => true)
 ipcMain.handle('study-room:discover-start', () => undefined)
 ipcMain.handle('study-room:discover-stop', () => undefined)
+
+const onlineMembers = [
+  { deviceId: 'me', nickname: '小桌', catId: 'mikan', intro: '一战成硕', seconds: 7260, streakDays: 12, totalDays: 43, wakeAt: '06:40', sleepAt: '', rank: 1, online: true, focusing: true },
+  { deviceId: 'd2', nickname: '柚子', catId: 'sesame', intro: '专四冲刺', seconds: 5400, streakDays: 5, totalDays: 20, wakeAt: '07:10', sleepAt: '', rank: 2, online: true, focusing: true },
+  { deviceId: 'd3', nickname: '阿元', catId: 'mocha', intro: '', seconds: 3120, streakDays: 0, totalDays: 8, wakeAt: '', sleepAt: '', rank: 3, online: true, focusing: false },
+  { deviceId: 'd4', nickname: '小满', catId: 'mikan', intro: '每天两小时', seconds: 1800, streakDays: 3, totalDays: 11, wakeAt: '07:55', sleepAt: '', rank: 4, online: false, focusing: false }
+]
+const onlineSnapshot = {
+  status: 'online',
+  error: '',
+  deviceId: 'me',
+  intro: '一战成硕',
+  checkin: { wakeAt: '06:40', sleepAt: '' },
+  myRooms: [
+    { id: 'r1', code: 'KY2026AB', name: '考研自习室', intro: '安静刷题，互不打扰', memberCount: 24, attendeeCount: 4, focusingCount: 2, isOwner: true },
+    { id: 'r2', code: '', name: '早八不迟到', intro: '六点半起床打卡', memberCount: 12, attendeeCount: 3, focusingCount: 1, isOwner: false }
+  ],
+  browse: [
+    { id: 'r3', name: '通宵图书馆', intro: '夜猫子集合', memberCount: 31, attendeeCount: 9, focusingCount: 6, isOwner: false },
+    { id: 'r4', name: '雅思 7 分小组', intro: '', memberCount: 15, attendeeCount: 5, focusingCount: 3, isOwner: false }
+  ],
+  room:
+    process.env.SHOT_ROOM === 'live'
+      ? {
+          id: 'r1', code: 'KY2026AB', name: '考研自习室', intro: '安静刷题，互不打扰',
+          goalMinutes: 240, memberCount: 24, attendeeCount: 4, focusingCount: 2,
+          isOwner: true, isMember: true, range: 'today', members: onlineMembers
+        }
+      : null,
+  wishes: [
+    { id: 1, nickname: '柚子', catId: 'sesame', text: '希望今年一次上岸', createdAt: Date.now() - 3600_000, mine: false },
+    { id: 2, nickname: '小桌', catId: 'mikan', text: '每天都能坐满四小时', createdAt: Date.now() - 7200_000, mine: true }
+  ]
+}
+ipcMain.handle('study-room:online-snapshot', () => onlineSnapshot)
+for (const channel of [
+  'online-connect', 'watch-browse', 'go-offline', 'set-intro', 'checkin', 'create',
+  'join-room', 'quit-room', 'dissolve', 'update-room', 'enter', 'exit', 'set-range',
+  'wish-add', 'wish-report', 'wish-delete'
+]) {
+  ipcMain.handle(`study-room:${channel}`, () => undefined)
+}
 
 app.whenReady().then(async () => {
   nativeTheme.themeSource = theme

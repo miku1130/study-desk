@@ -80,11 +80,12 @@ const api = {
     onChanged: (cb: () => void): (() => void) => on('todos:changed', () => cb())
   },
   pomodoro: {
-    start: (): Promise<void> => ipcRenderer.invoke('pomodoro:start'),
+    start: (options?: unknown): Promise<void> => ipcRenderer.invoke('pomodoro:start', options),
     pause: (): Promise<void> => ipcRenderer.invoke('pomodoro:pause'),
     toggle: (): Promise<void> => ipcRenderer.invoke('pomodoro:toggle'),
     reset: (): Promise<void> => ipcRenderer.invoke('pomodoro:reset'),
     skip: (): Promise<void> => ipcRenderer.invoke('pomodoro:skip'),
+    finish: (): Promise<void> => ipcRenderer.invoke('pomodoro:finish'),
     getState: (): Promise<unknown> => ipcRenderer.invoke('pomodoro:getState'),
     onTick: (cb: (state: unknown) => void): (() => void) => on('pomodoro:tick', (s) => cb(s)),
     onEvent: (cb: (type: string) => void): (() => void) =>
@@ -108,17 +109,37 @@ const api = {
       ipcRenderer.invoke('study-room:cheer', toId, cheerId),
     startDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-start'),
     stopDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-stop'),
-    watchLobby: (on: boolean): Promise<void> => ipcRenderer.invoke('study-room:watch-lobby', on),
-    getLobby: (): Promise<unknown[]> => ipcRenderer.invoke('study-room:get-lobby'),
-    hostOnline: (options: { name: string; goalMinutes: number }): Promise<unknown> =>
-      ipcRenderer.invoke('study-room:host-online', options),
-    joinOnline: (roomId: string): Promise<void> =>
-      ipcRenderer.invoke('study-room:join-online', roomId),
-    quickJoin: (): Promise<void> => ipcRenderer.invoke('study-room:quick-join'),
+    // 公网自习室：online* 是成员关系与房间，两组语义不同别混用
+    onlineConnect: (): Promise<void> => ipcRenderer.invoke('study-room:online-connect'),
+    onlineSnapshot: (): Promise<unknown> => ipcRenderer.invoke('study-room:online-snapshot'),
+    watchBrowse: (on: boolean): Promise<void> =>
+      ipcRenderer.invoke('study-room:watch-browse', on),
     goOffline: (): Promise<void> => ipcRenderer.invoke('study-room:go-offline'),
+    setIntro: (intro: string): Promise<void> => ipcRenderer.invoke('study-room:set-intro', intro),
+    checkIn: (kind: 'wake' | 'sleep', time: string): Promise<void> =>
+      ipcRenderer.invoke('study-room:checkin', kind, time),
+    createRoom: (options: { name: string; intro: string; goalMinutes: number }): Promise<void> =>
+      ipcRenderer.invoke('study-room:create', options),
+    joinStudyRoom: (params: { roomId?: string; code?: string }): Promise<void> =>
+      ipcRenderer.invoke('study-room:join-room', params),
+    quitStudyRoom: (roomId: string): Promise<void> =>
+      ipcRenderer.invoke('study-room:quit-room', roomId),
+    dissolveStudyRoom: (roomId: string): Promise<void> =>
+      ipcRenderer.invoke('study-room:dissolve', roomId),
+    updateStudyRoom: (
+      roomId: string,
+      patch: { name?: string; intro?: string; goalMinutes?: number }
+    ): Promise<void> => ipcRenderer.invoke('study-room:update-room', roomId, patch),
+    enterRoom: (roomId: string): Promise<void> => ipcRenderer.invoke('study-room:enter', roomId),
+    exitRoom: (): Promise<void> => ipcRenderer.invoke('study-room:exit'),
+    setRange: (range: string): Promise<void> => ipcRenderer.invoke('study-room:set-range', range),
+    addWish: (text: string): Promise<void> => ipcRenderer.invoke('study-room:wish-add', text),
+    reportWish: (id: number): Promise<void> => ipcRenderer.invoke('study-room:wish-report', id),
+    deleteWish: (id: number): Promise<void> => ipcRenderer.invoke('study-room:wish-delete', id),
+    onOnline: (cb: (snapshot: unknown) => void): (() => void) =>
+      on('study-room:online', (s) => cb(s)),
     onState: (cb: (state: unknown) => void): (() => void) => on('study-room:state', (s) => cb(s)),
     onRooms: (cb: (rooms: unknown) => void): (() => void) => on('study-room:rooms', (r) => cb(r)),
-    onLobby: (cb: (rooms: unknown) => void): (() => void) => on('study-room:lobby', (r) => cb(r)),
     onCheer: (cb: (event: unknown) => void): (() => void) =>
       on('study-room:cheer-event', (e) => cb(e)),
     onNotice: (cb: (notice: unknown) => void): (() => void) =>
