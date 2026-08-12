@@ -41,6 +41,9 @@ export const useUiStore = defineStore('ui', () => {
   const error = (text: string): void => toast(text, 'error', 3200)
 
   function confirm(options: ConfirmOptions): Promise<boolean> {
+    // 前一个确认框还没结算就被顶掉的话，它的 resolve 会随引用一起丢失，
+    // 调用方会永远卡在 await 上。所以先把旧的按「取消」结掉。
+    if (confirmState.value) settleConfirm(false)
     return new Promise((resolve) => {
       confirmState.value = { confirmText: '确定', danger: false, ...options, resolve }
     })

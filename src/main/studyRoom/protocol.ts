@@ -50,6 +50,21 @@ export function isCheerId(value: unknown): value is string {
   return typeof value === 'string' && CHEER_IDS.has(value)
 }
 
+/**
+ * 可用的猫咪形象。catId 会被服务端下发给房内其他成员并用于查找图片资源，
+ * 属于跨用户传播的字段，必须白名单化而不是只限长度。
+ */
+export const STUDY_ROOM_CAT_IDS = ['mikan', 'cloud', 'sesame'] as const
+export const STUDY_ROOM_DEFAULT_CAT_ID = 'mikan'
+
+const CAT_ID_SET = new Set<string>(STUDY_ROOM_CAT_IDS)
+
+export function sanitizeCatId(value: unknown): string {
+  return typeof value === 'string' && CAT_ID_SET.has(value)
+    ? value
+    : STUDY_ROOM_DEFAULT_CAT_ID
+}
+
 export function cheerSpec(id: string): StudyRoomCheerSpec | undefined {
   return STUDY_ROOM_CHEERS.find((c) => c.id === id)
 }
@@ -85,9 +100,23 @@ function compactForMatch(input: string): string {
     .replace(/[^0-9a-z\u3040-\u30ff\u4e00-\u9fff]/g, '')
 }
 
+/** 保留标点的归一化形式：域名后缀只能连着点号一起判定，压紧后会退化成字母串 */
+function normalizeForLinkMatch(input: string): string {
+  return toHalfWidth(input.replace(ZERO_WIDTH, '')).toLowerCase()
+}
+
+/**
+ * 域名后缀必须带点号，后面也不能再接字母。
+ * 否则 top / net / com 会命中 laptop、planet、Malcom 这类完全正常的昵称。
+ */
+const DOMAIN_SUFFIX = /\.\s*(com|cn|net|org|top|xyz|shop|vip|io|cc|me|site|fun|link)(?![a-z])/
+
+/** 考研年、入学年、出生年在自习场景里极常见，不参与数字占比统计 */
+const YEAR_LIKE = /(?:19|20)\d{2}/g
+
 const PROMOTION_KEYWORDS = [
-  // 链接与站点
-  'http', 'https', 'www', '.com', '.cn', '.net', '.org', '.top', '.xyz', '.shop', '.vip',
+  // 链接与站点（域名后缀交给 DOMAIN_SUFFIX，不能进压紧词表）
+  'http', 'https', 'www',
   // 联系方式
   'qq', '扣扣', '企鹅号', '微信', 'weixin', 'wechat', 'vx', '威信', '徽信', 'telegram', '电报',
   'whatsapp', '加v', '私聊', '私信', '联系我', '咨询我', '滴滴我', '手机号', '电话号',
@@ -102,14 +131,16 @@ const COMPACT_KEYWORDS = PROMOTION_KEYWORDS.map(compactForMatch).filter(Boolean)
 
 /** 判定是否疑似广告 / 引流文本 */
 export function looksLikePromotion(raw: string): boolean {
+  if (DOMAIN_SUFFIX.test(normalizeForLinkMatch(raw))) return true
   const compact = compactForMatch(raw)
   if (!compact) return false
   if (COMPACT_KEYWORDS.some((kw) => compact.includes(kw))) return true
-  // 连续 5 位以上数字：电话号 / QQ 号 / 微信号
+  // 连续 5 位以上数字：电话号 / QQ 号 / 微信号。在剔年份之前判断，否则可用年份切割长号码绕过
   if (/\d{5,}/.test(compact)) return true
-  // 数字占比过半的中长串，多为变体联系方式
-  const digits = (compact.match(/\d/g) ?? []).length
-  if (compact.length >= 6 && digits * 2 > compact.length) return true
+  // 数字占比过半的中长串，多为变体联系方式；先剔年份，否则「2026考研」会被误伤
+  const withoutYear = compact.replace(YEAR_LIKE, '')
+  const digits = (withoutYear.match(/\d/g) ?? []).length
+  if (withoutYear.length >= 6 && digits * 2 > withoutYear.length) return true
   return false
 }
 
@@ -345,7 +376,7 @@ function parseMember(value: unknown): StudyRoomMemberSnapshot {
     ...parseFocus(raw),
     id: str(raw.id, 40),
     nickname: sanitizeNickname(raw.nickname),
-    catId: str(raw.catId, 24) || 'mikan',
+    catId: sanitizeCatId(raw.catId),
     host: Boolean(raw.host),
     roomFocusSeconds: num(raw.roomFocusSeconds, 0, 24 * 3600),
     roomPomodoros: num(raw.roomPomodoros, 0, 999),
@@ -396,7 +427,7 @@ export function parseMessage(line: string): StudyRoomMessage | null {
         t: 'hello',
         v: num(raw.v, 0, 999),
         nickname: sanitizeNickname(raw.nickname),
-        catId: str(raw.catId, 24) || 'mikan',
+        catId: sanitizeCatId(raw.catId),
         focus: parseFocus(raw.focus)
       }
     case 'welcome':

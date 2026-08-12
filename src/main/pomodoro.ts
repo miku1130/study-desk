@@ -71,6 +71,11 @@ export class PomodoroEngine {
     else this.start()
   }
 
+  /** 进程退出时停掉计时循环；不改变 state，避免退出瞬间还广播一次状态 */
+  dispose(): void {
+    this.clear()
+  }
+
   reset(): void {
     if (this.workWasStarted()) this.emitEvent('workAbandoned')
     this.clear()

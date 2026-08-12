@@ -6,6 +6,7 @@ import type {
   StudyRoomCheer,
   StudyRoomCheerEvent,
   StudyRoomDiscovered,
+  StudyRoomLobbyEntry,
   StudyRoomMember,
   StudyRoomNameCheck,
   StudyRoomNotice,
@@ -56,6 +57,8 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
   const members = ref<StudyRoomMember[]>([])
   const error = shallowRef('')
   const rooms = ref<StudyRoomDiscovered[]>([])
+  /** 公网大厅列表，由服务端按人数降序推送 */
+  const lobby = ref<StudyRoomLobbyEntry[]>([])
   const cheers = ref<StudyRoomCheer[]>([])
   const discovering = shallowRef(false)
   const loaded = shallowRef(false)
@@ -70,13 +73,26 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
   let initPromise: Promise<void> | null = null
   let bubbleTimer: number | null = null
 
-  const connected = computed(() => status.value === 'hosting' || status.value === 'joined')
-  const isHost = computed(() => status.value === 'hosting')
+  const isOnline = computed(() => status.value === 'online')
+  const connected = computed(
+    () =>
+      status.value === 'hosting' ||
+      status.value === 'joined' ||
+      (status.value === 'online' && room.value !== null)
+  )
+  const isHost = computed(() =>
+    status.value === 'online'
+      ? members.value.some((member) => member.id === selfId.value && member.host)
+      : status.value === 'hosting'
+  )
   const self = computed(() => members.value.find((member) => member.id === selfId.value))
+  /** 公网模式按进房顺序排座位；局域网沿用专注时长排行 */
   const ranked = computed(() =>
-    [...members.value].sort(
-      (a, b) => b.roomFocusSeconds - a.roomFocusSeconds || a.joinedAt - b.joinedAt
-    )
+    isOnline.value
+      ? [...members.value].sort((a, b) => a.joinedAt - b.joinedAt)
+      : [...members.value].sort(
+          (a, b) => b.roomFocusSeconds - a.roomFocusSeconds || a.joinedAt - b.joinedAt
+        )
   )
   const focusingCount = computed(
     () => members.value.filter((member) => member.running && member.phase === 'work').length
@@ -162,6 +178,9 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
         window.api.studyRoom.onRooms((list) => {
           rooms.value = list
         }),
+        window.api.studyRoom.onLobby((list) => {
+          lobby.value = list
+        }),
         window.api.studyRoom.onCheer((event) => handleCheer(event)),
         window.api.studyRoom.onNotice((notice) => handleNotice(notice))
       ]
@@ -237,6 +256,34 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
     discovering.value = false
   }
 
+  /* ---- 公网模式 ---- */
+
+  async function watchLobby(on: boolean): Promise<void> {
+    await window.api.studyRoom.watchLobby(on)
+    if (!on) lobby.value = []
+  }
+
+  async function hostOnline(options: {
+    name: string
+    goalMinutes: number
+  }): Promise<StudyRoomNameCheck> {
+    return window.api.studyRoom.hostOnline(options)
+  }
+
+  async function joinOnline(roomId: string): Promise<void> {
+    await window.api.studyRoom.joinOnline(roomId)
+  }
+
+  async function quickJoin(): Promise<void> {
+    await window.api.studyRoom.quickJoin()
+  }
+
+  /** 退出公网模式，回到本地空闲态（局域网功能随之恢复可用） */
+  async function goOffline(): Promise<void> {
+    await window.api.studyRoom.goOffline()
+    lobby.value = []
+  }
+
   function cheerSpec(cheerId: string): StudyRoomCheer | undefined {
     return cheers.value.find((cheer) => cheer.id === cheerId)
   }
@@ -266,11 +313,13 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
     members,
     error,
     rooms,
+    lobby,
     cheers,
     discovering,
     loaded,
     soundEnabled,
     connected,
+    isOnline,
     isHost,
     self,
     ranked,
@@ -290,6 +339,11 @@ export const useStudyRoomStore = defineStore('studyRoom', () => {
     sendCheer,
     startDiscovery,
     stopDiscovery,
+    watchLobby,
+    hostOnline,
+    joinOnline,
+    quickJoin,
+    goOffline,
     cheerSpec,
     recentCheerFor
   }

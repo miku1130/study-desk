@@ -21,6 +21,10 @@ export class WaterReminder {
     this.lastRemind = Date.now()
   }
 
+  stop(): void {
+    this.clear()
+  }
+
   private check(): void {
     const w = this.settings.get('water') as { enabled: boolean; intervalMin: number } | undefined
     if (!w?.enabled) return

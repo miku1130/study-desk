@@ -1,0 +1,19 @@
+{
+  "name": "study-room-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StudyDesk 公网自习室服务端（wss 由 nginx 终止）",
+  "type": "module",
+  "main": "dist/server.cjs",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server.cjs --external:bufferutil --external:utf-8-validate",
+    "start": "node dist/server.cjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.24.0"
+  }
+}

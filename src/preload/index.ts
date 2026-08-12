@@ -108,8 +108,17 @@ const api = {
       ipcRenderer.invoke('study-room:cheer', toId, cheerId),
     startDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-start'),
     stopDiscovery: (): Promise<void> => ipcRenderer.invoke('study-room:discover-stop'),
+    watchLobby: (on: boolean): Promise<void> => ipcRenderer.invoke('study-room:watch-lobby', on),
+    getLobby: (): Promise<unknown[]> => ipcRenderer.invoke('study-room:get-lobby'),
+    hostOnline: (options: { name: string; goalMinutes: number }): Promise<unknown> =>
+      ipcRenderer.invoke('study-room:host-online', options),
+    joinOnline: (roomId: string): Promise<void> =>
+      ipcRenderer.invoke('study-room:join-online', roomId),
+    quickJoin: (): Promise<void> => ipcRenderer.invoke('study-room:quick-join'),
+    goOffline: (): Promise<void> => ipcRenderer.invoke('study-room:go-offline'),
     onState: (cb: (state: unknown) => void): (() => void) => on('study-room:state', (s) => cb(s)),
     onRooms: (cb: (rooms: unknown) => void): (() => void) => on('study-room:rooms', (r) => cb(r)),
+    onLobby: (cb: (rooms: unknown) => void): (() => void) => on('study-room:lobby', (r) => cb(r)),
     onCheer: (cb: (event: unknown) => void): (() => void) =>
       on('study-room:cheer-event', (e) => cb(e)),
     onNotice: (cb: (notice: unknown) => void): (() => void) =>
@@ -151,8 +160,8 @@ const api = {
     onStatus: (cb: (status: unknown) => void): (() => void) => on('update:status', (s) => cb(s))
   },
   backup: {
-    export: (): Promise<boolean> => ipcRenderer.invoke('backup:export'),
-    import: (): Promise<boolean> => ipcRenderer.invoke('backup:import')
+    export: (): Promise<unknown> => ipcRenderer.invoke('backup:export'),
+    import: (): Promise<unknown> => ipcRenderer.invoke('backup:import')
   },
   system: {
     onReload: (cb: () => void): (() => void) => on('data:reloaded', () => cb())

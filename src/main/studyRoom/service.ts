@@ -7,6 +7,7 @@ import * as os from 'node:os'
 import type { JsonStore } from '../store'
 import { localDateKey } from '../time'
 import { StudyRoomBeacon, StudyRoomScanner } from './discovery'
+import { OnlineRoomClient, type OnlineLobbyEntry } from './onlineClient'
 import {
   MessageDecoder,
   STUDY_ROOM_CHEERS,
@@ -60,7 +61,10 @@ const TODAY_FOCUS_STORE_KEY = 'todayRoomFocus'
 const TODAY_FOCUS_FLUSH_SEC = 15
 const TODAY_FOCUS_MAX_SEC = 24 * 3600
 
-export type StudyRoomStatus = 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
+export type StudyRoomStatus = 'idle' | 'hosting' | 'connecting' | 'joined' | 'error' | 'online'
+
+/** 公网服务端地址；可在设置里覆盖，换域名时老客户端不至于全废 */
+export const DEFAULT_STUDY_ROOM_SERVER = 'wss://study.lemon21.cn/ws'
 
 /** 与 preload 侧 StudyRoomStateDTO 结构完全一致 */
 export interface StudyRoomState {
@@ -127,6 +131,8 @@ export class StudyRoomService {
   private cancelConnecting: (() => void) | null = null
 
   private scanner: StudyRoomScanner | null = null
+  /** 公网模式的连接；非 null 表示当前走服务器而不是局域网 */
+  private online: OnlineRoomClient | null = null
 
   private statePushTimer: NodeJS.Timeout | null = null
   private lastStatePushAt = 0
@@ -151,6 +157,17 @@ export class StudyRoomService {
   }
 
   getState(): StudyRoomState {
+    if (this.online) {
+      const status = this.online.getStatus()
+      return {
+        status: status === 'idle' ? 'idle' : status === 'online' ? 'online' : status,
+        selfId: this.online.getSelfId(),
+        nickname: sanitizeNickname(this.deps.store.get('nickname'), ''),
+        room: this.online.getRoom(),
+        members: this.online.getMembers(),
+        error: this.online.getError()
+      }
+    }
     const members =
       this.status === 'hosting'
         ? [...this.links.values()].map((link) => ({ ...link.member }))
@@ -163,6 +180,67 @@ export class StudyRoomService {
       members,
       error: this.error
     }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 公网模式：服务器是权威，本地只做镜像
+   * ------------------------------------------------------------------ */
+
+  private ensureOnline(): OnlineRoomClient {
+    if (this.online) return this.online
+    // 进公网模式前先退干净局域网连接，避免两套链路同时上报专注状态
+    if (this.status !== 'idle') this.leave()
+    const configured = this.deps.store.get('serverUrl')
+    this.online = new OnlineRoomClient({
+      url: typeof configured === 'string' && configured ? configured : DEFAULT_STUDY_ROOM_SERVER,
+      getNickname: () => sanitizeNickname(this.deps.store.get('nickname'), ''),
+      getCatId: () => this.deps.getCatId(),
+      getFocus: () => this.selfFocus(),
+      onChanged: () => {
+        this.deps.send('study-room:lobby', this.online?.getLobby() ?? [])
+        this.pushState()
+      },
+      onNotice: (kind, text) => this.deps.send('study-room:notice', { kind, text }),
+      onCheer: (cheerId, fromId, fromNickname, toId) =>
+        this.emitCheer(cheerId, fromId, fromNickname, toId, Date.now()),
+      onGoal: (goalMinutes) =>
+        this.deps.notify('自习室目标达成', `大家共同专注满 ${goalMinutes} 分钟，太棒了！`)
+    })
+    return this.online
+  }
+
+  /** 订阅公网大厅；进入自习室页面时调用 */
+  watchLobby(on: boolean): void {
+    if (!on && !this.online) return
+    this.ensureOnline().watchLobby(on)
+  }
+
+  getLobby(): OnlineLobbyEntry[] {
+    return this.online?.getLobby() ?? []
+  }
+
+  hostOnline(name: string, goalMinutes: number): TextCheckResult {
+    const check = validateRoomName(name)
+    if (!check.ok) return check
+    this.deps.store.set('lastRoomName', check.value)
+    this.ensureOnline().createRoom(check.value, clampGoal(goalMinutes))
+    return check
+  }
+
+  joinOnline(roomId: string): void {
+    this.ensureOnline().joinRoom(String(roomId ?? ''))
+  }
+
+  quickJoinOnline(): void {
+    this.ensureOnline().quickJoin()
+  }
+
+  /** 彻底断开公网连接并回到本地空闲态 */
+  goOffline(): void {
+    if (!this.online) return
+    this.online.dispose()
+    this.online = null
+    this.pushState()
   }
 
   getCheers(): StudyRoomCheerSpec[] {
@@ -331,6 +409,14 @@ export class StudyRoomService {
   }
 
   leave(): void {
+    if (this.online) {
+      if (this.online.isInRoom()) {
+        this.online.leaveRoom()
+        this.notice('leave', '已离开自习室')
+      }
+      this.pushState()
+      return
+    }
     if (this.status === 'hosting') {
       this.broadcast({ t: 'bye' })
       this.teardownHost()
@@ -353,6 +439,11 @@ export class StudyRoomService {
   }
 
   setGoal(goalMinutes: number): boolean {
+    if (this.online) {
+      if (!this.online.isInRoom()) return false
+      this.online.setGoal(clampGoal(goalMinutes))
+      return true
+    }
     if (this.status !== 'hosting' || !this.room) return false
     const value = clampGoal(goalMinutes)
     this.room.goalMinutes = value
@@ -363,6 +454,14 @@ export class StudyRoomService {
 
   cheer(toId: string, cheerId: string): boolean {
     if (!isCheerId(cheerId)) return false
+    if (this.online) {
+      if (!this.online.isInRoom()) return false
+      const now = Date.now()
+      if (now - this.lastSelfCheerAt < STUDY_ROOM_CHEER_COOLDOWN_MS) return false
+      this.lastSelfCheerAt = now
+      this.online.cheer(toId, cheerId)
+      return true
+    }
     if (this.status === 'hosting') {
       const link = this.links.get(this.selfId)
       return link ? this.applyCheer(link, cheerId, toId) : false
@@ -394,6 +493,22 @@ export class StudyRoomService {
 
   /** 番茄钟 tick / 状态变化时调用；同阶段 3 秒内只上报一次，阶段变化立即上报 */
   reportFocus(): void {
+    if (this.online) {
+      if (!this.online.isInRoom()) return
+      const focus = this.selfFocus()
+      const signature = `${focus.phase}|${focus.running}`
+      const now = Date.now()
+      if (
+        signature === this.lastReportedSignature &&
+        now - this.lastFocusReportAt < FOCUS_REPORT_MIN_INTERVAL_MS
+      ) {
+        return
+      }
+      this.lastFocusReportAt = now
+      this.lastReportedSignature = signature
+      this.online.reportFocus()
+      return
+    }
     if (this.status !== 'hosting' && this.status !== 'joined') return
     // selfFocus 内部会先结算今日自习累计——必须发生在下面的节流之前，
     // 否则被节流吃掉的每秒 tick 将永远计不上时长
@@ -441,6 +556,8 @@ export class StudyRoomService {
 
   dispose(): void {
     if (this.disposed) return
+    this.online?.dispose()
+    this.online = null
     this.leave()
     // leave 内已按需结算；这里兜底强制落盘一次（含空闲时退出的场景）
     this.persistTodayRoomFocus()

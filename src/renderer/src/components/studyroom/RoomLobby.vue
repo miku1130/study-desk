@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 import PetSpriteAnimation from '@/components/pet/PetSpriteAnimation.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useStudyRoomStore } from '@/stores/studyRoom'
@@ -74,6 +74,9 @@ const goalMinutes = computed(() =>
   goalChoice.value === 'custom' ? customGoal.value : goalChoice.value
 )
 
+/** 公开房进公共大厅，任何人都能看到并加入；WiFi 房只在同一局域网内被发现 */
+const visibility = shallowRef<'public' | 'lan'>('public')
+
 const creating = shallowRef(false)
 const createDisabled = computed(
   () => creating.value || !roomNameDraft.value.trim() || roomCheck.value?.ok === false
@@ -82,6 +85,15 @@ const createDisabled = computed(
 async function createRoom(): Promise<void> {
   if (createDisabled.value) return
   creating.value = true
+  if (visibility.value === 'public') {
+    const check = await store.hostOnline({
+      name: roomNameDraft.value,
+      goalMinutes: goalMinutes.value
+    })
+    creating.value = false
+    if (!check.ok) ui.error(check.reason || '这个名字不能用，换一个试试')
+    return
+  }
   const result = await store.hostRoom({
     name: roomNameDraft.value,
     goalMinutes: goalMinutes.value
@@ -89,6 +101,29 @@ async function createRoom(): Promise<void> {
   creating.value = false
   if (!result.ok) ui.error(result.error || store.error || '创建失败了，稍后再试试吧')
 }
+
+/* ---- 公共大厅 ---- */
+
+const quickJoining = shallowRef(false)
+const joiningLobbyId = shallowRef('')
+
+async function quickJoin(): Promise<void> {
+  if (quickJoining.value) return
+  quickJoining.value = true
+  await store.quickJoin()
+  quickJoining.value = false
+}
+
+async function joinLobby(id: string): Promise<void> {
+  if (joiningLobbyId.value) return
+  joiningLobbyId.value = id
+  await store.joinOnline(id)
+  joiningLobbyId.value = ''
+}
+
+onMounted(() => {
+  void store.watchLobby(true)
+})
 
 const connecting = computed(() => store.status === 'connecting')
 const joiningId = shallowRef('')
@@ -125,6 +160,8 @@ onUnmounted(() => {
   window.clearTimeout(nicknameTimer)
   window.clearTimeout(roomTimer)
   if (store.discovering) void store.stopDiscovery()
+  // 只退订推送，不断开连接：已经进房的用户离开大厅页面后仍要保持在房内
+  void store.watchLobby(false)
 })
 </script>
 
@@ -165,7 +202,34 @@ onUnmounted(() => {
     <div class="lobby-grid">
       <section class="card host-card">
         <h3>创建自习室</h3>
-        <p class="card-hint">当一回房主，和同一 WiFi 下的同学一起把目标走满。</p>
+        <p class="card-hint">当一回房主，带着大家把目标走满。</p>
+
+        <span class="field-label">谁能加入</span>
+        <div class="seg">
+          <button
+            type="button"
+            class="seg-btn"
+            :class="{ active: visibility === 'public' }"
+            @click="visibility = 'public'"
+          >
+            公共大厅
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            :class="{ active: visibility === 'lan' }"
+            @click="visibility = 'lan'"
+          >
+            仅同一 WiFi
+          </button>
+        </div>
+        <p class="card-hint visibility-hint">
+          {{
+            visibility === 'public'
+              ? '会出现在公共大厅里，任何人都能看到房间名并加入。'
+              : '只有连着同一个 WiFi 的同学能搜到，不出网。'
+          }}
+        </p>
 
         <label class="field-label" for="study-room-name">自习室名字</label>
         <input
@@ -211,7 +275,41 @@ onUnmounted(() => {
       <section class="card join-card">
         <div class="join-head">
           <div>
-            <h3>加入自习室</h3>
+            <h3>公共大厅</h3>
+            <p class="card-hint">按人数排序，人多的在前面。不确定进哪间就随便来一间。</p>
+          </div>
+          <button class="btn btn-sm" :disabled="quickJoining" @click="quickJoin">
+            {{ quickJoining ? '进入中…' : '随便进一间' }}
+          </button>
+        </div>
+
+        <ul v-if="store.lobby.length" class="found-list">
+          <li v-for="entry in store.lobby" :key="entry.id" class="found-item">
+            <div class="found-info">
+              <strong :title="entry.name">{{ entry.name }}</strong>
+              <span>
+                {{ entry.memberCount }}/{{ entry.maxMembers }} 人 ·
+                {{ entry.focusingCount }} 人专注中 · 累计 {{ entry.focusMinutes }} 分钟
+              </span>
+            </div>
+            <button
+              class="btn btn-sm"
+              :disabled="Boolean(joiningLobbyId) || entry.memberCount >= entry.maxMembers"
+              @click="joinLobby(entry.id)"
+            >
+              {{ joiningLobbyId === entry.id ? '进入中…' : '加入' }}
+            </button>
+          </li>
+        </ul>
+        <p v-else class="discover-empty lobby-empty">
+          现在还没有人开着自习室。点「随便进一间」会直接帮你开一间，等别人来。
+        </p>
+
+        <div class="lan-divider"><span>或者找同一 WiFi 下的同学</span></div>
+
+        <div class="join-head">
+          <div>
+            <h3>附近的自习室</h3>
             <p class="card-hint">同学已经开好房间的话，搜一下就能找到。</p>
           </div>
           <button
@@ -432,6 +530,36 @@ h3 {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 650;
+}
+
+.lobby-empty {
+  padding: 24px 12px;
+  text-align: center;
+  line-height: 1.6;
+  font-weight: 600;
+}
+
+.visibility-hint {
+  margin-top: 6px;
+}
+
+/* 公共大厅与局域网搜索之间的分隔，避免两个列表被读成同一个 */
+.lan-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.lan-divider::before,
+.lan-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--separator);
 }
 
 .pulse-dot {

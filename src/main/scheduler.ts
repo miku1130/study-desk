@@ -44,6 +44,11 @@ export class BellScheduler {
     this.fired.clear()
   }
 
+  /** 退出时停掉轮询；与其它常驻模块保持同名接口 */
+  stop(): void {
+    this.clear()
+  }
+
   private check(): void {
     const now = new Date()
     const dayKey = localDateKey(now)

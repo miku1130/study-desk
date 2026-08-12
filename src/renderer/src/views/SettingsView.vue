@@ -123,8 +123,15 @@ function saveHealth(): void {
   settings.save()
 }
 async function doBackupExport(): Promise<void> {
-  const ok = await window.api.backup.export()
-  if (ok) ui.success('备份已导出')
+  try {
+    const res = await window.api.backup.export()
+    if (res.canceled) return
+    if (res.ok) ui.success('备份已导出')
+    else ui.error(res.error || '导出失败了')
+  } catch (err) {
+    console.error('[backup] 导出异常', err)
+    ui.error('导出失败了，稍后再试')
+  }
 }
 async function doBackupImport(): Promise<void> {
   const confirmed = await ui.confirm({
@@ -133,8 +140,15 @@ async function doBackupImport(): Promise<void> {
     confirmText: '导入'
   })
   if (!confirmed) return
-  const ok = await window.api.backup.import()
-  if (ok) ui.success('备份已恢复')
+  try {
+    const res = await window.api.backup.import()
+    if (res.canceled) return
+    if (res.ok) ui.success('备份已恢复')
+    else ui.error(res.error || '恢复失败了')
+  } catch (err) {
+    console.error('[backup] 导入异常', err)
+    ui.error('恢复失败了，稍后再试')
+  }
 }
 
 const showAppBgUrl = ref(false)

@@ -12,10 +12,11 @@ import {
   nativeImage,
   type NativeImage
 } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createStores, type AppStores } from './store'
+import { isServableMediaPath } from './mediaPath'
 import { PomodoroEngine } from './pomodoro'
 import { BellScheduler } from './scheduler'
 import { WaterReminder } from './water'
@@ -464,6 +465,17 @@ function registerIpc(): void {
   ipcMain.handle('study-room:discover-start', () => studyRoom.startDiscovery())
   ipcMain.handle('study-room:discover-stop', () => studyRoom.stopDiscovery())
 
+  ipcMain.handle('study-room:watch-lobby', (_e, on: boolean) => studyRoom.watchLobby(Boolean(on)))
+  ipcMain.handle('study-room:get-lobby', () => studyRoom.getLobby())
+  ipcMain.handle('study-room:host-online', (_e, options: { name: string; goalMinutes: number }) =>
+    studyRoom.hostOnline(String(options?.name ?? ''), Number(options?.goalMinutes ?? 0))
+  )
+  ipcMain.handle('study-room:join-online', (_e, roomId: string) =>
+    studyRoom.joinOnline(String(roomId ?? ''))
+  )
+  ipcMain.handle('study-room:quick-join', () => studyRoom.quickJoinOnline())
+  ipcMain.handle('study-room:go-offline', () => studyRoom.goOffline())
+
   ipcMain.handle('lockscreen:close', () => closeLock())
 
   ipcMain.handle('window:show', () => {
@@ -530,22 +542,34 @@ function registerIpc(): void {
       defaultPath: `studydesk-backup-${localDateKey()}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }]
     })
-    if (res.canceled || !res.filePath) return false
-    const all: Record<string, unknown> = {}
-    for (const k of Object.keys(stores) as (keyof AppStores)[]) all[k] = stores[k].all
-    writeFileSync(res.filePath, JSON.stringify(all, null, 2), 'utf-8')
-    return true
+    if (res.canceled) return { ok: true, canceled: true }
+    if (!res.filePath) return { ok: false, error: '没有选择保存位置' }
+    try {
+      const all: Record<string, unknown> = {}
+      for (const k of Object.keys(stores) as (keyof AppStores)[]) all[k] = stores[k].all
+      // 备份是用户面对数据损坏时唯一的自救手段，写盘失败必须让他知道
+      writeFileSync(res.filePath, JSON.stringify(all, null, 2), 'utf-8')
+      return { ok: true, canceled: false }
+    } catch (err) {
+      console.error('[backup] 导出失败', err)
+      return { ok: false, error: '写入备份文件失败，检查磁盘空间或换个位置' }
+    }
   })
   ipcMain.handle('backup:import', async () => {
     const res = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'JSON', extensions: ['json'] }]
     })
-    if (res.canceled || !res.filePaths[0]) return false
+    if (res.canceled) return { ok: true, canceled: true }
+    if (!res.filePaths[0]) return { ok: false, error: '没有选择备份文件' }
     try {
       const data = JSON.parse(readFileSync(res.filePaths[0], 'utf-8')) as Record<string, unknown>
-      for (const k of Object.keys(stores) as (keyof AppStores)[]) {
-        if (data[k]) stores[k].replace(data[k] as Record<string, unknown>)
+      const known = (Object.keys(stores) as (keyof AppStores)[]).filter((k) => data[k])
+      if (known.length === 0) {
+        return { ok: false, error: '这个文件里没有可识别的数据，确认是 StudyDesk 的备份吗？' }
+      }
+      for (const k of known) {
+        stores[k].replace(data[k] as Record<string, unknown>)
       }
       const s = stores.settings.all
       nativeTheme.themeSource = (s.theme as 'system' | 'light' | 'dark') ?? 'system'
@@ -556,9 +580,10 @@ function registerIpc(): void {
       syncAutostart()
       syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
       sendToAll('data:reloaded')
-      return true
-    } catch {
-      return false
+      return { ok: true, canceled: false }
+    } catch (err) {
+      console.error('[backup] 导入失败', err)
+      return { ok: false, error: '备份文件损坏或格式不对，没能恢复' }
     }
   })
 
@@ -617,7 +642,8 @@ app.whenReady().then(() => {
       const url = new URL(request.url)
       const p = url.searchParams.get('p')
       if (!p) return new Response('missing path', { status: 400 })
-      return net.fetch(pathToFileURL(p).toString())
+      if (!isServableMediaPath(p)) return new Response('forbidden', { status: 403 })
+      return net.fetch(pathToFileURL(resolve(p)).toString())
     } catch {
       return new Response('error', { status: 500 })
     }
@@ -676,6 +702,13 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   isQuitting = true
   studyRoom?.dispose()
+  // 这几个模块各自都实现了 stop，但之前一直没人调；进程退出时定时器虽然会随进程消失，
+  // 手写清理清单终究会漏，新增模块时记得一并加进来
+  scheduler?.stop()
+  waterReminder?.stop()
+  healthReminder?.stop()
+  todoReminder?.stop()
+  engine?.dispose()
   closeDesktopWidgets()
   closePetWidget()
 })

@@ -10,6 +10,7 @@ import {
   normalizeDisplayText,
   parseMessage,
   primaryLanAddress,
+  sanitizeCatId,
   sanitizeNickname,
   validateNickname,
   validateRoomName
@@ -51,6 +52,34 @@ describe('looksLikePromotion', () => {
   it.each(['小明', '爱学习的猫', 'Room 3', '高三7班'])('放行正常文本：%s', (text) => {
     expect(looksLikePromotion(text)).toBe(false)
   })
+
+  // 年份是自习场景最常见的昵称成分，不能被「数字占比过半」误判
+  it.each(['2026考研', '2026上岸', '高考2026', '2027届', '1998年生'])(
+    '放行年份类昵称：%s',
+    (text) => {
+      expect(looksLikePromotion(text)).toBe(false)
+    }
+  )
+
+  // 域名后缀必须带点号才算命中，否则压紧后会退化成 top / net / com 之类的高频字母串
+  it.each(['laptop', 'workshop', 'bishop', 'Janet', 'planet', 'Malcom', 'Concord'])(
+    '放行含域名后缀字母的英文昵称：%s',
+    (text) => {
+      expect(looksLikePromotion(text)).toBe(false)
+    }
+  )
+
+  // 剥离年份后仍需拦住真正的联系方式
+  it.each(['1995123456', '20261380013', '2026 2027 2028'])('年份不能成为绕过手段：%s', (text) => {
+    expect(looksLikePromotion(text)).toBe(true)
+  })
+
+  it.each(['来我的站 a.top', '看 x.cn 有惊喜', 'shop.example.net'])(
+    '带点号的域名仍被拦截：%s',
+    (text) => {
+      expect(looksLikePromotion(text)).toBe(true)
+    }
+  )
 })
 
 describe('validateNickname / validateRoomName', () => {
@@ -71,6 +100,10 @@ describe('validateNickname / validateRoomName', () => {
     expect(result.reason).toContain('不能包含')
   })
 
+  it('年份昵称可以正常使用', () => {
+    expect(validateNickname('2026考研')).toEqual({ ok: true, value: '2026考研', reason: '' })
+  })
+
   it('房间名超长会被截断后通过', () => {
     const result = validateRoomName('x'.repeat(30))
     expect(result.ok).toBe(true)
@@ -82,6 +115,20 @@ describe('validateNickname / validateRoomName', () => {
     expect(result.ok).toBe(false)
     expect(result.reason).toContain('自习室名称')
   })
+})
+
+describe('sanitizeCatId', () => {
+  it.each(['mikan', 'cloud', 'sesame'])('放行已知猫咪：%s', (id) => {
+    expect(sanitizeCatId(id)).toBe(id)
+  })
+
+  // catId 会被服务端下发给房内其他成员，必须白名单化而不是只限长度
+  it.each(['../../etc/passwd', '<img onerror=x>', 'unknown-cat', '', null, 123, {}])(
+    '未知值回退默认猫咪：%s',
+    (id) => {
+      expect(sanitizeCatId(id)).toBe('mikan')
+    }
+  )
 })
 
 describe('sanitizeNickname', () => {

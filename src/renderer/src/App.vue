@@ -23,6 +23,7 @@ import { useCountdownStore } from '@/stores/countdowns'
 import { useGardenStore } from '@/stores/garden'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { usePetCompanionStore } from '@/stores/petCompanion'
+import { useUiStore } from '@/stores/ui'
 import { useGlobalEffects } from '@/composables/useGlobalEffects'
 import { getGlassSurfaceAlphas } from '@/lib/appearance'
 
@@ -46,6 +47,7 @@ const countdowns = useCountdownStore()
 const garden = useGardenStore()
 const desktopWidgets = useDesktopWidgetsStore()
 const petCompanion = usePetCompanionStore()
+const ui = useUiStore()
 
 const appShellStyle = computed<CSSProperties>(() => {
   if (!settings.s.appBg) return {}
@@ -97,8 +99,14 @@ if (!isIsolatedWindow) {
 }
 
 async function loadAll(): Promise<void> {
-  await settings.load()
-  await Promise.all([
+  // 设置读失败不能拦住整个应用：宁可用默认外观启动，也不能白屏
+  try {
+    await settings.load()
+  } catch (err) {
+    console.error('[app] 设置加载失败，先用默认值启动', err)
+  }
+  // 用 allSettled 而不是 all：任何一项失败都不该把其余已加载好的数据一起丢掉
+  const results = await Promise.allSettled([
     timetable.load(),
     todos.load(),
     stats.load(),
@@ -111,6 +119,11 @@ async function loadAll(): Promise<void> {
     petCompanion.load(),
     pomodoro.init()
   ])
+  const failed = results.filter((r) => r.status === 'rejected')
+  if (failed.length) {
+    for (const item of failed) console.error('[app] 数据加载失败', (item as PromiseRejectedResult).reason)
+    ui.error(`有 ${failed.length} 项数据没能加载，重启应用试试`)
+  }
 }
 
 onMounted(() => {

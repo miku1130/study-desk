@@ -440,7 +440,14 @@ export interface PomodoroState {
   completed: number
 }
 
-export type StudyRoomStatus = 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
+export type StudyRoomStatus =
+  | 'idle'
+  | 'hosting'
+  | 'connecting'
+  | 'joined'
+  | 'error'
+  /** 已连上公网服务器；服务器是权威，本地只做镜像 */
+  | 'online'
 
 export interface StudyRoomCheer {
   id: string
@@ -487,6 +494,16 @@ export interface StudyRoomState {
   room: StudyRoomSummary | null
   members: StudyRoomMember[]
   error: string
+}
+
+/** 公网大厅条目；不含昵称，公开自由文本只保留房间名一处 */
+export interface StudyRoomLobbyEntry {
+  id: string
+  name: string
+  memberCount: number
+  maxMembers: number
+  focusingCount: number
+  focusMinutes: number
 }
 
 export interface StudyRoomDiscovered {

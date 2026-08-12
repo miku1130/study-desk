@@ -23,6 +23,10 @@ export class HealthReminder {
     this.lastEye = now
   }
 
+  stop(): void {
+    this.clear()
+  }
+
   private check(): void {
     const h = this.settings.get('health') as
       | { sitEnabled: boolean; sitIntervalMin: number; eyeEnabled: boolean; eyeIntervalMin: number }

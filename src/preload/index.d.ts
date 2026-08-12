@@ -48,12 +48,29 @@ export interface StudyRoomSummaryDTO {
 }
 
 export interface StudyRoomStateDTO {
-  status: 'idle' | 'hosting' | 'connecting' | 'joined' | 'error'
+  status: 'idle' | 'hosting' | 'connecting' | 'joined' | 'error' | 'online'
   selfId: string
   nickname: string
   room: StudyRoomSummaryDTO | null
   members: StudyRoomMemberDTO[]
   error: string
+}
+
+/** 备份导入导出结果；canceled 表示用户主动放弃，不算失败 */
+export interface BackupResultDTO {
+  ok: boolean
+  canceled?: boolean
+  error?: string
+}
+
+/** 公网大厅里的一条房间摘要；不含昵称，公开自由文本只留房间名一处 */
+export interface StudyRoomLobbyEntryDTO {
+  id: string
+  name: string
+  memberCount: number
+  maxMembers: number
+  focusingCount: number
+  focusMinutes: number
 }
 
 export interface StudyRoomDiscoveredDTO {
@@ -170,8 +187,15 @@ export interface StudyDeskApi {
     cheer: (toId: string, cheerId: string) => Promise<boolean>
     startDiscovery: () => Promise<void>
     stopDiscovery: () => Promise<void>
+    watchLobby: (on: boolean) => Promise<void>
+    getLobby: () => Promise<StudyRoomLobbyEntryDTO[]>
+    hostOnline: (options: { name: string; goalMinutes: number }) => Promise<StudyRoomNameCheckDTO>
+    joinOnline: (roomId: string) => Promise<void>
+    quickJoin: () => Promise<void>
+    goOffline: () => Promise<void>
     onState: (cb: (state: StudyRoomStateDTO) => void) => () => void
     onRooms: (cb: (rooms: StudyRoomDiscoveredDTO[]) => void) => () => void
+    onLobby: (cb: (rooms: StudyRoomLobbyEntryDTO[]) => void) => () => void
     onCheer: (cb: (event: StudyRoomCheerEventDTO) => void) => () => void
     onNotice: (cb: (notice: StudyRoomNoticeDTO) => void) => () => void
   }
@@ -210,8 +234,8 @@ export interface StudyDeskApi {
     onStatus: (cb: (status: unknown) => void) => () => void
   }
   backup: {
-    export: () => Promise<boolean>
-    import: () => Promise<boolean>
+    export: () => Promise<BackupResultDTO>
+    import: () => Promise<BackupResultDTO>
   }
   system: {
     onReload: (cb: () => void) => () => void

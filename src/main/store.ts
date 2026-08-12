@@ -1,14 +1,19 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs'
 
 /**
  * 轻量 JSON 持久化：每个实例对应 userData 下的一个文件。
  * 自实现以避免 electron-store 的 ESM/CJS 版本困扰。
+ *
+ * 写入必须是原子的：直接覆盖原文件时，断电或崩溃会留下半截 JSON，
+ * 下次启动解析失败就等于用户数据凭空消失。
  */
 export class JsonStore<T extends Record<string, unknown>> {
   private readonly filePath: string
   private data: T
+  /** 最近一次写盘是否失败，供上层决定要不要提示用户 */
+  private lastWriteFailed = false
 
   constructor(fileName: string, defaults: T) {
     const dir = app.getPath('userData')
@@ -18,12 +23,30 @@ export class JsonStore<T extends Record<string, unknown>> {
       try {
         const parsed = JSON.parse(readFileSync(this.filePath, 'utf-8')) as Partial<T>
         this.data = { ...defaults, ...parsed }
-      } catch {
+      } catch (err) {
+        // 不能直接回退默认值就完事：下一次 set 会把默认值写回去，
+        // 原文件里那份还能人工抢救的数据就永久没了
         this.data = { ...defaults }
+        this.quarantineCorruptFile(err)
       }
     } else {
       this.data = { ...defaults }
       this.persist()
+    }
+  }
+
+  get healthy(): boolean {
+    return !this.lastWriteFailed
+  }
+
+  private quarantineCorruptFile(err: unknown): void {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const backup = `${this.filePath}.corrupt-${stamp}`
+    try {
+      renameSync(this.filePath, backup)
+      console.error(`[store] ${this.filePath} 解析失败，已另存为 ${backup}`, err)
+    } catch (renameErr) {
+      console.error(`[store] ${this.filePath} 解析失败且无法备份`, err, renameErr)
     }
   }
 
@@ -45,8 +68,22 @@ export class JsonStore<T extends Record<string, unknown>> {
     this.persist()
   }
 
+  /** 先写临时文件再 rename：同一文件系统上 rename 是原子的，永远不会留下半截文件 */
   private persist(): void {
-    writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8')
+    const tmp = `${this.filePath}.tmp`
+    try {
+      writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf-8')
+      renameSync(tmp, this.filePath)
+      this.lastWriteFailed = false
+    } catch (err) {
+      this.lastWriteFailed = true
+      console.error(`[store] 写入 ${this.filePath} 失败`, err)
+      try {
+        if (existsSync(tmp)) unlinkSync(tmp)
+      } catch {
+        /* 临时文件清理失败不影响主流程 */
+      }
+    }
   }
 }
 
