@@ -1,11 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
+import { createLockController, type LockWindowHandle } from './lockController'
 
-let lockWin: BrowserWindow | null = null
-
-export function openLock(): void {
-  if (lockWin) return
-  lockWin = new BrowserWindow({
+function createLockWindow(): LockWindowHandle {
+  const win = new BrowserWindow({
     fullscreen: true,
     frame: false,
     alwaysOnTop: true,
@@ -17,20 +15,29 @@ export function openLock(): void {
       contextIsolation: true
     }
   })
-  lockWin.setAlwaysOnTop(true, 'screen-saver')
+  win.setAlwaysOnTop(true, 'screen-saver')
 
   const base = process.env['ELECTRON_RENDERER_URL']
-  if (base) lockWin.loadURL(`${base}#/lock`)
-  else lockWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/lock' })
+  if (base) void win.loadURL(`${base}#/lock`)
+  else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/lock' })
 
-  lockWin.on('closed', () => {
-    lockWin = null
-  })
+  return {
+    isDestroyed: () => win.isDestroyed(),
+    destroy: () => win.destroy(),
+    onClosed: (listener) => win.once('closed', listener)
+  }
+}
+
+const controller = createLockController(createLockWindow)
+
+export function openLock(): void {
+  controller.open()
 }
 
 export function closeLock(): void {
-  if (lockWin) {
-    lockWin.close()
-    lockWin = null
-  }
+  controller.close()
+}
+
+export function isLockOpen(): boolean {
+  return controller.isOpen()
 }

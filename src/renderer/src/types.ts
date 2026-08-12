@@ -31,6 +31,14 @@ export interface HotkeyConfig {
   toggleWindow: string
 }
 
+/** 某个全局热键没注册上的原因，由主进程回报 */
+export interface HotkeyFailure {
+  action: keyof HotkeyConfig
+  accelerator: string
+  /** taken：被别的程序占了；invalid：写法不合法 */
+  reason: 'taken' | 'invalid'
+}
+
 export interface WaterConfig {
   enabled: boolean
   intervalMin: number

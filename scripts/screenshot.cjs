@@ -178,6 +178,12 @@ ipcMain.handle('pomodoro:getState', () =>
 )
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)
+const hotkeyFailures =
+  process.env.SHOT_HOTKEY === 'fail'
+    ? [{ action: 'toggleTimer', accelerator: 'CommandOrControl+Alt+P', reason: 'taken' }]
+    : []
+ipcMain.handle('shortcuts:status', () => hotkeyFailures)
+ipcMain.handle('shortcuts:update', () => hotkeyFailures)
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
 ipcMain.handle('window:maximize', () => false)
@@ -331,6 +337,13 @@ app.whenReady().then(async () => {
       const check = () => document.querySelector('.desktop-widget-card') || Date.now() >= deadline ? resolve(true) : setTimeout(check, 40)
       check()
     })`)
+  }
+  if (process.env.SHOT_ANCHOR) {
+    await win.webContents.executeJavaScript(`(async () => {
+      const el = document.querySelector(${JSON.stringify(process.env.SHOT_ANCHOR)})
+      if (el) el.scrollIntoView({ block: 'center' })
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    })()`)
   }
   await win.webContents.executeJavaScript(`Promise.all([...document.images].map((image) => image.complete ? true : new Promise((resolve) => { image.addEventListener('load', resolve, { once: true }); image.addEventListener('error', resolve, { once: true }) })))`)
   await win.webContents.executeJavaScript(`Promise.all([...document.querySelectorAll('video')].map((video) => video.play().catch(() => undefined)))`)

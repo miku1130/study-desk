@@ -3,6 +3,13 @@ export interface FileFilterDTO {
   extensions: string[]
 }
 
+export interface HotkeyFailureDTO {
+  action: 'toggleTimer' | 'toggleWindow'
+  accelerator: string
+  /** taken：被别的程序占了；invalid：写法不合法 */
+  reason: 'taken' | 'invalid'
+}
+
 export type PomodoroModeDTO = 'countdown' | 'countup' | 'untimed'
 
 export interface PomodoroStateDTO {
@@ -330,7 +337,9 @@ export interface StudyDeskApi {
     set: (v: boolean) => Promise<boolean>
   }
   shortcuts: {
-    update: () => Promise<void>
+    update: () => Promise<HotkeyFailureDTO[]>
+    status: () => Promise<HotkeyFailureDTO[]>
+    onStatus: (cb: (failures: HotkeyFailureDTO[]) => void) => () => void
   }
   timetable: {
     export: () => Promise<boolean>

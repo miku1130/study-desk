@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 type Listener = (...args: unknown[]) => void
 
+export interface HotkeyFailureDTO {
+  action: 'toggleTimer' | 'toggleWindow'
+  accelerator: string
+  reason: 'taken' | 'invalid'
+}
+
 function on(channel: string, cb: Listener): () => void {
   const handler = (_e: IpcRendererEvent, ...args: unknown[]): void => cb(...args)
   ipcRenderer.on(channel, handler)
@@ -162,7 +168,10 @@ const api = {
     set: (v: boolean): Promise<boolean> => ipcRenderer.invoke('autostart:set', v)
   },
   shortcuts: {
-    update: (): Promise<void> => ipcRenderer.invoke('shortcuts:update')
+    update: (): Promise<HotkeyFailureDTO[]> => ipcRenderer.invoke('shortcuts:update'),
+    status: (): Promise<HotkeyFailureDTO[]> => ipcRenderer.invoke('shortcuts:status'),
+    onStatus: (cb: (failures: HotkeyFailureDTO[]) => void): (() => void) =>
+      on('hotkeys:status', (list) => cb((list as HotkeyFailureDTO[]) ?? []))
   },
   timetable: {
     export: (): Promise<boolean> => ipcRenderer.invoke('timetable:export'),

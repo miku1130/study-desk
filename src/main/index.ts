@@ -10,6 +10,7 @@ import {
   dialog,
   globalShortcut,
   nativeImage,
+  screen,
   type NativeImage
 } from 'electron'
 import { join, resolve } from 'path'
@@ -24,6 +25,7 @@ import { HealthReminder } from './health'
 import { TodoReminder } from './reminders'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
+import { resolveWindowBounds } from './windowBounds'
 import { closePetWidget, hidePetWidget, setPetWidgetVisible } from './petWidget'
 import {
   openWidget,
@@ -165,13 +167,41 @@ function resolveAppIcon(): NativeImage | undefined {
   return img.isEmpty() ? undefined : img
 }
 
+const MAIN_WINDOW_SIZE = { width: 1180, height: 760, minWidth: 940, minHeight: 620 }
+
+/** 尺寸位置每次变动都写盘太吵，攒一下再落 */
+let boundsSaveTimer: NodeJS.Timeout | null = null
+
+function persistMainWindowBounds(): void {
+  const win = mainWindow
+  if (!win || win.isDestroyed() || win.isMinimized()) return
+  // 最大化时 getBounds 返回的是铺满屏幕的尺寸，存下来会让「还原」失去意义
+  const maximized = win.isMaximized()
+  const bounds = maximized ? win.getNormalBounds() : win.getBounds()
+  stores.windowState.set('main', { bounds, maximized })
+}
+
+function scheduleBoundsSave(): void {
+  if (boundsSaveTimer) clearTimeout(boundsSaveTimer)
+  boundsSaveTimer = setTimeout(() => {
+    boundsSaveTimer = null
+    persistMainWindowBounds()
+  }, 500)
+}
+
 function createWindow(): void {
   const icon = resolveAppIcon()
+  const restored = resolveWindowBounds(
+    stores.windowState.get('main'),
+    screen.getAllDisplays(),
+    MAIN_WINDOW_SIZE
+  )
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 760,
-    minWidth: 940,
-    minHeight: 620,
+    width: MAIN_WINDOW_SIZE.width,
+    height: MAIN_WINDOW_SIZE.height,
+    ...(restored.bounds ?? {}),
+    minWidth: MAIN_WINDOW_SIZE.minWidth,
+    minHeight: MAIN_WINDOW_SIZE.minHeight,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
@@ -185,9 +215,17 @@ function createWindow(): void {
     }
   })
 
+  if (restored.maximized) mainWindow.maximize()
+
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('resized', scheduleBoundsSave)
+  mainWindow.on('moved', scheduleBoundsSave)
+  mainWindow.on('maximize', scheduleBoundsSave)
+  mainWindow.on('unmaximize', scheduleBoundsSave)
   // 关闭按钮：默认隐藏到托盘后台常驻，仅在托盘「退出」或应用真正退出时才销毁窗口
   mainWindow.on('close', (e) => {
+    // 隐藏之后就取不到有效尺寸了，先把当前位置落盘
+    persistMainWindowBounds()
     if (!isQuitting) {
       e.preventDefault()
       mainWindow?.hide()
@@ -244,19 +282,48 @@ function toggleMainWindow(): void {
   }
 }
 
-function registerShortcuts(): void {
+export interface HotkeyFailure {
+  action: 'toggleTimer' | 'toggleWindow'
+  accelerator: string
+  /** taken：被别的程序占了；invalid：写法不合法 */
+  reason: 'taken' | 'invalid'
+}
+
+let hotkeyFailures: HotkeyFailure[] = []
+
+/**
+ * 注册全局热键，并把失败的那些报给渲染层。
+ *
+ * 以前这里 catch 了就算完，用户改完热键按下去没反应，也不知道是被别的
+ * 程序占了还是自己写错了——这种沉默比功能缺失更让人怀疑应用坏了。
+ */
+function registerShortcuts(): HotkeyFailure[] {
   globalShortcut.unregisterAll()
   const hk = stores.settings.get('hotkeys') as { toggleTimer: string; toggleWindow: string }
-  try {
-    if (hk?.toggleTimer) globalShortcut.register(hk.toggleTimer, () => engine.toggle())
-  } catch {
-    /* 热键冲突时忽略 */
+  const failures: HotkeyFailure[] = []
+
+  const bind = (
+    action: HotkeyFailure['action'],
+    accelerator: string | undefined,
+    handler: () => void
+  ): void => {
+    if (!accelerator) return
+    try {
+      // 被占用时 register 返回 false 而不抛异常，两种失败都要接住
+      if (!globalShortcut.register(accelerator, handler)) {
+        failures.push({ action, accelerator, reason: 'taken' })
+      }
+    } catch {
+      failures.push({ action, accelerator, reason: 'invalid' })
+    }
   }
-  try {
-    if (hk?.toggleWindow) globalShortcut.register(hk.toggleWindow, () => toggleMainWindow())
-  } catch {
-    /* 热键冲突时忽略 */
-  }
+
+  bind('toggleTimer', hk?.toggleTimer, () => engine.toggle())
+  bind('toggleWindow', hk?.toggleWindow, () => toggleMainWindow())
+
+  hotkeyFailures = failures
+  sendToAll('hotkeys:status', failures)
+  return failures
 }
 
 function notify(title: string, body: string): void {
@@ -570,6 +637,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('shortcuts:update', () => registerShortcuts())
+  ipcMain.handle('shortcuts:status', () => hotkeyFailures)
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('notify:show', (_e, title: string, body: string) => notify(title, body))
   ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
@@ -745,6 +813,11 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  if (boundsSaveTimer) {
+    clearTimeout(boundsSaveTimer)
+    boundsSaveTimer = null
+  }
+  persistMainWindowBounds()
   studyRoom?.dispose()
   // 这几个模块各自都实现了 stop，但之前一直没人调；进程退出时定时器虽然会随进程消失，
   // 手写清理清单终究会漏，新增模块时记得一并加进来

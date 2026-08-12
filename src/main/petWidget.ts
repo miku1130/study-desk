@@ -29,6 +29,7 @@ function createPetWidget(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
+      // 挂件永远不是焦点窗口，开着节流猫会卡住不动；隐藏时再由 setThrottling 关掉
       backgroundThrottling: false
     }
   })
@@ -53,13 +54,25 @@ function createPetWidget(): BrowserWindow {
   return win
 }
 
+/**
+ * 隐藏的挂件不该继续按 60fps 画猫。
+ * 窗口是 hide 而不是 destroy（避免每次重开都闪一下白），
+ * 所以要手动把节流打开，否则动画和计时在看不见的时候照样烧 CPU。
+ */
+function setThrottling(win: BrowserWindow | null, throttled: boolean): void {
+  if (!win || win.isDestroyed()) return
+  win.webContents.setBackgroundThrottling(throttled)
+}
+
 export function setPetWidgetVisible(visible: boolean): void {
   petWidgetRequested = visible
   if (!visible) {
+    setThrottling(petWidgetWin, true)
     petWidgetWin?.hide()
     return
   }
   if (!petWidgetWin || petWidgetWin.isDestroyed()) petWidgetWin = createPetWidget()
+  setThrottling(petWidgetWin, false)
   if (!petWidgetWin.webContents.isLoading()) {
     petWidgetWin.setAlwaysOnTop(true, 'floating', 1)
     petWidgetWin.showInactive()
@@ -69,6 +82,7 @@ export function setPetWidgetVisible(visible: boolean): void {
 
 export function hidePetWidget(): void {
   petWidgetRequested = false
+  setThrottling(petWidgetWin, true)
   petWidgetWin?.hide()
 }
 

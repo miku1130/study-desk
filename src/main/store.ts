@@ -140,6 +140,7 @@ export interface AppStores {
   garden: JsonStore<Record<string, unknown>>
   petCompanion: JsonStore<Record<string, unknown>>
   studyRoom: JsonStore<Record<string, unknown>>
+  windowState: JsonStore<Record<string, unknown>>
 }
 
 export function createStores(): AppStores {
@@ -186,6 +187,8 @@ export function createStores(): AppStores {
       lastRoomName: '',
       goalMinutes: 120,
       soundEnabled: true
-    })
+    }),
+    // 单独一个文件：settings 会被渲染层整体覆盖，放进去会被下一次保存抹掉
+    windowState: new JsonStore('window-state.json', { main: null })
   }
 }

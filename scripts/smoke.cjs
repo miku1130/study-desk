@@ -134,6 +134,11 @@ ipcMain.handle('dialog:openFiles', () => [])
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)
+// 故意报一个占用失败，验证设置页真的会把热键冲突显示出来
+ipcMain.handle('shortcuts:status', () => [
+  { action: 'toggleTimer', accelerator: 'CommandOrControl+Alt+P', reason: 'taken' }
+])
+ipcMain.handle('shortcuts:update', () => [])
 ipcMain.handle('tray:setIcon', () => undefined)
 ipcMain.handle('window:minimize', () => undefined)
 ipcMain.handle('window:maximize', () => false)

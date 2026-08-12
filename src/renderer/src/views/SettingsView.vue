@@ -6,7 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import UrlPromptModal from '@/components/UrlPromptModal.vue'
 import OnlineSearchModal from '@/components/OnlineSearchModal.vue'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
-import type { OnlineTrack, ThemeMode, TimetableData } from '@/types'
+import type { HotkeyFailure, OnlineTrack, ThemeMode, TimetableData } from '@/types'
 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
@@ -25,9 +25,13 @@ const updateText = ref('点击检查是否有新版本')
 const updatePercent = ref(0)
 const checking = ref(false)
 let unsubUpdate: (() => void) | null = null
+let unsubHotkeys: (() => void) | null = null
 
 onMounted(async () => {
   version.value = await window.api.app.getVersion()
+  // 保存设置后主进程会重新注册并推结果过来，这里只负责拿首屏状态
+  hotkeyFailures.value = await window.api.shortcuts.status()
+  unsubHotkeys = window.api.shortcuts.onStatus((list) => (hotkeyFailures.value = list))
   unsubUpdate = window.api.update.onStatus((s) => {
     const st = s as { state: string; version?: string; percent?: number; message?: string }
     updateState.value = st.state
@@ -55,7 +59,10 @@ onMounted(async () => {
     }
   })
 })
-onUnmounted(() => unsubUpdate?.())
+onUnmounted(() => {
+  unsubUpdate?.()
+  unsubHotkeys?.()
+})
 
 async function checkUpdate(): Promise<void> {
   checking.value = true
@@ -110,6 +117,19 @@ function onCustomAccent(e: Event): void {
 function save(): void {
   settings.save()
 }
+
+/* ---- 全局热键 ---- */
+
+const hotkeyFailures = ref<HotkeyFailure[]>([])
+
+function hotkeyError(action: HotkeyFailure['action']): string {
+  const failure = hotkeyFailures.value.find((item) => item.action === action)
+  if (!failure) return ''
+  return failure.reason === 'taken'
+    ? `${failure.accelerator} 已被其它程序占用，换一个组合试试`
+    : `${failure.accelerator} 不是合法的组合键`
+}
+
 function saveWater(): void {
   const w = settings.s.water
   w.intervalMin = Math.max(5, Math.floor(w.intervalMin || 60))
@@ -533,10 +553,12 @@ async function importTimetable(): Promise<void> {
         <div>
           <p class="s-title">番茄钟开始/暂停热键</p>
           <p class="s-sub">全局快捷键，如 CommandOrControl+Alt+P</p>
+          <p v-if="hotkeyError('toggleTimer')" class="s-error">{{ hotkeyError('toggleTimer') }}</p>
         </div>
         <input
           v-model="settings.s.hotkeys.toggleTimer"
           class="input input-sm hk"
+          :class="{ invalid: hotkeyError('toggleTimer') }"
           @change="save"
         />
       </div>
@@ -544,10 +566,12 @@ async function importTimetable(): Promise<void> {
         <div>
           <p class="s-title">显示/隐藏窗口热键</p>
           <p class="s-sub">全局快捷键，如 CommandOrControl+Alt+S</p>
+          <p v-if="hotkeyError('toggleWindow')" class="s-error">{{ hotkeyError('toggleWindow') }}</p>
         </div>
         <input
           v-model="settings.s.hotkeys.toggleWindow"
           class="input input-sm hk"
+          :class="{ invalid: hotkeyError('toggleWindow') }"
           @change="save"
         />
       </div>
@@ -702,6 +726,15 @@ async function importTimetable(): Promise<void> {
 .hk {
   width: 240px;
   text-align: center;
+}
+.hk.invalid {
+  border-color: var(--status-danger);
+}
+.s-error {
+  margin-top: 4px;
+  color: var(--status-danger);
+  font-size: 12px;
+  font-weight: 600;
 }
 .num {
   width: 64px;
