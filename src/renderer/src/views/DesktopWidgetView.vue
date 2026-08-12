@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DesktopWidgetCard, { type WidgetLessonItem } from '@/components/widgets/DesktopWidgetCard.vue'
 import { useTimetableStatus } from '@/composables/useTimetableStatus'
@@ -7,6 +7,7 @@ import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useCountdownStore } from '@/stores/countdowns'
 import { useTodoStore } from '@/stores/todos'
 import { calculateWidgetDragPosition, type DragPoint } from '@/lib/widgetDrag'
+import { resolvePointerInteractive, WIDGET_INTERACTIVE_SELECTOR } from '@/lib/widgetPointer'
 
 const route = useRoute()
 const widgets = useDesktopWidgetsStore()
@@ -121,21 +122,41 @@ function endDrag(event: PointerEvent): void {
 }
 
 let pointerInteractive = false
+
+function applyPointerInteractive(overInteractive: boolean): void {
+  const id = config.value?.id
+  if (!id) return
+  const decision = resolvePointerInteractive(
+    Boolean(config.value?.locked),
+    overInteractive,
+    pointerInteractive
+  )
+  pointerInteractive = decision.interactive
+  if (decision.send) void window.api.desktopWidgets.setPointerInteractive(id, decision.interactive)
+}
+
 function handleMouseMove(event: MouseEvent): void {
-  if (!config.value?.locked) return
   const target = document.elementFromPoint(event.clientX, event.clientY)
-  const overInteractive = Boolean(target?.closest('.widget-lock-toggle, .todo-attachment-open'))
-  if (overInteractive === pointerInteractive) return
-  pointerInteractive = overInteractive
-  void window.api.desktopWidgets.setPointerInteractive(config.value.id, overInteractive)
+  applyPointerInteractive(Boolean(target?.closest(WIDGET_INTERACTIVE_SELECTOR)))
+}
+
+// 指针可能从小锁上直接飞出窗口，之后再也收不到 mousemove；
+// 不兜底的话窗口会一直抓着鼠标，系统提示条也会卡在最顶层
+function handlePointerGone(): void {
+  applyPointerInteractive(false)
 }
 
 document.documentElement.classList.add('desktop-widget-window')
 document.addEventListener('mousemove', handleMouseMove)
+document.addEventListener('mouseleave', handlePointerGone)
+window.addEventListener('blur', handlePointerGone)
+watch(() => config.value?.locked, handlePointerGone)
 onBeforeUnmount(() => {
   if (moveFrame) cancelAnimationFrame(moveFrame)
   document.documentElement.classList.remove('desktop-widget-window')
   document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseleave', handlePointerGone)
+  window.removeEventListener('blur', handlePointerGone)
 })
 </script>
 

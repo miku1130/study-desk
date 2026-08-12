@@ -58,13 +58,26 @@ function desktopWidgetUrl(id: string): { url?: string; file?: string; hash?: str
     : { file: join(__dirname, '../renderer/index.html'), hash: route }
 }
 
+/**
+ * Windows 上 setIgnoreMouseEvents(false) 会连同 WS_EX_TRANSPARENT 一起清掉 WS_EX_LAYERED，
+ * 而 Win11 raised-desktop 模式下摆件正是靠这个扩展样式才能在桌面层显示（见 windowsDesktopLayer 的 attach）。
+ * 样式被清掉后窗口依然是桌面层的子窗口，健康检查查到 attached 仍为 true，不会自愈，
+ * 表现就是鼠标一碰摆件卡片就凭空消失。这里用一次几乎看不见的透明度变化让 Electron 把该样式加回来。
+ */
+function setPointerPassthrough(win: BrowserWindow, passthrough: boolean): void {
+  win.setIgnoreMouseEvents(passthrough, { forward: true })
+  if (passthrough || process.platform !== 'win32' || win.isDestroyed()) return
+  win.setOpacity(0.999)
+  win.setOpacity(1)
+}
+
 function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfig): void {
   const locked = Boolean(config.locked)
   win.setMovable(!locked)
   win.setResizable(!locked)
   // 摆件位于 Explorer 桌面层，不需要置顶，也不会遮挡其他应用。
   win.setAlwaysOnTop(false)
-  win.setIgnoreMouseEvents(locked, { forward: true })
+  setPointerPassthrough(win, locked)
   const bounds = win.getBounds()
   const size = widgetDimensions(config)
   const next = fitToDisplay({ ...bounds, ...size })
@@ -152,7 +165,7 @@ function createDesktopWidget(config: DesktopWidgetConfig, index: number): Browse
     }
   })
   win.setAlwaysOnTop(false)
-  win.setIgnoreMouseEvents(Boolean(config.locked), { forward: true })
+  setPointerPassthrough(win, Boolean(config.locked))
 
   const target = desktopWidgetUrl(config.id)
   if (target.url) win.loadURL(target.url)
@@ -214,7 +227,7 @@ export function closeDesktopWidgets(): void {
 export function setDesktopWidgetPointerInteractive(id: string, interactive: boolean): boolean {
   const win = desktopWidgetWins.get(id)
   if (!win || win.isDestroyed()) return false
-  win.setIgnoreMouseEvents(!interactive, { forward: true })
+  setPointerPassthrough(win, !interactive)
   return true
 }
 
