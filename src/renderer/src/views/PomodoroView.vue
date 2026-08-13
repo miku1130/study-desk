@@ -48,7 +48,8 @@ function setTab(tab: FocusSpaceTab): void {
 }
 
 const showUrl = ref(false)
-const urlTarget = ref<'wallpaper' | 'sound'>('wallpaper')
+type UrlTarget = 'wallpaper' | 'sound' | 'cardBg'
+const urlTarget = ref<UrlTarget>('wallpaper')
 
 function toggleClockWidget(): void {
   window.api.clockWidget.toggle()
@@ -148,6 +149,58 @@ function save(): void {
 function fileName(p: string): string {
   return p ? (p.split(/[\\/]/).pop() ?? p) : '未选择'
 }
+
+/* ---- 卡片背景 ---- */
+
+/**
+ * 图片铺在独立的一层上而不是直接做卡片背景：
+ * 计时数字是这张卡的主角，图片必须能单独调淡到不抢戏。
+ */
+const cardBgStyle = computed(() => {
+  const p = settings.s.pomodoro
+  if (!p.cardBg) return null
+  return {
+    backgroundImage: `url("${window.api.media.url(p.cardBg)}")`,
+    opacity: p.cardBgOpacity
+  }
+})
+
+/** 图片越浓，压在它上面的那层就要越厚，否则卡片上的小字会被冲淡到看不清 */
+const cardScrimStyle = computed(() => {
+  const p = settings.s.pomodoro
+  if (!p.cardBg) return undefined
+  return { '--card-scrim': String(0.2 + p.cardBgOpacity * 0.45) }
+})
+
+async function pickCardBg(): Promise<void> {
+  const p = await window.api.dialog.openFile([
+    { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }
+  ])
+  if (p) saveCardBg(p)
+}
+
+async function pickCardBgOnline(): Promise<void> {
+  const p = await window.api.media.download(`https://picsum.photos/1200/1600?random=${Date.now()}`)
+  if (p) saveCardBg(p)
+}
+
+function useFocusWallpaper(): void {
+  if (settings.s.pomodoro.wallpaper) saveCardBg(settings.s.pomodoro.wallpaper)
+}
+
+function saveCardBg(path: string): void {
+  settings.s.pomodoro.cardBg = path
+  settings.save()
+}
+
+function clearCardBg(): void {
+  settings.s.pomodoro.cardBg = ''
+  settings.save()
+}
+
+function onCardBgOpacity(): void {
+  settings.save()
+}
 async function pickWallpaper(): Promise<void> {
   const p = await window.api.dialog.openFile([
     { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }
@@ -177,7 +230,7 @@ function clearWallpaper(): void {
   settings.s.pomodoro.wallpaper = ''
   settings.save()
 }
-function openUrl(target: 'wallpaper' | 'sound'): void {
+function openUrl(target: UrlTarget): void {
   urlTarget.value = target
   showUrl.value = true
 }
@@ -186,9 +239,19 @@ async function onUrlConfirm(url: string): Promise<void> {
   showUrl.value = false
   if (!p) return
   if (urlTarget.value === 'wallpaper') settings.s.pomodoro.wallpaper = p
+  else if (urlTarget.value === 'cardBg') settings.s.pomodoro.cardBg = p
   else settings.s.pomodoro.sound = p
   settings.save()
 }
+
+const urlPrompt = computed(() =>
+  urlTarget.value === 'sound'
+    ? { title: '在线提示音链接', placeholder: '音频直链 (mp3/ogg/wav)…' }
+    : {
+        title: urlTarget.value === 'cardBg' ? '卡片背景链接' : '在线壁纸链接',
+        placeholder: '图片直链 (jpg/png/webp)…'
+      }
+)
 
 function soundLabel(v: string): string {
   if (v.startsWith('chime:')) {
@@ -234,7 +297,8 @@ function testSound(): void {
 
     <div v-if="activeTab === 'timer'" class="timer-pane">
       <div class="timer-focus-grid">
-        <div class="timer-card card">
+        <div class="timer-card card" :class="{ 'has-bg': !!cardBgStyle }" :style="cardScrimStyle">
+      <span v-if="cardBgStyle" class="card-bg" :style="cardBgStyle" />
       <div v-if="todos.activeItem" class="bound-task">
         <span class="bound-label">正在专注</span>
         <strong>{{ todos.activeItem.text }}</strong>
@@ -512,6 +576,41 @@ function testSound(): void {
       </div>
       <div class="setting-row">
         <div>
+          <p class="s-title">计时卡片背景</p>
+          <p class="s-sub">{{ fileName(settings.s.pomodoro.cardBg) }}</p>
+        </div>
+        <div class="row wrap">
+          <button class="btn btn-secondary btn-sm" @click="pickCardBgOnline">随机在线</button>
+          <button
+            v-if="settings.s.pomodoro.wallpaper"
+            class="btn btn-secondary btn-sm"
+            @click="useFocusWallpaper"
+          >
+            用专注壁纸
+          </button>
+          <button class="btn btn-secondary btn-sm" @click="openUrl('cardBg')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickCardBg">本地</button>
+          <button class="btn btn-secondary btn-sm" @click="clearCardBg">清除</button>
+        </div>
+      </div>
+      <div v-if="settings.s.pomodoro.cardBg" class="setting-row">
+        <div>
+          <p class="s-title">背景浓度</p>
+          <p class="s-sub">
+            {{ Math.round(settings.s.pomodoro.cardBgOpacity * 100) }}% · 太浓会盖住计时数字
+          </p>
+        </div>
+        <input
+          v-model.number="settings.s.pomodoro.cardBgOpacity"
+          type="range"
+          min="0.05"
+          max="1"
+          step="0.05"
+          @change="onCardBgOpacity"
+        />
+      </div>
+      <div class="setting-row">
+        <div>
           <p class="s-title">完成提示音</p>
           <p class="s-sub">{{ soundLabel(settings.s.pomodoro.sound) }}</p>
         </div>
@@ -530,8 +629,8 @@ function testSound(): void {
 
     <UrlPromptModal
       v-if="showUrl"
-      :title="urlTarget === 'wallpaper' ? '在线壁纸链接' : '在线提示音链接'"
-      :placeholder="urlTarget === 'wallpaper' ? '图片直链 (jpg/png/webp)…' : '音频直链 (mp3/ogg/wav)…'"
+      :title="urlPrompt.title"
+      :placeholder="urlPrompt.placeholder"
       @confirm="onUrlConfirm"
       @close="showUrl = false"
     />
@@ -588,11 +687,39 @@ function testSound(): void {
   margin-bottom: 20px;
 }
 .timer-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 32px;
   margin-bottom: 0;
+  overflow: hidden;
+}
+.card-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+/* 两层遮罩：整卡一层薄的托住小字，中心再厚一层托住大号数字 */
+.timer-card.has-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      circle at 50% 46%,
+      color-mix(in srgb, var(--surface-card) 76%, transparent) 0%,
+      color-mix(in srgb, var(--surface-card) 24%, transparent) 58%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--surface-card) calc(var(--card-scrim, 0.3) * 100%), transparent);
+  pointer-events: none;
+}
+.timer-card > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
 }
 .bound-task {
   display: flex;

@@ -26,6 +26,10 @@ export interface PomodoroConfig {
   lastMinutes: number
   /** 专注环境音；scene 为空表示不放 */
   noise: NoiseConfig
+  /** 番茄钟卡片的背景图；空表示用默认卡片底色 */
+  cardBg: string
+  /** 卡片背景的浓度：太浓会盖住计时数字，所以默认压得很低 */
+  cardBgOpacity: number
 }
 
 export interface NoiseConfig {
@@ -104,7 +108,9 @@ export const defaultSettings: AppSettings = {
     volume: 0.8,
     mode: 'countdown',
     lastMinutes: 25,
-    noise: { scene: '', volume: 0.5, duringBreak: false }
+    noise: { scene: '', volume: 0.5, duringBreak: false },
+    cardBg: '',
+    cardBgOpacity: 0.3
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },

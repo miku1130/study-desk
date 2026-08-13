@@ -43,7 +43,9 @@ const sample = {
       lockscreen: true,
       wallpaper: '',
       sound: '',
-      volume: 0.8
+      volume: 0.8,
+      cardBg: process.env.SHOT_CARD_BG ? join(__dirname, '../src/renderer/src/assets/pet/room-sunroom.png') : '',
+      cardBgOpacity: Number(process.env.SHOT_CARD_BG) || 0.3
     },
     autostart: false,
     hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }
