@@ -25,11 +25,7 @@ onMounted(async () => {
   version.value = await window.api.app.getVersion()
 })
 
-const miniTime = computed(() => {
-  const m = String(pomodoro.minutes).padStart(2, '0')
-  const s = String(pomodoro.seconds).padStart(2, '0')
-  return `${m}:${s}`
-})
+const miniTime = computed(() => pomodoro.clockText)
 
 const svg = (inner: string): string =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`

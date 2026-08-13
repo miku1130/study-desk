@@ -168,17 +168,20 @@ const sample = {
 
 ipcMain.handle('store:get', (_e, name) => sample[name] ?? {})
 ipcMain.handle('store:set', () => true)
-ipcMain.handle('pomodoro:getState', () =>
-  process.env.SHOT_TIMER === 'idle'
-    ? {
-        phase: 'idle', mode: 'countdown', remaining: 0, elapsed: 0, total: 0,
-        running: false, completed: 3, targetId: '', targetName: ''
-      }
-    : {
-        phase: 'work', mode: 'countdown', remaining: 1124, elapsed: 376, total: 1500,
-        running: true, completed: 3, targetId: '', targetName: ''
-      }
-)
+const TIMER_STATES = {
+  idle: { phase: 'idle', mode: 'countdown', remaining: 0, elapsed: 0, total: 0, running: false },
+  countup: { phase: 'work', mode: 'countup', remaining: 0, elapsed: 4271, total: 0, running: true },
+  untimed: { phase: 'work', mode: 'untimed', remaining: 0, elapsed: 1832, total: 0, running: true },
+  // 正计时的休息段仍然是倒计时，这里专门用来验证卡片没有显示成已过时间
+  countupBreak: { phase: 'short', mode: 'countup', remaining: 261, elapsed: 39, total: 300, running: true },
+  work: { phase: 'work', mode: 'countdown', remaining: 1124, elapsed: 376, total: 1500, running: true }
+}
+ipcMain.handle('pomodoro:getState', () => ({
+  ...(TIMER_STATES[process.env.SHOT_TIMER] ?? TIMER_STATES.work),
+  completed: 3,
+  targetId: '',
+  targetName: ''
+}))
 ipcMain.handle('app:getVersion', () => '0.1.0')
 ipcMain.handle('autostart:get', () => false)
 const hotkeyFailures =

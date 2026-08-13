@@ -13,7 +13,7 @@ const timetable = useTimetableStatus()
 const title = computed(() => timetable.current.value?.name || '一起专注')
 const timer = computed(() => {
   if (timetable.current.value) return `${timetable.current.value.period.end} 下课`
-  return `${String(pomodoro.minutes).padStart(2, '0')}:${String(pomodoro.seconds).padStart(2, '0')}`
+  return pomodoro.clockText
 })
 
 function hide(): void {

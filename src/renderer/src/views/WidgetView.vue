@@ -11,9 +11,7 @@ const pomodoro = usePomodoroStore()
 const timeText = computed(() =>
   now.value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
 )
-const mmss = computed(
-  () => `${String(pomodoro.minutes).padStart(2, '0')}:${String(pomodoro.seconds).padStart(2, '0')}`
-)
+const mmss = computed(() => pomodoro.clockText)
 const classText = computed(() => {
   if (current.value) return `正在上：${current.value.name}`
   if (next.value) return `下节 ${next.value.period.start} ${next.value.name}`

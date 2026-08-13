@@ -2,17 +2,32 @@
 import { computed, onMounted } from 'vue'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
+import { timerFace } from '@/lib/timerDisplay'
 
 const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
 
-const displaySeconds = computed(() =>
-  pomodoro.phase === 'idle' ? settings.s.pomodoro.workMin * 60 : pomodoro.remaining
+/** 空闲时显示上次选的时长；正计时没有预设终点，从零起步 */
+const idleSeconds = computed(() => {
+  const p = settings.s.pomodoro
+  if ((p.mode ?? 'countdown') !== 'countdown') return 0
+  return (p.lastMinutes || p.workMin || 25) * 60
+})
+const face = computed(() =>
+  timerFace(
+    {
+      phase: pomodoro.phase,
+      mode: pomodoro.mode,
+      remaining: pomodoro.remaining,
+      elapsed: pomodoro.elapsed,
+      total: pomodoro.total,
+      running: pomodoro.running
+    },
+    idleSeconds.value
+  )
 )
-const mm = computed(() => String(Math.floor(displaySeconds.value / 60)).padStart(2, '0'))
-const ss = computed(() => String(displaySeconds.value % 60).padStart(2, '0'))
-const mmss = computed(() => `${mm.value}:${ss.value}`)
-const digits = computed(() => [mm.value[0], mm.value[1], ss.value[0], ss.value[1]])
+const mmss = computed(() => face.value.clock || face.value.label)
+const digits = computed(() => face.value.digits)
 const style = computed(() => settings.s.pomodoro.lockStyle || 'minimal')
 
 onMounted(() => pomodoro.init())
@@ -38,13 +53,15 @@ function close(): void {
     <div class="cw-clock">
       <span v-if="style === 'minimal'" class="cw-time">{{ mmss }}</span>
       <span v-else-if="style === 'pixel'" class="cw-time pixel">{{ mmss }}</span>
-      <div v-else-if="style === 'flip'" class="cw-flip">
+      <!-- 翻页钟只有四格；不计时或超过 99 分钟时退回普通文本 -->
+      <div v-else-if="style === 'flip' && digits" class="cw-flip">
         <span class="fc">{{ digits[0] }}</span>
         <span class="fc">{{ digits[1] }}</span>
         <span class="fcolon">:</span>
         <span class="fc">{{ digits[2] }}</span>
         <span class="fc">{{ digits[3] }}</span>
       </div>
+      <span v-else-if="style === 'flip'" class="cw-time">{{ mmss }}</span>
       <div v-else class="cw-breath">
         <span class="bglow" />
         <span class="cw-time">{{ mmss }}</span>

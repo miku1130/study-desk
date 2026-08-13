@@ -15,9 +15,7 @@ const visible = computed(() => (pomodoro.phase === 'work' && pomodoro.running) |
 const title = computed(() => timetable.current.value?.name || pomodoro.phaseLabel)
 const detail = computed(() => {
   if (timetable.current.value) return `${timetable.current.value.period.end} 下课`
-  const mm = String(pomodoro.minutes).padStart(2, '0')
-  const ss = String(pomodoro.seconds).padStart(2, '0')
-  return `${mm}:${ss}`
+  return pomodoro.clockText
 })
 </script>
 

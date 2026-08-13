@@ -14,6 +14,7 @@ import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import type { PetVisualState } from '@/lib/petAssets'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
 import { NOISE_SCENES, ambience, previewAmbience, stopPreview } from '@/lib/noise'
+import { timerFace } from '@/lib/timerDisplay'
 import type { PomodoroMode } from '@/types'
 
 const pomodoro = usePomodoroStore()
@@ -37,7 +38,7 @@ const petVisualState = computed<PetVisualState>(() => {
 })
 const petStatus = computed(() => {
   if (timetable.current.value) return `正在陪你上「${timetable.current.value.name}」`
-  if (pomodoro.phase === 'work' && pomodoro.running) return `一起写完这一页 · ${mm.value}:${ss.value}`
+  if (pomodoro.phase === 'work' && pomodoro.running) return `一起写完这一页 · ${clockText.value}`
   if (pomodoro.phase === 'work') return '计时暂停，猫还在原地等你'
   return '猫已经把纸笔摆好了'
 })
@@ -117,16 +118,22 @@ function onNoiseVolume(): void {
 
 onUnmounted(() => stopPreview())
 
-const displaySeconds = computed(() => {
-  if (pomodoro.phase === 'idle') {
-    return selectedMode.value === 'countdown' ? plannedMinutes.value * 60 : 0
-  }
-  return pomodoro.displaySeconds
-})
-/** 不计时模式的意义就是别盯着数字，所以只在休息段显示时间 */
-const hideDigits = computed(() => selectedMode.value === 'untimed' && pomodoro.phase === 'work')
-const mm = computed(() => String(Math.floor(displaySeconds.value / 60)).padStart(2, '0'))
-const ss = computed(() => String(displaySeconds.value % 60).padStart(2, '0'))
+const face = computed(() =>
+  timerFace(
+    {
+      phase: pomodoro.phase,
+      mode: pomodoro.mode,
+      remaining: pomodoro.remaining,
+      elapsed: pomodoro.elapsed,
+      total: pomodoro.total,
+      running: pomodoro.running
+    },
+    selectedMode.value === 'countdown' ? plannedMinutes.value * 60 : 0
+  )
+)
+/** 不计时模式的意义就是别盯着数字，所以专注段只给一句话 */
+const hideDigits = computed(() => !face.value.clock)
+const clockText = computed(() => face.value.clock || face.value.label)
 const dashoffset = computed(() => (pomodoro.total > 0 ? C * (1 - pomodoro.progress) : C))
 
 function save(): void {
@@ -298,8 +305,9 @@ function testSound(): void {
         </svg>
         <div class="ring-center">
           <p class="phase" :class="pomodoro.phase">{{ pomodoro.phaseLabel }}</p>
-          <p v-if="hideDigits" class="time untimed">在学</p>
-          <p v-else class="time">{{ mm }}:{{ ss }}</p>
+          <p class="time" :class="{ untimed: hideDigits, long: clockText.length > 5 }">
+            {{ clockText }}
+          </p>
           <p class="cycles">今日 {{ pomodoro.completed }} 个番茄</p>
         </div>
       </div>
@@ -765,6 +773,10 @@ function testSound(): void {
   font-size: 40px;
   letter-spacing: 0.08em;
   color: var(--accent-strong);
+}
+/* 正计时过了 100 分钟就是三位数，56px 会顶到圆环上 */
+.time.long {
+  font-size: 44px;
 }
 .cycles {
   font-size: 12.5px;

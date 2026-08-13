@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { timerFace } from '@/lib/timerDisplay'
 import type { PomodoroMode, PomodoroPhase, PomodoroState } from '@/types'
 
 export interface PomodoroStartOptions {
@@ -41,12 +42,30 @@ export const usePomodoroStore = defineStore('pomodoro', () => {
     if (!unsub) unsub = window.api.pomodoro.onTick((s) => apply(s as PomodoroState))
   }
 
-  /** 正向计时与不计时没有剩余量，显示的是已过去的时间 */
-  const displaySeconds = computed(() =>
-    mode.value === 'countdown' ? remaining.value : elapsed.value
+  /**
+   * 各卡片显示什么由 timerFace 统一决定。
+   * idleSeconds 由调用方（番茄钟页）自己补，别的卡片空闲时不显示数字。
+   */
+  const face = computed(() =>
+    timerFace(
+      {
+        phase: phase.value,
+        mode: mode.value,
+        remaining: remaining.value,
+        elapsed: elapsed.value,
+        total: total.value,
+        running: running.value
+      },
+      0
+    )
   )
+  /** 当前阶段该显示的秒数：有终点看剩余，没终点看已过 */
+  const displaySeconds = computed(() => face.value.seconds)
   const minutes = computed(() => Math.floor(displaySeconds.value / 60))
   const seconds = computed(() => displaySeconds.value % 60)
+  /** 统一的时钟文本；不计时的专注段是「在学」而不是数字 */
+  const clockText = computed(() => face.value.clock || face.value.label)
+  const clockDigits = computed(() => face.value.digits)
   const progress = computed(() => (total.value > 0 ? 1 - remaining.value / total.value : 0))
   /** 没有终点的模式只能由用户手动结束 */
   const needsManualFinish = computed(() => mode.value !== 'countdown' && phase.value === 'work')
@@ -84,6 +103,8 @@ export const usePomodoroStore = defineStore('pomodoro', () => {
     minutes,
     seconds,
     displaySeconds,
+    clockText,
+    clockDigits,
     progress,
     phaseLabel,
     needsManualFinish,

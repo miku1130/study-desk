@@ -10,14 +10,8 @@ const pomodoro = usePomodoroStore()
 const settings = useSettingsStore()
 const pet = usePetCompanionStore()
 
-const mmss = computed(
-  () => `${String(pomodoro.minutes).padStart(2, '0')}:${String(pomodoro.seconds).padStart(2, '0')}`
-)
-const digits = computed(() => {
-  const m = String(pomodoro.minutes).padStart(2, '0')
-  const s = String(pomodoro.seconds).padStart(2, '0')
-  return [m[0], m[1], s[0], s[1]]
-})
+const mmss = computed(() => pomodoro.clockText)
+const digits = computed(() => pomodoro.clockDigits)
 const style = computed(() => settings.s.pomodoro.lockStyle || 'minimal')
 
 const bgStyle = computed(() => {
@@ -65,13 +59,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
         <p v-if="style === 'minimal'" class="lock-time minimal">{{ mmss }}</p>
 
-        <div v-else-if="style === 'flip'" class="flip">
+        <!-- 翻页钟只有四格；不计时或超过 99 分钟时退回普通文本 -->
+        <div v-else-if="style === 'flip' && digits" class="flip">
           <span class="flip-card">{{ digits[0] }}</span>
           <span class="flip-card">{{ digits[1] }}</span>
           <span class="flip-colon">:</span>
           <span class="flip-card">{{ digits[2] }}</span>
           <span class="flip-card">{{ digits[3] }}</span>
         </div>
+        <p v-else-if="style === 'flip'" class="lock-time minimal">{{ mmss }}</p>
 
         <p v-else-if="style === 'pixel'" class="lock-time pixel">{{ mmss }}</p>
 
