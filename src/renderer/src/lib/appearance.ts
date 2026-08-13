@@ -1,3 +1,29 @@
+export type ResolvedTheme = 'light' | 'dark'
+
+/** theme 为 system 时由系统偏好决定 */
+export function resolveThemeMode(
+  theme: 'system' | 'light' | 'dark',
+  prefersDark: boolean
+): ResolvedTheme {
+  if (theme === 'system') return prefersDark ? 'dark' : 'light'
+  return theme
+}
+
+/**
+ * 取当前主题下的强调色。
+ *
+ * 同一个颜色在奶油白和深灰底上观感差很远：浅色下清爽的薄荷，深色下会发灰糊掉。
+ * 所以两套主题各存一个颜色；老配置只有一个 accent 时深色沿用它，
+ * 不然用户会发现自己挑的紫色一切到深色就没了。
+ */
+export function activeAccentOf(
+  colors: { accent: string; accentDark: string },
+  mode: ResolvedTheme
+): string {
+  if (mode === 'dark') return colors.accentDark || colors.accent
+  return colors.accent
+}
+
 export interface GlassSurfaceAlphas {
   sidebar: number
   content: number

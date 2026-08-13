@@ -1,5 +1,5 @@
 import type { JsonStore } from './store'
-import { localDateKey } from './time'
+import { appendSession, type FocusSession } from './focusStats'
 
 export type PomodoroPhase = 'idle' | 'work' | 'short' | 'long'
 
@@ -26,23 +26,8 @@ export interface PomodoroState {
   targetName: string
 }
 
-/** 一次专注的明细。聚合值全部由明细算出，不再单独累加 */
-export interface FocusSession {
-  id: string
-  startAt: number
-  endAt: number
-  /** 实际专注分钟数，不是配置里的那个值 */
-  minutes: number
-  mode: PomodoroMode
-  targetId: string
-  /** 冗余存一份名字，待办删了历史记录也还看得懂 */
-  targetName: string
-  /** 是否走完了整段，中途放弃为 false */
-  completed: boolean
-}
+export type { FocusSession } from './focusStats'
 
-/** 明细上限，按每天 10 次算能存两年多 */
-const SESSION_LIMIT = 8000
 /** 短于这个时长的不记账，避免误触产生一堆垃圾记录 */
 const MIN_SESSION_SECONDS = 60
 
@@ -294,19 +279,7 @@ export class PomodoroEngine {
       completed
     }
 
-    const sessions = (this.stats.get('sessions') as FocusSession[] | undefined) ?? []
-    sessions.push(session)
-    this.stats.set('sessions', sessions.slice(-SESSION_LIMIT))
-
-    // days 是旧版聚合，继续维护以兼容还没改造的读取方
-    const key = localDateKey()
-    const days =
-      (this.stats.get('days') as Record<string, { pomodoros: number; focusMinutes: number }>) || {}
-    const day = days[key] || { pomodoros: 0, focusMinutes: 0 }
-    if (completed) day.pomodoros += 1
-    day.focusMinutes += session.minutes
-    days[key] = day
-    this.stats.set('days', days)
+    appendSession(this.stats, session)
   }
 
   private emit(): void {

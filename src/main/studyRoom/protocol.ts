@@ -114,34 +114,92 @@ const DOMAIN_SUFFIX = /\.\s*(com|cn|net|org|top|xyz|shop|vip|io|cc|me|site|fun|l
 /** 考研年、入学年、出生年在自习场景里极常见，不参与数字占比统计 */
 const YEAR_LIKE = /(?:19|20)\d{2}/g
 
-const PROMOTION_KEYWORDS = [
-  // 链接与站点（域名后缀交给 DOMAIN_SUFFIX，不能进压紧词表）
-  'http', 'https', 'www',
-  // 联系方式
+// 链接与站点（带点号的域名交给 DOMAIN_SUFFIX，不能进压紧词表）
+const LINK_KEYWORDS = ['http', 'https', 'www']
+
+const CONTACT_KEYWORDS = [
   'qq', '扣扣', '企鹅号', '微信', 'weixin', 'wechat', 'vx', '威信', '徽信', 'telegram', '电报',
-  'whatsapp', '加v', '私聊', '私信', '联系我', '咨询我', '滴滴我', '手机号', '电话号',
-  // 推广与灰产
+  'whatsapp', '加v', '私聊', '私信', '联系我', '咨询我', '滴滴我', '手机号', '电话号'
+]
+
+const PROMO_KEYWORDS = [
   '代写', '代做', '代练', '代考', '包过', '刷单', '兼职', '招聘', '日结', '返利', '优惠券',
   '免费领', '限时抢', '点击进', '扫码', '广告', '推广', '引流', '办证', '贷款', '博彩', '彩票',
   '开票', '发票'
 ]
 
-// 关键词以压紧形式比对，所以这里也要用压紧形式
-const COMPACT_KEYWORDS = PROMOTION_KEYWORDS.map(compactForMatch).filter(Boolean)
+/** 命中的是哪一类，决定了要给用户看什么话 */
+export type PromotionKind = 'link' | 'contact' | 'promo' | 'numberRun' | 'numberHeavy'
 
-/** 判定是否疑似广告 / 引流文本 */
-export function looksLikePromotion(raw: string): boolean {
-  if (DOMAIN_SUFFIX.test(normalizeForLinkMatch(raw))) return true
+export interface PromotionHit {
+  kind: PromotionKind
+  /** 命中的原词，用来告诉用户改哪儿；数字类没有具体词 */
+  match: string
+}
+
+/** 关键词以压紧形式比对，所以词表也要压紧；原词留着回报给用户 */
+function compactPairs(words: string[]): Array<{ compact: string; raw: string }> {
+  return words
+    .map((raw) => ({ compact: compactForMatch(raw), raw }))
+    .filter((item) => item.compact)
+}
+
+const LINK_PAIRS = compactPairs(LINK_KEYWORDS)
+const CONTACT_PAIRS = compactPairs(CONTACT_KEYWORDS)
+const PROMO_PAIRS = compactPairs(PROMO_KEYWORDS)
+
+/**
+ * 判定疑似广告 / 引流文本，并说明命中的是哪一条规则。
+ *
+ * 只回 true/false 的话，用户看到的永远是「不能包含链接、联系方式或推广内容」，
+ * 三种可能都摆在面前，等于什么都没说——他只能一个字一个字试。
+ */
+export function promotionHit(raw: string): PromotionHit | null {
+  if (DOMAIN_SUFFIX.test(normalizeForLinkMatch(raw))) return { kind: 'link', match: '' }
   const compact = compactForMatch(raw)
-  if (!compact) return false
-  if (COMPACT_KEYWORDS.some((kw) => compact.includes(kw))) return true
+  if (!compact) return null
+
+  const groups: Array<{ kind: PromotionKind; pairs: typeof LINK_PAIRS }> = [
+    { kind: 'link', pairs: LINK_PAIRS },
+    { kind: 'contact', pairs: CONTACT_PAIRS },
+    { kind: 'promo', pairs: PROMO_PAIRS }
+  ]
+  for (const group of groups) {
+    const found = group.pairs.find((pair) => compact.includes(pair.compact))
+    if (found) return { kind: group.kind, match: found.raw }
+  }
+
   // 连续 5 位以上数字：电话号 / QQ 号 / 微信号。在剔年份之前判断，否则可用年份切割长号码绕过
-  if (/\d{5,}/.test(compact)) return true
+  const run = compact.match(/\d{5,}/)
+  if (run) return { kind: 'numberRun', match: run[0] }
   // 数字占比过半的中长串，多为变体联系方式；先剔年份，否则「2026考研」会被误伤
   const withoutYear = compact.replace(YEAR_LIKE, '')
   const digits = (withoutYear.match(/\d/g) ?? []).length
-  if (withoutYear.length >= 6 && digits * 2 > withoutYear.length) return true
-  return false
+  if (withoutYear.length >= 6 && digits * 2 > withoutYear.length) {
+    return { kind: 'numberHeavy', match: '' }
+  }
+  return null
+}
+
+/** 判定是否疑似广告 / 引流文本 */
+export function looksLikePromotion(raw: string): boolean {
+  return promotionHit(raw) !== null
+}
+
+/** 把命中结果翻译成给用户看的一句话；what 是「昵称」「愿望」这类主语 */
+export function promotionReason(what: string, hit: PromotionHit): string {
+  switch (hit.kind) {
+    case 'link':
+      return `${what}里不能放网址`
+    case 'contact':
+      return `${what}里不能留联系方式，「${hit.match}」得去掉`
+    case 'promo':
+      return `${what}里不能有推广内容，「${hit.match}」得去掉`
+    case 'numberRun':
+      return `${what}里不能出现连续 5 位以上的数字，看起来像联系方式`
+    default:
+      return `${what}里数字太多了，看起来像联系方式`
+  }
 }
 
 export interface TextCheckResult {
@@ -153,9 +211,8 @@ export interface TextCheckResult {
 function checkText(raw: unknown, maxLength: number, what: string): TextCheckResult {
   const value = normalizeDisplayText(raw, maxLength)
   if (!value) return { ok: false, value: '', reason: `请填写${what}` }
-  if (looksLikePromotion(value)) {
-    return { ok: false, value: '', reason: `${what}不能包含链接、联系方式或推广内容` }
-  }
+  const hit = promotionHit(value)
+  if (hit) return { ok: false, value: '', reason: promotionReason(what, hit) }
   return { ok: true, value, reason: '' }
 }
 

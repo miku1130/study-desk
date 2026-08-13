@@ -12,8 +12,9 @@ import Database from 'better-sqlite3'
 import { mkdirSync } from 'fs'
 import { dirname } from 'path'
 import {
-  looksLikePromotion,
   normalizeDisplayText,
+  promotionHit,
+  promotionReason,
   sanitizeCatId,
   sanitizeNickname,
   sanitizeRoomName,
@@ -800,9 +801,8 @@ export function checkFreeText(
 ): { ok: true; value: string } | TextRejection {
   const value = normalizeDisplayText(raw, maxLength)
   if (!value) return { ok: false, reason: `请先写点${what}内容` }
-  if (looksLikePromotion(value)) {
-    return { ok: false, reason: `${what}里不能有链接、联系方式或推广内容` }
-  }
+  const hit = promotionHit(value)
+  if (hit) return { ok: false, reason: promotionReason(what, hit) }
   // 连续数字在自由文本里没有正当用途，却是绕过关键词最常见的手法
   if (/\d{6,}/.test(value.replace(/\s/g, ''))) {
     return { ok: false, reason: `${what}里不能出现长串数字` }

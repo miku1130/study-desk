@@ -101,6 +101,7 @@ export const DEFAULT_PERIODS = [
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
   theme: 'system',
   accent: '#0a84ff',
+  accentDark: '',
   appBg: '',
   appBgOpacity: 0.18,
   bell: { enabled: false, onSound: 'chime:school-bell', offSound: 'chime:westminster', volume: 0.8 },

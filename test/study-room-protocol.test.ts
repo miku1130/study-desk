@@ -8,6 +8,7 @@ import {
   encodeRoomCode,
   looksLikePromotion,
   normalizeDisplayText,
+  promotionHit,
   parseMessage,
   primaryLanAddress,
   sanitizeCatId,
@@ -82,6 +83,33 @@ describe('looksLikePromotion', () => {
   )
 })
 
+describe('promotionHit：拒绝理由要说清是哪一类', () => {
+  it('域名与链接归为 link', () => {
+    expect(promotionHit('看 x.cn 有惊喜')?.kind).toBe('link')
+    expect(promotionHit('http 我的主页')?.kind).toBe('link')
+  })
+
+  it('联系方式类关键词报出命中的那个词', () => {
+    const hit = promotionHit('加我微信聊')
+    expect(hit).toMatchObject({ kind: 'contact', match: '微信' })
+  })
+
+  it('推广类关键词报出命中的那个词', () => {
+    const hit = promotionHit('专业代写作业')
+    expect(hit).toMatchObject({ kind: 'promo', match: '代写' })
+  })
+
+  it('长串数字与数字过多是两种不同的理由', () => {
+    expect(promotionHit('13800138000')?.kind).toBe('numberRun')
+    expect(promotionHit('1a2b3c4d5')?.kind).toBe('numberHeavy')
+  })
+
+  it('正常文本没有命中', () => {
+    expect(promotionHit('2026考研')).toBeNull()
+    expect(promotionHit('laptop')).toBeNull()
+  })
+})
+
 describe('validateNickname / validateRoomName', () => {
   it('正常昵称通过并返回归一化值', () => {
     const result = validateNickname('  小明  ')
@@ -94,10 +122,19 @@ describe('validateNickname / validateRoomName', () => {
     expect(result.reason).toContain('请填写昵称')
   })
 
-  it('广告昵称给出拒绝理由', () => {
-    const result = validateNickname('加我QQ12345')
-    expect(result.ok).toBe(false)
-    expect(result.reason).toContain('不能包含')
+  it('广告昵称的理由要指出到底哪儿不合规', () => {
+    const contact = validateNickname('加我微信')
+    expect(contact.ok).toBe(false)
+    expect(contact.reason).toContain('联系方式')
+    expect(contact.reason).toContain('微信')
+
+    const link = validateRoomName('来 a.top 学习')
+    expect(link.ok).toBe(false)
+    expect(link.reason).toContain('网址')
+
+    const digits = validateNickname('13800138000')
+    expect(digits.ok).toBe(false)
+    expect(digits.reason).toContain('连续')
   })
 
   it('年份昵称可以正常使用', () => {

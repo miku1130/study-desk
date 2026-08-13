@@ -70,6 +70,9 @@
 }
 
 :root[data-theme="dark"] {
+  /* 深色下再往深绿混就糊在背景里了，强调文字要往亮的方向走 */
+  --accent-strong: color-mix(in srgb, var(--accent) 78%, #ecfff8);
+
   --surface-canvas: #202925;
   --surface-sidebar: rgb(38 49 44 / var(--glass-sidebar-alpha, 0.96));
   --surface-content: rgb(33 43 39 / var(--glass-content-alpha, 0.94));

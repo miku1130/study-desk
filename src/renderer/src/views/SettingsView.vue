@@ -107,10 +107,9 @@ function setTheme(t: ThemeMode): void {
   settings.save()
 }
 function setAccent(c: string): void {
-  settings.s.accent = c
-  settings.save()
+  settings.setActiveAccent(c)
 }
-const isCustomAccent = computed(() => !accents.includes(settings.s.accent))
+const isCustomAccent = computed(() => !accents.includes(settings.activeAccent))
 function onCustomAccent(e: Event): void {
   setAccent((e.target as HTMLInputElement).value)
 }
@@ -307,21 +306,25 @@ async function importTimetable(): Promise<void> {
       <div class="setting-row">
         <div>
           <p class="s-title">强调色</p>
-          <p class="s-sub">用于高亮、按钮与选中态；最右侧可自选任意颜色</p>
+          <p class="s-sub">
+            用于高亮、按钮与选中态；最右侧可自选任意颜色。现在改的是<strong>{{
+              settings.resolvedTheme === 'dark' ? '深色' : '浅色'
+            }}</strong>主题这一套，另一套主题单独保存。
+          </p>
         </div>
         <div class="swatches">
           <button
             v-for="c in accents"
             :key="c"
             class="swatch"
-            :class="{ active: settings.s.accent === c }"
+            :class="{ active: settings.activeAccent === c }"
             :style="{ background: c }"
             :aria-label="c"
             @click="setAccent(c)"
           />
-          <label class="swatch custom" :class="{ active: isCustomAccent }" :style="isCustomAccent ? { background: settings.s.accent } : {}" title="自定义颜色">
+          <label class="swatch custom" :class="{ active: isCustomAccent }" :style="isCustomAccent ? { background: settings.activeAccent } : {}" title="自定义颜色">
             <span v-if="!isCustomAccent">+</span>
-            <input type="color" :value="settings.s.accent" @input="onCustomAccent" />
+            <input type="color" :value="settings.activeAccent" @input="onCustomAccent" />
           </label>
         </div>
       </div>

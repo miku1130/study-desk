@@ -19,6 +19,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createStores, type AppStores } from './store'
 import { isServableMediaPath } from './mediaPath'
 import { PomodoroEngine } from './pomodoro'
+import { dayTotals } from './focusStats'
 import { BellScheduler } from './scheduler'
 import { WaterReminder } from './water'
 import { HealthReminder } from './health'
@@ -333,15 +334,14 @@ function notify(title: string, body: string): void {
 /** 自习室对外展示的专注画像：番茄钟当前状态 + 今日统计 */
 function studyRoomFocus(): StudyRoomFocusReport {
   const state = engine.getState()
-  const days =
-    (stores.stats.get('days') as Record<string, { pomodoros: number; focusMinutes: number }>) || {}
-  const today = days[localDateKey()] ?? { pomodoros: 0, focusMinutes: 0 }
+  // 与统计页同一个口径，免得自习室里显示的今日时长和统计页对不上
+  const today = dayTotals(stores.stats)
   return {
     phase: state.phase,
     running: state.running,
     remaining: state.remaining,
-    todayFocusMinutes: Number(today.focusMinutes) || 0,
-    todayPomodoros: Number(today.pomodoros) || 0,
+    todayFocusMinutes: today.focusMinutes,
+    todayPomodoros: today.pomodoros,
     // 占位：真实值由 StudyRoomService 用自己按日累计的本地计时覆盖
     todayRoomFocusSeconds: 0
   }

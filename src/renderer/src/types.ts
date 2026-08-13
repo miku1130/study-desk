@@ -54,7 +54,10 @@ export interface HealthConfig {
 
 export interface AppSettings {
   theme: ThemeMode
+  /** 浅色主题下的强调色 */
   accent: string
+  /** 深色主题下的强调色；同一个颜色在两种底色上观感差很远，所以分开存 */
+  accentDark: string
   appBg: string
   appBgOpacity: number
   bell: BellConfig
@@ -75,6 +78,7 @@ export interface AppSettings {
 export const defaultSettings: AppSettings = {
   theme: 'light',
   accent: '#4fae98',
+  accentDark: '#7fd3bb',
   appBg: '',
   appBgOpacity: 0.18,
   bell: { enabled: false, onSound: 'chime:school-bell', offSound: 'chime:westminster', volume: 0.8 },

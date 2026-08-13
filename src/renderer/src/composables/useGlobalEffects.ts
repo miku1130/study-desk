@@ -38,7 +38,7 @@ export function useGlobalEffects(): void {
   }
 
   function updateTray(): void {
-    const url = makeTrayIcon(settings.s.accent || '#0a84ff')
+    const url = makeTrayIcon(settings.activeAccent || '#0a84ff')
     if (url) void window.api.tray.setIcon(url)
   }
 
@@ -75,7 +75,7 @@ export function useGlobalEffects(): void {
       })
     )
     updateTray()
-    watch(() => settings.s.accent, updateTray)
+    watch(() => settings.activeAccent, updateTray)
 
     watch(
       [
