@@ -117,7 +117,8 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     sound: '',
     volume: 0.8,
     mode: 'countdown',
-    lastMinutes: 25
+    lastMinutes: 25,
+    noise: { scene: '', volume: 0.5, duringBreak: false }
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },

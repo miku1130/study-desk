@@ -184,7 +184,8 @@ ipcMain.handle('study-room:online-snapshot', () => ({
   ],
   room: null,
   wishes: [],
-  pendingWishes: []
+  pendingWishes: [],
+  linkCode: null
 }))
 ipcMain.handle('study-room:online-connect', () => undefined)
 ipcMain.handle('study-room:watch-browse', () => undefined)
@@ -204,6 +205,8 @@ ipcMain.handle('study-room:wish-report', () => undefined)
 ipcMain.handle('study-room:wish-delete', () => undefined)
 ipcMain.handle('study-room:wish-pending', () => undefined)
 ipcMain.handle('study-room:wish-restore', () => undefined)
+ipcMain.handle('study-room:link-create', () => undefined)
+ipcMain.handle('study-room:link-claim', () => undefined)
 
 // 猫咪动画自检：待机是逐帧视频，写字是立绘 + CSS 位移，两种都必须真的在动
 const CAT_ANIMATION_PROBE = `(async (scope) => {

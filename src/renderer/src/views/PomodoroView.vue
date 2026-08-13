@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePomodoroStore } from '@/stores/pomodoro'
 import { useSettingsStore } from '@/stores/settings'
@@ -13,6 +13,7 @@ import { usePetCompanionStore } from '@/stores/petCompanion'
 import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import type { PetVisualState } from '@/lib/petAssets'
 import { CHIME_PRESETS, playChime } from '@/lib/audio'
+import { NOISE_SCENES, ambience, previewAmbience, stopPreview } from '@/lib/noise'
 import type { PomodoroMode } from '@/types'
 
 const pomodoro = usePomodoroStore()
@@ -95,6 +96,26 @@ async function onPlay(): Promise<void> {
     targetName: todos.activeItem?.text ?? ''
   })
 }
+
+/* ---- 环境音 ---- */
+
+const noise = computed(() => settings.s.pomodoro.noise)
+
+/** 常驻播放由全局副作用跟着番茄钟起停，这里只负责选和试听 */
+function pickScene(scene: string): void {
+  const next = noise.value.scene === scene ? '' : scene
+  settings.s.pomodoro.noise.scene = next
+  settings.save()
+  if (next) previewAmbience(next, noise.value.volume)
+  else stopPreview()
+}
+
+function onNoiseVolume(): void {
+  ambience.setVolume(noise.value.volume)
+  settings.save()
+}
+
+onUnmounted(() => stopPreview())
 
 const displaySeconds = computed(() => {
   if (pomodoro.phase === 'idle') {
@@ -309,6 +330,49 @@ function testSound(): void {
           <AppIcon name="skip-forward" :size="18" />
         </button>
       </div>
+      <div class="noise-box">
+        <div class="noise-head">
+          <span class="noise-title">环境音</span>
+          <span class="noise-sub">{{
+            noise.scene
+              ? NOISE_SCENES.find((s) => s.id === noise.scene)?.desc
+              : '专注开始时自动响起，暂停就停'
+          }}</span>
+        </div>
+        <div class="noise-scenes">
+          <button
+            v-for="scene in NOISE_SCENES"
+            :key="scene.id"
+            type="button"
+            class="noise-chip"
+            :class="{ active: noise.scene === scene.id }"
+            :title="scene.desc"
+            @click="pickScene(scene.id)"
+          >
+            {{ scene.label }}
+          </button>
+        </div>
+        <div v-if="noise.scene" class="noise-controls">
+          <input
+            v-model.number="settings.s.pomodoro.noise.volume"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            aria-label="环境音音量"
+            @input="onNoiseVolume"
+          />
+          <label class="noise-break">
+            <input
+              v-model="settings.s.pomodoro.noise.duringBreak"
+              type="checkbox"
+              @change="save"
+            />
+            休息也放
+          </label>
+        </div>
+      </div>
+
       <button class="btn btn-secondary btn-sm clock-summon" @click="toggleClockWidget">
         呼出时钟小浮窗
       </button>
@@ -711,6 +775,64 @@ function testSound(): void {
   align-items: center;
   gap: 16px;
   margin-top: 26px;
+}
+.noise-box {
+  width: 100%;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--separator);
+}
+.noise-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.noise-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.noise-sub {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+.noise-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.noise-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+.noise-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.noise-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+.noise-controls input[type='range'] {
+  flex: 1;
+}
+.noise-break {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .clock-summon {
   margin-top: 18px;

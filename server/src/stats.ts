@@ -38,6 +38,8 @@ export const WISH_PAGE_SIZE = 30
 export const WISH_COOLDOWN_MS = 60_000
 /** 被举报到这个数就自动隐藏，等房主复核 */
 export const WISH_AUTO_HIDE_REPORTS = 3
+/** 配对码有效期：够走完流程，又短到捡到也没用 */
+export const LINK_CODE_TTL_MS = 5 * 60 * 1000
 
 export type RangeKey = 'today' | 'week' | 'month'
 
@@ -251,6 +253,14 @@ export class FocusStats {
         created_at INTEGER NOT NULL,
         PRIMARY KEY (wish_id, device_id)
       );
+
+      -- 跨设备配对：短码 + 短有效期，用完即弃
+      CREATE TABLE IF NOT EXISTS link_codes (
+        code       TEXT PRIMARY KEY,
+        device_id  TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_link_device ON link_codes(device_id);
     `)
     this.migrate()
   }
@@ -955,6 +965,186 @@ export class FocusStats {
     this.db.prepare('DELETE FROM wishes WHERE id = ?').run(wishId)
     this.db.prepare('DELETE FROM wish_reports WHERE wish_id = ?').run(wishId)
     return true
+  }
+
+  /* ---------------------------------------------------------------- *
+   * 跨设备：把另一台设备并到同一个身份上
+   * ---------------------------------------------------------------- */
+
+  /** 生成配对码。一台设备同时只留一个有效码，重新生成即作废旧的 */
+  createLinkCode(deviceId: string): { code: string; expiresAt: number } {
+    const now = this.now()
+    this.db.prepare('DELETE FROM link_codes WHERE device_id = ? OR expires_at < ?').run(deviceId, now)
+    const expiresAt = now + LINK_CODE_TTL_MS
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const code = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+      const taken = this.db.prepare('SELECT 1 FROM link_codes WHERE code = ?').get(code)
+      if (taken) continue
+      this.db
+        .prepare('INSERT INTO link_codes (code, device_id, expires_at) VALUES (?, ?, ?)')
+        .run(code, deviceId, expiresAt)
+      return { code, expiresAt }
+    }
+    throw new Error('配对码生成失败')
+  }
+
+  /**
+   * 认领配对码：把当前设备的数据并进出码那台设备的身份。
+   * 成功后调用方要让本机改用返回的 primary 作为 deviceId。
+   */
+  claimLinkCode(code: string, deviceId: string): { ok: true; primary: string } | TextRejection {
+    const row = this.db
+      .prepare('SELECT device_id AS deviceId, expires_at AS expiresAt FROM link_codes WHERE code = ?')
+      .get(String(code ?? '').trim()) as { deviceId: string; expiresAt: number } | undefined
+    if (!row) return { ok: false, reason: '配对码不对，检查一下有没有输错' }
+    if (row.expiresAt < this.now()) {
+      this.db.prepare('DELETE FROM link_codes WHERE code = ?').run(code)
+      return { ok: false, reason: '配对码已过期，回到另一台设备重新生成一个' }
+    }
+    if (row.deviceId === deviceId) return { ok: false, reason: '这就是当前设备，不用连自己' }
+
+    this.mergeDevices(row.deviceId, deviceId)
+    this.db.prepare('DELETE FROM link_codes WHERE code = ?').run(code)
+    return { ok: true, primary: row.deviceId }
+  }
+
+  /**
+   * 把 secondary 的一切并进 primary。
+   *
+   * 累计天数不能简单相加：两台设备同一天都学过只能算一天。focus_daily 里
+   * 有真实的按日记录，用它算出重叠天数再扣掉；超出保留期的部分没法还原，
+   * 那种情况下宁可少算也不虚报。
+   */
+  private mergeDevices(primary: string, secondary: string): void {
+    this.db.transaction(() => {
+      const overlap = this.db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM focus_daily a
+           JOIN focus_daily b ON a.day = b.day
+           WHERE a.device_id = ? AND b.device_id = ?`
+        )
+        .get(primary, secondary) as { c: number }
+
+      // 专注时长按天相加，单日上限照旧
+      this.db
+        .prepare(
+          `INSERT INTO focus_daily (device_id, day, seconds)
+           SELECT ?, day, seconds FROM focus_daily WHERE device_id = ?
+           ON CONFLICT(device_id, day) DO UPDATE SET
+             seconds = MIN(?, focus_daily.seconds + excluded.seconds)`
+        )
+        .run(primary, secondary, DAILY_CAP_SECONDS)
+      this.db.prepare('DELETE FROM focus_daily WHERE device_id = ?').run(secondary)
+
+      const profiles = this.db
+        .prepare(
+          `SELECT device_id AS deviceId, streak_days AS streak, best_streak AS best,
+                  total_days AS total, last_focus_day AS lastDay, intro
+           FROM profiles WHERE device_id IN (?, ?)`
+        )
+        .all(primary, secondary) as Array<{
+        deviceId: string
+        streak: number
+        best: number
+        total: number
+        lastDay: string
+        intro: string
+      }>
+      const head = profiles.find((p) => p.deviceId === primary)
+      const tail = profiles.find((p) => p.deviceId === secondary)
+
+      if (head || tail) {
+        const lastDay = [head?.lastDay ?? '', tail?.lastDay ?? ''].sort().pop() ?? ''
+        const walked = this.walkStreak(primary, lastDay)
+        const streak = Math.max(walked, head?.streak ?? 0, tail?.streak ?? 0)
+        const total = Math.max(
+          0,
+          (head?.total ?? 0) + (tail?.total ?? 0) - overlap.c
+        )
+        this.db
+          .prepare(
+            `INSERT INTO profiles (device_id, nickname, cat_id, last_seen, streak_days, best_streak, total_days, last_focus_day, intro)
+             VALUES (?, '', 'mikan', ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(device_id) DO UPDATE SET
+               streak_days = excluded.streak_days,
+               best_streak = excluded.best_streak,
+               total_days = excluded.total_days,
+               last_focus_day = excluded.last_focus_day,
+               intro = CASE WHEN profiles.intro = '' THEN excluded.intro ELSE profiles.intro END`
+          )
+          .run(
+            primary,
+            this.now(),
+            streak,
+            Math.max(streak, head?.best ?? 0, tail?.best ?? 0),
+            total,
+            lastDay,
+            head?.intro || tail?.intro || ''
+          )
+      }
+
+      // 自习室：成员关系合并，房内贡献相加，加入时间取更早的
+      this.db
+        .prepare(
+          `INSERT INTO room_members (room_id, device_id, joined_at, seconds_total, days_total, last_focus_day)
+           SELECT room_id, ?, joined_at, seconds_total, days_total, last_focus_day
+           FROM room_members WHERE device_id = ?
+           ON CONFLICT(room_id, device_id) DO UPDATE SET
+             joined_at = MIN(room_members.joined_at, excluded.joined_at),
+             seconds_total = room_members.seconds_total + excluded.seconds_total,
+             days_total = room_members.days_total + excluded.days_total,
+             last_focus_day = MAX(room_members.last_focus_day, excluded.last_focus_day)`
+        )
+        .run(primary, secondary)
+      this.db.prepare('DELETE FROM room_members WHERE device_id = ?').run(secondary)
+      this.db.prepare('UPDATE rooms SET owner_device = ? WHERE owner_device = ?').run(primary, secondary)
+
+      // 打卡合并取更早的那次，与「同一天以第一次为准」一致
+      this.db
+        .prepare(
+          `INSERT INTO checkins (device_id, day, wake_at, sleep_at)
+           SELECT ?, day, wake_at, sleep_at FROM checkins WHERE device_id = ?
+           ON CONFLICT(device_id, day) DO UPDATE SET
+             wake_at = CASE
+               WHEN checkins.wake_at = '' THEN excluded.wake_at
+               WHEN excluded.wake_at = '' THEN checkins.wake_at
+               ELSE MIN(checkins.wake_at, excluded.wake_at) END,
+             sleep_at = CASE
+               WHEN checkins.sleep_at = '' THEN excluded.sleep_at
+               WHEN excluded.sleep_at = '' THEN checkins.sleep_at
+               ELSE MIN(checkins.sleep_at, excluded.sleep_at) END`
+        )
+        .run(primary, secondary)
+      this.db.prepare('DELETE FROM checkins WHERE device_id = ?').run(secondary)
+
+      this.db.prepare('UPDATE wishes SET device_id = ? WHERE device_id = ?').run(primary, secondary)
+      this.db
+        .prepare('UPDATE OR IGNORE wish_reports SET device_id = ? WHERE device_id = ?')
+        .run(primary, secondary)
+      this.db.prepare('DELETE FROM wish_reports WHERE device_id = ?').run(secondary)
+
+      this.db.prepare('DELETE FROM link_codes WHERE device_id = ?').run(secondary)
+      this.db.prepare('DELETE FROM profiles WHERE device_id = ?').run(secondary)
+    })()
+  }
+
+  /** 从某一天往前数连续有记录的天数；只能看到保留期内的部分 */
+  private walkStreak(deviceId: string, lastDay: string): number {
+    if (!lastDay) return 0
+    const days = new Set(
+      (
+        this.db.prepare('SELECT day FROM focus_daily WHERE device_id = ?').all(deviceId) as Array<{
+          day: string
+        }>
+      ).map((r) => r.day)
+    )
+    let count = 0
+    let cursor = lastDay
+    while (days.has(cursor)) {
+      count += 1
+      cursor = previousDay(cursor)
+    }
+    return count
   }
 
   /** 在线备份：运行中拷贝也能拿到一致快照，不用停服 */

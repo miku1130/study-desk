@@ -586,6 +586,10 @@ function registerIpc(): void {
   ipcMain.handle('study-room:wish-add', (_e, text: string) => studyRoom.addWish(String(text ?? '')))
   ipcMain.handle('study-room:wish-report', (_e, id: number) => studyRoom.reportWish(Number(id)))
   ipcMain.handle('study-room:wish-delete', (_e, id: number) => studyRoom.deleteWish(Number(id)))
+  ipcMain.handle('study-room:link-create', () => studyRoom.createLinkCode())
+  ipcMain.handle('study-room:link-claim', (_e, code: string) =>
+    studyRoom.claimLinkCode(String(code ?? ''))
+  )
   ipcMain.handle('study-room:wish-pending', () => studyRoom.listPendingWishes())
   ipcMain.handle('study-room:wish-restore', (_e, id: number) => studyRoom.restoreWish(Number(id)))
 

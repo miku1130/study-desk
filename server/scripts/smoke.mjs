@@ -186,6 +186,35 @@ async function main() {
   check('主人放行后重新可见', restored.wishes.some((w) => w.id === wishId))
   for (const r of reporters) r.close()
 
+  // 换设备：两台连成同一个人
+  const oldDevice = `smoke-old-${stamp}`
+  const newDevice = `smoke-new-${stamp}`
+  const oldPhone = await connect('旧手机', oldDevice)
+  await oldPhone.wait((m) => m.t === 'welcome')
+  oldPhone.send({ t: 'checkin', kind: 'wake', time: '05:30' })
+  await oldPhone.wait((m) => m.t === 'checkin')
+  oldPhone.send({ t: 'link:create' })
+  const issued = await oldPhone.wait((m) => m.t === 'link:code')
+  check('生成配对码', /^\d{6}$/.test(issued.code), issued.code)
+
+  const newPc = await connect('新电脑', newDevice)
+  await newPc.wait((m) => m.t === 'welcome')
+  newPc.send({ t: 'link:claim', code: '000000' })
+  const badCode = await newPc.wait((m) => m.t === 'error')
+  check('乱输的码被拒绝', !!badCode.message)
+
+  newPc.send({ t: 'link:claim', code: issued.code })
+  const linked = await newPc.wait((m) => m.t === 'link:done')
+  check('配对成功后换成对方身份', linked.deviceId === oldDevice)
+  const carried = await newPc.wait((m) => m.t === 'checkin')
+  check('旧设备的打卡跟过来了', carried.wakeAt === '05:30')
+
+  newPc.send({ t: 'link:claim', code: issued.code })
+  const usedUp = await newPc.wait((m) => m.t === 'error')
+  check('同一个码不能用第二次', !!usedUp.message)
+  oldPhone.close()
+  newPc.close()
+
   // 关键区分：退出房间 ≠ 退出自习室
   // 先清主人侧积压，否则「1 人在座」会匹配到刚建房时那条旧详情
   owner.drain()

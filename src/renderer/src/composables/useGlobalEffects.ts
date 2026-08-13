@@ -10,6 +10,7 @@ import { useTimetableStatus } from '@/composables/useTimetableStatus'
 import { TREE_SPECIES } from '@/types'
 import { makeTrayIcon } from '@/lib/trayIcon'
 import { playChime } from '@/lib/audio'
+import { ambience, shouldPlayAmbience } from '@/lib/noise'
 
 /** 主窗口专用：铃声 / 番茄完成音效、统计刷新、托盘图标、专注森林奖励、任务番茄累计。 */
 export function useGlobalEffects(): void {
@@ -93,6 +94,28 @@ export function useGlobalEffects(): void {
         const showForTimer = Boolean(duringPomodoro && phase === 'work' && running && !lockscreen)
         const showForClass = Boolean(duringClass && lesson)
         void window.api.petWidget.sync(Boolean(enabled && (showForTimer || showForClass)))
+      },
+      { immediate: true }
+    )
+
+    // 环境音跟着番茄钟走，而不是跟着页面：切到别的页面继续专注，声音不该断
+    watch(
+      [
+        () => settings.loaded,
+        () => settings.s.pomodoro.noise.scene,
+        () => settings.s.pomodoro.noise.volume,
+        () => settings.s.pomodoro.noise.duringBreak,
+        () => pomodoro.phase,
+        () => pomodoro.running
+      ],
+      ([ready]) => {
+        if (!ready) return
+        const config = settings.s.pomodoro.noise
+        if (shouldPlayAmbience(config, { phase: pomodoro.phase, running: pomodoro.running })) {
+          ambience.play(config.scene, config.volume)
+        } else {
+          ambience.stop()
+        }
       },
       { immediate: true }
     )

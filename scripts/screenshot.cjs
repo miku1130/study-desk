@@ -260,6 +260,7 @@ const onlineSnapshot = {
   status: 'online',
   error: '',
   deviceId: 'me',
+  linkCode: process.env.SHOT_LINK === 'code' ? { code: '482913', expiresAt: Date.now() + 240_000 } : null,
   intro: '一战成硕',
   checkin: { wakeAt: '06:40', sleepAt: '' },
   myRooms: [
@@ -295,7 +296,8 @@ ipcMain.handle('study-room:online-snapshot', () => onlineSnapshot)
 for (const channel of [
   'online-connect', 'watch-browse', 'go-offline', 'set-intro', 'checkin', 'create',
   'join-room', 'quit-room', 'dissolve', 'update-room', 'enter', 'exit', 'set-range',
-  'wish-add', 'wish-report', 'wish-delete', 'wish-pending', 'wish-restore'
+  'wish-add', 'wish-report', 'wish-delete', 'wish-pending', 'wish-restore',
+  'link-create', 'link-claim'
 ]) {
   ipcMain.handle(`study-room:${channel}`, () => undefined)
 }

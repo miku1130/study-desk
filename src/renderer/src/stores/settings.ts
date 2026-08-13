@@ -37,7 +37,11 @@ export const useSettingsStore = defineStore('settings', () => {
       // 老配置只有一个 accent：深色沿用它，否则用户挑的颜色会在切主题时凭空消失
       accentDark: data.accentDark || data.accent || base.accentDark,
       bell: { ...base.bell, ...data.bell },
-      pomodoro: { ...base.pomodoro, ...data.pomodoro },
+      pomodoro: {
+        ...base.pomodoro,
+        ...data.pomodoro,
+        noise: { ...base.pomodoro.noise, ...data.pomodoro?.noise }
+      },
       water: { ...base.water, ...data.water },
       health: { ...base.health, ...data.health },
       hotkeys: { ...base.hotkeys, ...data.hotkeys },

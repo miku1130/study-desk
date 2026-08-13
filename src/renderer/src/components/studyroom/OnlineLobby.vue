@@ -97,6 +97,32 @@ async function joinByCode(): Promise<void> {
 
 const connecting = computed(() => online.status === 'connecting')
 
+/* ---- 换设备 ---- */
+
+const showLink = shallowRef(false)
+const linkInput = ref('')
+
+function onLinkInput(event: Event): void {
+  linkInput.value = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)
+}
+
+async function claim(): Promise<void> {
+  if (linkInput.value.length !== 6) return
+  await online.claimLinkCode(linkInput.value)
+  linkInput.value = ''
+}
+
+async function copyLinkCode(): Promise<void> {
+  const code = online.linkCode?.code
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    ui.success('配对码已复制')
+  } catch {
+    ui.error('复制失败，手动记一下吧')
+  }
+}
+
 onMounted(() => {
   void online.watchBrowse(true)
 })
@@ -154,6 +180,46 @@ onUnmounted(() => {
             {{ online.checkin.sleepAt ? `睡觉 ${online.checkin.sleepAt}` : '睡觉打卡' }}
           </button>
           <span class="checkin-hint">每天各记一次，以第一次为准</span>
+        </div>
+
+        <!-- 没有账号体系，换台电脑就是另一个人，所以要给一条把两台连起来的路 -->
+        <div class="link-row">
+          <button class="btn-link" @click="showLink = !showLink">
+            换了设备？把两台连成同一个人
+          </button>
+        </div>
+
+        <div v-if="showLink" class="link-box">
+          <div class="link-side">
+            <p class="field-label">在这台上生成配对码</p>
+            <div class="row">
+              <button class="btn btn-secondary btn-sm" @click="online.createLinkCode()">
+                {{ online.linkCode ? '换一个码' : '生成配对码' }}
+              </button>
+              <button v-if="online.linkCode" class="link-code" title="点击复制" @click="copyLinkCode">
+                {{ online.linkCode.code }}
+              </button>
+            </div>
+            <p class="hint">5 分钟内有效，用一次就失效。</p>
+          </div>
+          <div class="link-side">
+            <p class="field-label">或者输入另一台给的码</p>
+            <div class="row">
+              <input
+                :value="linkInput"
+                class="input code-input"
+                maxlength="6"
+                inputmode="numeric"
+                placeholder="6 位数字"
+                @input="onLinkInput"
+                @keyup.enter="claim"
+              />
+              <button class="btn btn-sm" :disabled="linkInput.length !== 6" @click="claim">
+                连接
+              </button>
+            </div>
+            <p class="hint">这台的记录会并进对方，之后两台算同一个人。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -356,6 +422,44 @@ onUnmounted(() => {
 .checkin-hint {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.link-row {
+  margin-top: 10px;
+}
+
+.link-box {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.link-side {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.link-code {
+  padding: 4px 12px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 42%, transparent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
 }
 
 .section-head {

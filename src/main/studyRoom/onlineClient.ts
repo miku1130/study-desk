@@ -90,6 +90,8 @@ export interface OnlineSnapshot {
   status: OnlineStatus
   error: string
   deviceId: string
+  /** 当前有效的配对码；过期或用掉后清空 */
+  linkCode: LinkCode | null
   intro: string
   checkin: { wakeAt: string; sleepAt: string }
   myRooms: RoomBrief[]
@@ -98,6 +100,11 @@ export interface OnlineSnapshot {
   wishes: WishView[]
   /** 等主人复核的内容，只有主人拿得到 */
   pendingWishes: WishView[]
+}
+
+export interface LinkCode {
+  code: string
+  expiresAt: number
 }
 
 export interface OnlineRoomDeps {
@@ -109,6 +116,8 @@ export interface OnlineRoomDeps {
   onChanged: () => void
   onNotice: (kind: string, text: string) => void
   onCheer: (cheerId: string, fromDeviceId: string, fromNickname: string, toDeviceId: string) => void
+  /** 配对成功后本机要改用新的 deviceId 并持久化 */
+  onDeviceIdChanged: (deviceId: string) => void
   socketFactory?: (url: string) => WebSocket
 }
 
@@ -135,14 +144,20 @@ export class OnlineRoomClient {
   private disposed = false
   private manualClose = false
   private pending: Array<Record<string, unknown>> = []
+  /** 配对成功后会换成对方的身份，所以不能一直用 deps.deviceId */
+  private deviceId: string
+  private linkCode: LinkCode | null = null
 
-  constructor(private readonly deps: OnlineRoomDeps) {}
+  constructor(private readonly deps: OnlineRoomDeps) {
+    this.deviceId = deps.deviceId
+  }
 
   snapshot(): OnlineSnapshot {
     return {
       status: this.status,
       error: this.error,
-      deviceId: this.deps.deviceId,
+      deviceId: this.deviceId,
+      linkCode: this.linkCode ? { ...this.linkCode } : null,
       intro: this.intro,
       checkin: { ...this.checkin },
       myRooms: this.myRooms.map((r) => ({ ...r })),
@@ -185,7 +200,7 @@ export class OnlineRoomClient {
       this.write({
         t: 'hello',
         v: STUDY_ROOM_PROTOCOL_VERSION,
-        deviceId: this.deps.deviceId,
+        deviceId: this.deviceId,
         nickname: sanitizeNickname(this.deps.getNickname()),
         catId: sanitizeCatId(this.deps.getCatId())
       })
@@ -313,6 +328,16 @@ export class OnlineRoomClient {
     this.request({ t: 'wish:delete', id, roomId: this.room?.id ?? '' })
   }
 
+  /** 换设备：在老设备上生成配对码 */
+  createLinkCode(): void {
+    this.request({ t: 'link:create' })
+  }
+
+  /** 换设备：在新设备上输入配对码，成功后本机改用对方身份 */
+  claimLinkCode(code: string): void {
+    this.request({ t: 'link:claim', code })
+  }
+
   /** 主人复核：拉取被举报隐藏的内容 */
   listPendingWishes(): void {
     if (!this.room) return
@@ -438,6 +463,22 @@ export class OnlineRoomClient {
         this.write({ t: 'wish:list', roomId: this.room.id })
         // 主人那边的待复核列表也要跟着变，否则处理完还挂着旧条目
         if (this.room.isOwner) this.write({ t: 'wish:pending', roomId: this.room.id })
+        return
+      }
+      case 'link:code': {
+        this.linkCode = { code: String(msg.code ?? ''), expiresAt: num(msg.expiresAt) }
+        this.deps.onChanged()
+        return
+      }
+      case 'link:done': {
+        const next = String(msg.deviceId ?? '')
+        if (next) {
+          this.deviceId = next
+          this.deps.onDeviceIdChanged(next)
+        }
+        this.linkCode = null
+        this.deps.onNotice('link', '已经连上另一台设备，专注记录和自习室都合并过来了')
+        this.deps.onChanged()
         return
       }
       case 'notice': {

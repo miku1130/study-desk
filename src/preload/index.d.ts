@@ -150,6 +150,7 @@ export interface StudyRoomOnlineDTO {
   status: 'idle' | 'connecting' | 'online' | 'error'
   error: string
   deviceId: string
+  linkCode: { code: string; expiresAt: number } | null
   intro: string
   checkin: { wakeAt: string; sleepAt: string }
   myRooms: StudyRoomBriefDTO[]
@@ -330,6 +331,8 @@ export interface StudyDeskApi {
     addWish: (text: string) => Promise<void>
     reportWish: (id: number) => Promise<void>
     deleteWish: (id: number) => Promise<void>
+    createLinkCode: () => Promise<void>
+    claimLinkCode: (code: string) => Promise<void>
     listPendingWishes: () => Promise<void>
     restoreWish: (id: number) => Promise<void>
     onOnline: (cb: (snapshot: StudyRoomOnlineDTO | null) => void) => () => void

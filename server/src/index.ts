@@ -504,6 +504,28 @@ function handle(client: Client, raw: string): void {
       return
     }
 
+    /* ---- 跨设备 ---- */
+
+    case 'link:create': {
+      const { code, expiresAt } = db.createLinkCode(client.deviceId)
+      send(client, { t: 'link:code', code, expiresAt })
+      return
+    }
+
+    case 'link:claim': {
+      const result = db.claimLinkCode(String(msg.code ?? ''), client.deviceId)
+      if (!result.ok) return fail(client, result.reason)
+      // 本机身份换成对方的，之后所有请求都以这个身份算
+      const previous = client.deviceId
+      client.deviceId = result.primary
+      db.touchProfile(result.primary, client.nickname, client.catId)
+      send(client, { t: 'link:done', deviceId: result.primary, previous })
+      send(client, myRooms(client))
+      send(client, { t: 'checkin', ...db.todayCheckin(result.primary) })
+      send(client, { t: 'profile', intro: db.getIntro(result.primary) })
+      return
+    }
+
     /* ---- 全站榜 ---- */
 
     case 'leaderboard': {

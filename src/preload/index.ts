@@ -142,6 +142,9 @@ const api = {
     addWish: (text: string): Promise<void> => ipcRenderer.invoke('study-room:wish-add', text),
     reportWish: (id: number): Promise<void> => ipcRenderer.invoke('study-room:wish-report', id),
     deleteWish: (id: number): Promise<void> => ipcRenderer.invoke('study-room:wish-delete', id),
+    createLinkCode: (): Promise<void> => ipcRenderer.invoke('study-room:link-create'),
+    claimLinkCode: (code: string): Promise<void> =>
+      ipcRenderer.invoke('study-room:link-claim', code),
     listPendingWishes: (): Promise<void> => ipcRenderer.invoke('study-room:wish-pending'),
     restoreWish: (id: number): Promise<void> => ipcRenderer.invoke('study-room:wish-restore', id),
     onOnline: (cb: (snapshot: unknown) => void): (() => void) =>

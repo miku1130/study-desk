@@ -209,7 +209,12 @@ export class StudyRoomService {
       onChanged: () => this.pushOnline(),
       onNotice: (kind, text) => this.deps.send('study-room:notice', { kind, text }),
       onCheer: (cheerId, fromId, fromNickname, toId) =>
-        this.emitCheer(cheerId, fromId, fromNickname, toId, Date.now())
+        this.emitCheer(cheerId, fromId, fromNickname, toId, Date.now()),
+      onDeviceIdChanged: (next) => {
+        // 换身份必须落盘，否则重启又变回原来那台设备
+        this.deps.store.set('deviceId', next)
+        this.selfId = next
+      }
     })
     return this.online
   }
@@ -293,6 +298,16 @@ export class StudyRoomService {
 
   deleteWish(id: number): void {
     this.online?.deleteWish(id)
+  }
+
+  /* ---- 跨设备 ---- */
+
+  createLinkCode(): void {
+    this.ensureOnline().createLinkCode()
+  }
+
+  claimLinkCode(code: string): void {
+    this.ensureOnline().claimLinkCode(code)
   }
 
   listPendingWishes(): void {

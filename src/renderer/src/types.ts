@@ -24,6 +24,15 @@ export interface PomodoroConfig {
   mode: PomodoroMode
   /** 上次选的单次时长（分钟），仅倒计时用得上 */
   lastMinutes: number
+  /** 专注环境音；scene 为空表示不放 */
+  noise: NoiseConfig
+}
+
+export interface NoiseConfig {
+  scene: string
+  volume: number
+  /** 休息时也继续放 */
+  duringBreak: boolean
 }
 
 export interface HotkeyConfig {
@@ -94,7 +103,8 @@ export const defaultSettings: AppSettings = {
     sound: '',
     volume: 0.8,
     mode: 'countdown',
-    lastMinutes: 25
+    lastMinutes: 25,
+    noise: { scene: '', volume: 0.5, duringBreak: false }
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },
@@ -615,6 +625,8 @@ export interface StudyRoomOnline {
   status: 'idle' | 'connecting' | 'online' | 'error'
   error: string
   deviceId: string
+  /** 当前有效的配对码；过期或用掉后为空 */
+  linkCode: { code: string; expiresAt: number } | null
   intro: string
   checkin: { wakeAt: string; sleepAt: string }
   myRooms: StudyRoomBrief[]

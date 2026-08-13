@@ -23,6 +23,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
   const status = shallowRef<StudyRoomOnline['status']>('idle')
   const error = shallowRef('')
   const deviceId = shallowRef('')
+  const linkCode = ref<{ code: string; expiresAt: number } | null>(null)
   const intro = shallowRef('')
   const checkin = ref({ wakeAt: '', sleepAt: '' })
   const myRooms = ref<StudyRoomBrief[]>([])
@@ -56,6 +57,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     status.value = snapshot.status
     error.value = snapshot.error
     deviceId.value = snapshot.deviceId
+    linkCode.value = snapshot.linkCode ?? null
     intro.value = snapshot.intro
     checkin.value = snapshot.checkin
     myRooms.value = snapshot.myRooms
@@ -143,6 +145,22 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     playChime('marimba', 0.3)
   }
 
+  /* ---- 跨设备 ---- */
+
+  const createLinkCode = (): Promise<void> => window.api.studyRoom.createLinkCode()
+
+  async function claimLinkCode(code: string): Promise<void> {
+    const ui = useUiStore()
+    const ok = await ui.confirm({
+      title: '连到另一台设备？',
+      message:
+        '这台设备现在的专注记录、自习室和打卡会并进对方的身份，之后两台算同一个人。合并没法撤销。',
+      confirmText: '连接'
+    })
+    if (!ok) return
+    await window.api.studyRoom.claimLinkCode(code.trim())
+  }
+
   /* ---- 许愿墙 ---- */
 
   const addWish = (text: string): Promise<void> => window.api.studyRoom.addWish(text)
@@ -171,6 +189,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     status,
     error,
     deviceId,
+    linkCode,
     intro,
     checkin,
     myRooms,
@@ -203,6 +222,8 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     reportWish,
     deleteWish,
     listPendingWishes,
-    restoreWish
+    restoreWish,
+    createLinkCode,
+    claimLinkCode
   }
 })
