@@ -29,6 +29,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
   const browse = ref<StudyRoomBrief[]>([])
   const room = ref<StudyRoomDetail | null>(null)
   const wishes = ref<StudyRoomWish[]>([])
+  const pendingWishes = ref<StudyRoomWish[]>([])
   const loaded = shallowRef(false)
 
   let unsubscribe: (() => void) | null = null
@@ -49,6 +50,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
       status.value = 'idle'
       room.value = null
       wishes.value = []
+      pendingWishes.value = []
       return
     }
     status.value = snapshot.status
@@ -60,6 +62,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     browse.value = snapshot.browse
     room.value = snapshot.room
     wishes.value = snapshot.wishes
+    pendingWishes.value = snapshot.pendingWishes ?? []
   }
 
   async function init(): Promise<void> {
@@ -144,6 +147,18 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
 
   const addWish = (text: string): Promise<void> => window.api.studyRoom.addWish(text)
   const reportWish = (id: number): Promise<void> => window.api.studyRoom.reportWish(id)
+  const listPendingWishes = (): Promise<void> => window.api.studyRoom.listPendingWishes()
+
+  async function restoreWish(id: number): Promise<void> {
+    const ui = useUiStore()
+    const ok = await ui.confirm({
+      title: '放行这条内容？',
+      message: '放行后所有人都能看到，而且不会再被举报自动隐藏。',
+      confirmText: '放行'
+    })
+    if (!ok) return
+    await window.api.studyRoom.restoreWish(id)
+  }
 
   async function deleteWish(id: number): Promise<void> {
     const ui = useUiStore()
@@ -162,6 +177,7 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     browse,
     room,
     wishes,
+    pendingWishes,
     loaded,
     connected,
     inRoom,
@@ -185,6 +201,8 @@ export const useStudyRoomOnlineStore = defineStore('studyRoomOnline', () => {
     checkInNow,
     addWish,
     reportWish,
-    deleteWish
+    deleteWish,
+    listPendingWishes,
+    restoreWish
   }
 })

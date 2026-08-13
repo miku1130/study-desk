@@ -41,8 +41,8 @@ export interface Attendee {
 
 export interface PresenceOptions {
   now?: () => number
-  /** 专注增量回调，交给持久层累计到排行榜 */
-  onFocusAccrued?: (deviceId: string, seconds: number) => void
+  /** 专注增量回调，交给持久层累计到排行榜与房间战绩 */
+  onFocusAccrued?: (deviceId: string, seconds: number, roomId: string) => void
 }
 
 const DEFAULT_FOCUS: FocusReport = {
@@ -59,7 +59,7 @@ export class Presence {
   /** connectionId -> roomId */
   private readonly location = new Map<string, string>()
   private readonly now: () => number
-  private readonly onFocusAccrued: (deviceId: string, seconds: number) => void
+  private readonly onFocusAccrued: (deviceId: string, seconds: number, roomId: string) => void
 
   constructor(options: PresenceOptions = {}) {
     this.now = options.now ?? Date.now
@@ -151,7 +151,7 @@ export class Presence {
       if (gap > 0) {
         const step = Math.min(gap, STUDY_ROOM_MAX_FOCUS_STEP_SEC)
         attendee.sessionSeconds += step
-        this.onFocusAccrued(attendee.deviceId, step)
+        this.onFocusAccrued(attendee.deviceId, step, roomId)
       }
     }
     attendee.focus = normalizeFocus(raw)

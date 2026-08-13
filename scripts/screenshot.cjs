@@ -83,15 +83,18 @@ const sample = {
     ]
   },
   stats: {
-    days: {
-      [dkey(6)]: { pomodoros: 4, focusMinutes: 100 },
-      [dkey(5)]: { pomodoros: 6, focusMinutes: 150 },
-      [dkey(4)]: { pomodoros: 3, focusMinutes: 75 },
-      [dkey(3)]: { pomodoros: 8, focusMinutes: 200 },
-      [dkey(2)]: { pomodoros: 5, focusMinutes: 125 },
-      [dkey(1)]: { pomodoros: 7, focusMinutes: 175 },
-      [dkey(0)]: { pomodoros: 3, focusMinutes: 75 }
-    },
+    // 半年的样本数据：热力图要看得出「哪几周断了」，光有一周撑不起来
+    days: (() => {
+      const days = {}
+      for (let offset = 0; offset < 180; offset++) {
+        const weekday = (new Date(Date.now() - offset * 86400000)).getDay()
+        const skip = weekday === 0 || (offset % 11 === 0) || (offset > 120 && offset % 3 === 0)
+        if (skip) continue
+        const minutes = 25 + ((offset * 37) % 8) * 25
+        days[dkey(offset)] = { pomodoros: Math.max(1, Math.round(minutes / 25)), focusMinutes: minutes }
+      }
+      return days
+    })(),
     sessions: [
       { id: 's1', startAt: Date.now() - 3 * 3600_000, endAt: Date.now() - 2.2 * 3600_000, minutes: 48, mode: 'countdown', targetId: '1', targetName: '完成高数第三章习题', completed: true },
       { id: 's2', startAt: Date.now() - 6 * 3600_000, endAt: Date.now() - 5.5 * 3600_000, minutes: 27, mode: 'countup', targetId: '2', targetName: '背 30 个英语单词', completed: true },
@@ -272,19 +275,27 @@ const onlineSnapshot = {
       ? {
           id: 'r1', code: 'KY2026AB', name: '考研自习室', intro: '安静刷题，互不打扰',
           goalMinutes: 240, memberCount: 24, attendeeCount: 4, focusingCount: 2,
-          isOwner: true, isMember: true, range: 'today', members: onlineMembers
+          isOwner: true, isMember: true, range: 'today', members: onlineMembers,
+          pendingCount: 1,
+          record: {
+            totalSeconds: 486_000, activeDays: 63, streakDays: 12, bestStreak: 21,
+            createdAt: Date.now() - 71 * 86_400_000, mySeconds: 92_400, myDays: 41
+          }
         }
       : null,
   wishes: [
-    { id: 1, nickname: '柚子', catId: 'sesame', text: '希望今年一次上岸', createdAt: Date.now() - 3600_000, mine: false },
-    { id: 2, nickname: '小桌', catId: 'mikan', text: '每天都能坐满四小时', createdAt: Date.now() - 7200_000, mine: true }
+    { id: 1, nickname: '柚子', catId: 'sesame', text: '希望今年一次上岸', createdAt: Date.now() - 3600_000, mine: false, hidden: false, reports: 0 },
+    { id: 2, nickname: '小桌', catId: 'mikan', text: '每天都能坐满四小时', createdAt: Date.now() - 7200_000, mine: true, hidden: false, reports: 0 }
+  ],
+  pendingWishes: [
+    { id: 3, nickname: '阿元', catId: 'mocha', text: '这条被举报了三次', createdAt: Date.now() - 5400_000, mine: false, hidden: true, reports: 3 }
   ]
 }
 ipcMain.handle('study-room:online-snapshot', () => onlineSnapshot)
 for (const channel of [
   'online-connect', 'watch-browse', 'go-offline', 'set-intro', 'checkin', 'create',
   'join-room', 'quit-room', 'dissolve', 'update-room', 'enter', 'exit', 'set-range',
-  'wish-add', 'wish-report', 'wish-delete'
+  'wish-add', 'wish-report', 'wish-delete', 'wish-pending', 'wish-restore'
 ]) {
   ipcMain.handle(`study-room:${channel}`, () => undefined)
 }
@@ -337,6 +348,14 @@ app.whenReady().then(async () => {
       const check = () => document.querySelector('.desktop-widget-card') || Date.now() >= deadline ? resolve(true) : setTimeout(check, 40)
       check()
     })`)
+  }
+  if (process.env.SHOT_CLICK) {
+    await win.webContents.executeJavaScript(`(async () => {
+      for (const selector of ${JSON.stringify(process.env.SHOT_CLICK.split('|'))}) {
+        document.querySelector(selector)?.click()
+        await new Promise((resolve) => setTimeout(resolve, 120))
+      }
+    })()`)
   }
   if (process.env.SHOT_ANCHOR) {
     await win.webContents.executeJavaScript(`(async () => {

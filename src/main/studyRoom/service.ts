@@ -295,6 +295,14 @@ export class StudyRoomService {
     this.online?.deleteWish(id)
   }
 
+  listPendingWishes(): void {
+    this.online?.listPendingWishes()
+  }
+
+  restoreWish(id: number): void {
+    this.online?.restoreWish(id)
+  }
+
   /** 彻底断开公网连接并回到本地空闲态 */
   goOffline(): void {
     if (!this.online) return

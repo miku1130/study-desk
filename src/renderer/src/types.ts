@@ -579,6 +579,23 @@ export interface StudyRoomDetail {
   isMember: boolean
   range: StudyRoomRange
   members: StudyRoomMemberView[]
+  record: StudyRoomRecord
+  /** 等主人复核的条数；非主人恒为 0 */
+  pendingCount: number
+}
+
+/** 一间自习室攒下来的长期战绩 */
+export interface StudyRoomRecord {
+  /** 大家在这间屋里累计专注的秒数 */
+  totalSeconds: number
+  /** 有人来学过的天数 */
+  activeDays: number
+  /** 连续有人来学的天数 */
+  streakDays: number
+  bestStreak: number
+  createdAt: number
+  mySeconds: number
+  myDays: number
 }
 
 export interface StudyRoomWish {
@@ -588,6 +605,9 @@ export interface StudyRoomWish {
   text: string
   createdAt: number
   mine: boolean
+  /** 被举报隐藏中，只有作者与主人看得到 */
+  hidden: boolean
+  reports: number
 }
 
 /** 公网自习室的完整镜像 */
@@ -601,6 +621,7 @@ export interface StudyRoomOnline {
   browse: StudyRoomBrief[]
   room: StudyRoomDetail | null
   wishes: StudyRoomWish[]
+  pendingWishes: StudyRoomWish[]
 }
 
 export interface StudyRoomLeaderboardRow {

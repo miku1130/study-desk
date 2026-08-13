@@ -183,7 +183,8 @@ ipcMain.handle('study-room:online-snapshot', () => ({
     { id: 'r2', name: '早八自习室', intro: '', memberCount: 8, attendeeCount: 4, focusingCount: 2, isOwner: false }
   ],
   room: null,
-  wishes: []
+  wishes: [],
+  pendingWishes: []
 }))
 ipcMain.handle('study-room:online-connect', () => undefined)
 ipcMain.handle('study-room:watch-browse', () => undefined)
@@ -201,6 +202,8 @@ ipcMain.handle('study-room:set-range', () => undefined)
 ipcMain.handle('study-room:wish-add', () => undefined)
 ipcMain.handle('study-room:wish-report', () => undefined)
 ipcMain.handle('study-room:wish-delete', () => undefined)
+ipcMain.handle('study-room:wish-pending', () => undefined)
+ipcMain.handle('study-room:wish-restore', () => undefined)
 
 // 猫咪动画自检：待机是逐帧视频，写字是立绘 + CSS 位移，两种都必须真的在动
 const CAT_ANIMATION_PROBE = `(async (scope) => {

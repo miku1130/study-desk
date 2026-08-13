@@ -227,6 +227,66 @@ describe('房内榜单', () => {
   })
 })
 
+describe('自习室长期战绩', () => {
+  const DAY = 24 * 3600 * 1000
+
+  it('累计的是在这间自习室里学的时长，不是成员的全部专注', () => {
+    const id = newRoom('owner')
+    db.joinRoom(id, 'u1')
+
+    db.addRoomFocus(id, 'u1', 1800)
+    db.addRoomFocus(id, 'owner', 600)
+    // 这段发生在别处，不该算进这间房的战绩
+    db.addFocus('u1', 3600)
+
+    const record = db.roomRecord(id, 'u1')
+    expect(record.totalSeconds).toBe(2400)
+    expect(record.mySeconds).toBe(1800)
+  })
+
+  it('连续有人在学的天数按天推进，断一天就归零重来', () => {
+    const id = newRoom('owner')
+    db.addRoomFocus(id, 'owner', 600)
+    clock += DAY
+    db.addRoomFocus(id, 'owner', 600)
+    expect(db.roomRecord(id, 'owner')).toMatchObject({ activeDays: 2, streakDays: 2, bestStreak: 2 })
+
+    clock += 2 * DAY
+    db.addRoomFocus(id, 'owner', 600)
+    const record = db.roomRecord(id, 'owner')
+    expect(record).toMatchObject({ activeDays: 3, streakDays: 1 })
+    // 最好成绩要留着，否则断一次之前的坚持就白费了
+    expect(record.bestStreak).toBe(2)
+  })
+
+  it('同一天多次专注只算一天', () => {
+    const id = newRoom('owner')
+    db.addRoomFocus(id, 'owner', 600)
+    db.addRoomFocus(id, 'owner', 600)
+    expect(db.roomRecord(id, 'owner')).toMatchObject({ activeDays: 1, myDays: 1 })
+  })
+
+  it('昨天有人学、今天还没人来，连续天数不算断', () => {
+    const id = newRoom('owner')
+    db.addRoomFocus(id, 'owner', 600)
+    clock += DAY
+    expect(db.roomRecord(id, 'owner').streakDays).toBe(1)
+    clock += DAY
+    expect(db.roomRecord(id, 'owner').streakDays).toBe(0)
+  })
+
+  it('还没人学过时返回全零而不是 undefined', () => {
+    const id = newRoom('owner')
+    expect(db.roomRecord(id, 'owner')).toMatchObject({
+      totalSeconds: 0,
+      activeDays: 0,
+      streakDays: 0,
+      mySeconds: 0,
+      myDays: 0
+    })
+  })
+})
+
 describe('作息打卡', () => {
   it('记录起床与睡觉', () => {
     expect(db.checkIn('d1', 'wake', '06:30')).toEqual({ ok: true, value: '06:30' })
@@ -297,7 +357,9 @@ describe('许愿墙', () => {
       expect(db.reportWish(wish.id, `reporter${i}`).hidden).toBe(false)
     }
     expect(db.reportWish(wish.id, 'last').hidden).toBe(true)
-    expect(db.wishes(id, 'owner')).toHaveLength(0)
+    // 对别人不可见；作者自己仍看得到，只是标着「待复核」
+    expect(db.wishes(id, 'passerby')).toHaveLength(0)
+    expect(db.wishes(id, 'owner')[0]).toMatchObject({ hidden: true })
   })
 
   it('同一人重复举报只算一次', () => {
@@ -317,6 +379,51 @@ describe('许愿墙', () => {
 
     expect(db.deleteWish(wish.id, 'someone')).toBe(false)
     expect(db.deleteWish(wish.id, 'u1')).toBe(true)
+  })
+
+  it('被隐藏后作者自己仍看得到，并知道正在等复核', () => {
+    const id = newRoom('owner')
+    db.joinRoom(id, 'u1')
+    const wish = db.addWish(id, 'u1', '我的愿望')
+    if (!wish.ok) throw new Error('发愿失败')
+    for (let i = 0; i < WISH_AUTO_HIDE_REPORTS; i++) db.reportWish(wish.id, `reporter${i}`)
+
+    expect(db.wishes(id, 'other')).toHaveLength(0)
+    const mine = db.wishes(id, 'u1')
+    expect(mine).toHaveLength(1)
+    expect(mine[0]).toMatchObject({ hidden: true, mine: true })
+  })
+
+  it('主人能看到待复核的内容与举报数', () => {
+    const id = newRoom('owner')
+    db.joinRoom(id, 'u1')
+    const wish = db.addWish(id, 'u1', '我的愿望')
+    if (!wish.ok) throw new Error('发愿失败')
+    for (let i = 0; i < WISH_AUTO_HIDE_REPORTS; i++) db.reportWish(wish.id, `reporter${i}`)
+
+    expect(db.pendingWishes(id, 'u1')).toEqual([])
+    const pending = db.pendingWishes(id, 'owner')
+    expect(pending).toHaveLength(1)
+    expect(pending[0]).toMatchObject({ text: '我的愿望', reports: WISH_AUTO_HIDE_REPORTS })
+  })
+
+  it('主人复核放行后不会被再次举报下去', () => {
+    const id = newRoom('owner')
+    db.joinRoom(id, 'u1')
+    const wish = db.addWish(id, 'u1', '我的愿望')
+    if (!wish.ok) throw new Error('发愿失败')
+    for (let i = 0; i < WISH_AUTO_HIDE_REPORTS; i++) db.reportWish(wish.id, `reporter${i}`)
+
+    expect(db.restoreWish(wish.id, 'u1')).toBe(false)
+    expect(db.restoreWish(wish.id, 'owner')).toBe(true)
+    expect(db.wishes(id, 'other')).toHaveLength(1)
+
+    // 复核过的内容不再自动隐藏，否则同一批人可以反复把它压下去
+    for (let i = 0; i < WISH_AUTO_HIDE_REPORTS * 2; i++) {
+      expect(db.reportWish(wish.id, `again${i}`).hidden).toBe(false)
+    }
+    expect(db.wishes(id, 'other')).toHaveLength(1)
+    expect(db.pendingWishes(id, 'owner')).toEqual([])
   })
 
   it('房主可以删别人的', () => {

@@ -62,6 +62,36 @@ function wishTime(at: number): string {
   return `${String(d.getMonth() + 1)}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+/* ---- 长期战绩 ---- */
+
+const record = computed(() => room.value?.record)
+
+function hours(seconds: number): string {
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`
+  return `${(seconds / 3600).toFixed(1)} 小时`
+}
+
+const roomAge = computed(() => {
+  const createdAt = record.value?.createdAt
+  if (!createdAt) return ''
+  const days = Math.max(1, Math.ceil((Date.now() - createdAt) / 86_400_000))
+  return `开了 ${days} 天`
+})
+
+/* ---- 待复核 ---- */
+
+const showPending = shallowRef(false)
+
+// 主人进房或复核完成后拉一次；非主人服务端不会给数据
+watch(
+  () => [store.isOwner, room.value?.id] as const,
+  ([isOwner]) => {
+    if (isOwner) void store.listPendingWishes()
+    else showPending.value = false
+  },
+  { immediate: true }
+)
+
 /* ---- 加油 ---- */
 
 const cheerTargetId = shallowRef('')
@@ -152,6 +182,7 @@ onUnmounted(() => window.clearTimeout(cooldownTimer))
           </button>
           <button class="head-tab" :class="{ active: tab === 'wish' }" @click="tab = 'wish'">
             许愿墙
+            <span v-if="room.pendingCount > 0" class="tab-dot">{{ room.pendingCount }}</span>
           </button>
         </div>
         <div class="head-live">
@@ -181,6 +212,26 @@ onUnmounted(() => window.clearTimeout(cooldownTimer))
           <button v-else-if="!room.isMember" class="btn btn-sm" @click="joinThisRoom">
             加入这间自习室
           </button>
+        </div>
+      </div>
+
+      <!-- 长期战绩：让「一起坚持了多久」看得见，而不是只有今天的数字 -->
+      <div v-if="record" class="record-bar">
+        <div class="record-item">
+          <strong>{{ hours(record.totalSeconds) }}</strong>
+          <span>大家在这里学了</span>
+        </div>
+        <div class="record-item">
+          <strong>{{ record.activeDays }} 天</strong>
+          <span>有人来学过{{ roomAge ? ` · ${roomAge}` : '' }}</span>
+        </div>
+        <div class="record-item">
+          <strong>{{ record.streakDays }} 天</strong>
+          <span>连续有人在学{{ record.bestStreak > record.streakDays ? ` · 最长 ${record.bestStreak}` : '' }}</span>
+        </div>
+        <div class="record-item mine">
+          <strong>{{ hours(record.mySeconds) }}</strong>
+          <span>我贡献的 · 来过 {{ record.myDays }} 天</span>
         </div>
       </div>
 
@@ -283,12 +334,45 @@ onUnmounted(() => window.clearTimeout(cooldownTimer))
           </button>
         </div>
         <p class="card-hint">
-          不能写链接、联系方式和长串数字。看到不合适的内容可以举报，攒够就会自动隐藏。
+          不能写链接、联系方式和长串数字。看到不合适的内容可以举报，攒够会先隐藏起来等主人复核。
         </p>
       </section>
 
+      <!-- 屏蔽词挡不住辱骂和政治，所以举报隐藏之后必须有人真的看一眼 -->
+      <section v-if="room.isOwner && store.pendingWishes.length" class="card pending-card">
+        <button class="pending-head" @click="showPending = !showPending">
+          <span>
+            <AppIcon name="flag" :size="13" />
+            {{ store.pendingWishes.length }} 条被举报后隐藏，等你复核
+          </span>
+          <span class="pending-toggle">{{ showPending ? '收起' : '展开' }}</span>
+        </button>
+        <ul v-if="showPending" class="pending-list">
+          <li v-for="wish in store.pendingWishes" :key="wish.id" class="pending-item">
+            <div class="wish-body">
+              <div class="wish-head">
+                <strong>{{ wish.nickname }}</strong>
+                <span class="wish-time">{{ wishTime(wish.createdAt) }} · {{ wish.reports }} 人举报</span>
+              </div>
+              <p class="wish-text">{{ wish.text }}</p>
+            </div>
+            <div class="pending-ops">
+              <button class="btn btn-secondary btn-sm" @click="store.restoreWish(wish.id)">
+                放行
+              </button>
+              <button class="btn btn-sm danger" @click="store.deleteWish(wish.id)">删除</button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <ul v-if="store.wishes.length" class="wish-list">
-        <li v-for="wish in store.wishes" :key="wish.id" class="wish-item card">
+        <li
+          v-for="wish in store.wishes"
+          :key="wish.id"
+          class="wish-item card"
+          :class="{ 'is-hidden': wish.hidden }"
+        >
           <span class="avatar small">
             <PetSpriteAnimation animation="idle" :cat-id="wish.catId" lite />
           </span>
@@ -296,6 +380,8 @@ onUnmounted(() => window.clearTimeout(cooldownTimer))
             <div class="wish-head">
               <strong>{{ wish.nickname }}</strong>
               <span class="wish-time">{{ wishTime(wish.createdAt) }}</span>
+              <!-- 内容凭空消失、又没人说为什么，比看到这行字难受得多 -->
+              <span v-if="wish.hidden" class="wish-flag">被举报，等主人复核</span>
             </div>
             <p class="wish-text">{{ wish.text }}</p>
           </div>
@@ -660,6 +746,126 @@ onUnmounted(() => window.clearTimeout(cooldownTimer))
   align-items: stretch;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.record-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.record-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.record-item strong {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.record-item span {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-item.mine strong {
+  color: var(--accent-strong);
+}
+
+.tab-dot {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--status-danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
+  vertical-align: 2px;
+}
+
+.pending-card {
+  border: 1px solid color-mix(in srgb, var(--status-danger) 34%, transparent);
+}
+
+.pending-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--status-danger);
+}
+
+.pending-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pending-toggle {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  list-style: none;
+  padding: 0;
+}
+
+.pending-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.pending-ops {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn.danger {
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.wish-item.is-hidden {
+  opacity: 0.62;
+  border: 1px dashed color-mix(in srgb, var(--status-danger) 40%, transparent);
+}
+
+.wish-flag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-danger) 14%, transparent);
+  color: var(--status-danger);
+  font-size: 10.5px;
+  font-weight: 700;
 }
 
 .cheer-dock {

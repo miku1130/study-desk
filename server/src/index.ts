@@ -11,9 +11,11 @@
 
 import { createServer } from 'http'
 import { randomUUID } from 'crypto'
+import { dirname, join } from 'path'
 import { WebSocketServer, WebSocket } from 'ws'
 import { Presence, type FocusReport } from './presence'
 import { FocusStats, WISH_PAGE_SIZE, type RangeKey } from './stats'
+import { backupSummary, startBackups } from './backup'
 import {
   STUDY_ROOM_PROTOCOL_VERSION,
   STUDY_ROOM_MAX_FRAME_BYTES,
@@ -25,6 +27,10 @@ import {
 const PORT = Number(process.env.PORT ?? 3100)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const DB_PATH = process.env.DB_PATH ?? '/opt/study-room/data/stats.db'
+const BACKUP_DIR = process.env.BACKUP_DIR ?? join(dirname(DB_PATH), 'backups')
+/** 六小时一份，留一周多一点：够覆盖「周末才发现数据不对」的场景 */
+const BACKUP_INTERVAL_MS = Number(process.env.BACKUP_INTERVAL_MS ?? 6 * 60 * 60 * 1000)
+const BACKUP_KEEP = Number(process.env.BACKUP_KEEP ?? 30)
 /** 同一瞬间的多次变化合并成一次广播，避免大房间产生 N² 条消息 */
 const BROADCAST_WINDOW_MS = 150
 const HEARTBEAT_MS = 30_000
@@ -50,7 +56,19 @@ interface Client {
 
 const db = new FocusStats({ filePath: DB_PATH })
 const presence = new Presence({
-  onFocusAccrued: (deviceId, seconds) => db.addFocus(deviceId, seconds)
+  onFocusAccrued: (deviceId, seconds, roomId) => {
+    // 全站榜算这个人到处学的总时长，房间战绩只算在这间屋里攒的，两本账分开记
+    db.addFocus(deviceId, seconds)
+    db.addRoomFocus(roomId, deviceId, seconds)
+  }
+})
+const backups = startBackups({
+  db,
+  dir: BACKUP_DIR,
+  keep: BACKUP_KEEP,
+  intervalMs: BACKUP_INTERVAL_MS,
+  onDone: (info) => console.log(`[study-room] 已备份 ${info.file}`),
+  onError: (err) => console.error('[study-room] 备份失败', err)
 })
 const clients = new Map<string, Client>()
 
@@ -103,17 +121,21 @@ function roomDetail(roomId: string, client: Client, range: RangeKey, offset = 0)
       (a) => a.deviceId === m.deviceId && a.focus.running && a.focus.phase === 'work'
     )
   }))
+  const isOwner = room.ownerDevice === client.deviceId
   return {
     t: 'room:detail',
     range,
     offset,
     room: {
       ...room,
-      isOwner: room.ownerDevice === client.deviceId,
+      isOwner,
       isMember: db.isMember(roomId, client.deviceId),
       attendeeCount: presence.attendeeCount(roomId),
       focusingCount: presence.focusingCount(roomId)
     },
+    record: db.roomRecord(roomId, client.deviceId),
+    // 只有主人需要知道有多少内容压在待复核里
+    pendingCount: isOwner ? db.pendingWishes(roomId, client.deviceId).length : 0,
     members
   }
 }
@@ -439,7 +461,11 @@ function handle(client: Client, raw: string): void {
         kind: 'report',
         text: result.hidden ? '已收到举报，这条愿望已隐藏' : '已收到举报，谢谢'
       })
-      if (result.hidden) broadcastRoom(roomId, { t: 'wish:changed', roomId })
+      if (result.hidden) {
+        broadcastRoom(roomId, { t: 'wish:changed', roomId })
+        // 让主人那边的「待复核」计数立刻变，而不是等他下次进房才发现
+        markDirty(roomId)
+      }
       return
     }
 
@@ -450,6 +476,31 @@ function handle(client: Client, raw: string): void {
       }
       broadcastRoom(roomId, { t: 'wish:changed', roomId })
       send(client, { t: 'wish:list', roomId, wishes: db.wishes(roomId, client.deviceId) })
+      markDirty(roomId)
+      return
+    }
+
+    /* ---- 许愿墙复核：只有主人能看能放行 ---- */
+
+    case 'wish:pending': {
+      const roomId = String(msg.roomId ?? client.viewing)
+      send(client, {
+        t: 'wish:pending',
+        roomId,
+        wishes: db.pendingWishes(roomId, client.deviceId)
+      })
+      return
+    }
+
+    case 'wish:restore': {
+      const roomId = String(msg.roomId ?? client.viewing)
+      if (!db.restoreWish(Number(msg.id ?? 0), client.deviceId)) {
+        return fail(client, '只有主人可以放行被举报的内容')
+      }
+      broadcastRoom(roomId, { t: 'wish:changed', roomId })
+      send(client, { t: 'wish:pending', roomId, wishes: db.pendingWishes(roomId, client.deviceId) })
+      send(client, { t: 'wish:list', roomId, wishes: db.wishes(roomId, client.deviceId) })
+      markDirty(roomId)
       return
     }
 
@@ -493,8 +544,19 @@ function clientIp(headers: Record<string, string | string[] | undefined>, fallba
 
 const httpServer = createServer((req, res) => {
   if (req.url === '/health') {
+    const snapshot = backupSummary(BACKUP_DIR)
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, clients: clients.size, rooms: presence.activeRoomIds().length }))
+    res.end(
+      JSON.stringify({
+        ok: true,
+        clients: clients.size,
+        rooms: presence.activeRoomIds().length,
+        // 备份是出事之后唯一的退路，状态必须能一眼看到，不能只写进日志
+        backups: snapshot.count,
+        latestBackup: snapshot.latest,
+        lastBackupAt: backups.lastBackupAt()
+      })
+    )
     return
   }
   res.writeHead(404)
@@ -563,6 +625,7 @@ function shutdown(): void {
   clearInterval(heartbeat)
   clearInterval(leaderboardTimer)
   clearInterval(pruneTimer)
+  backups.stop()
   if (flushTimer) clearTimeout(flushTimer)
   db.close()
   for (const client of clients.values()) client.socket.close(1001, 'server shutting down')
@@ -575,4 +638,6 @@ process.on('SIGINT', shutdown)
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[study-room] listening on ${HOST}:${PORT} (protocol v${STUDY_ROOM_PROTOCOL_VERSION})`)
+  // 启动后先存一份：崩溃重启往往就是数据出问题的前兆，这时候的快照最值钱
+  void backups.runOnce()
 })

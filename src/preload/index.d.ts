@@ -119,6 +119,19 @@ export interface StudyRoomDetailDTO {
   isMember: boolean
   range: StudyRoomRangeDTO
   members: StudyRoomMemberViewDTO[]
+  record: StudyRoomRecordDTO
+  pendingCount: number
+}
+
+/** 一间自习室攒下来的长期战绩 */
+export interface StudyRoomRecordDTO {
+  totalSeconds: number
+  activeDays: number
+  streakDays: number
+  bestStreak: number
+  createdAt: number
+  mySeconds: number
+  myDays: number
 }
 
 export interface StudyRoomWishDTO {
@@ -128,6 +141,8 @@ export interface StudyRoomWishDTO {
   text: string
   createdAt: number
   mine: boolean
+  hidden: boolean
+  reports: number
 }
 
 /** 公网自习室的完整镜像；room 为空表示今天还没进任何房间 */
@@ -141,6 +156,7 @@ export interface StudyRoomOnlineDTO {
   browse: StudyRoomBriefDTO[]
   room: StudyRoomDetailDTO | null
   wishes: StudyRoomWishDTO[]
+  pendingWishes: StudyRoomWishDTO[]
 }
 
 export interface StudyRoomLeaderboardRowDTO {
@@ -314,6 +330,8 @@ export interface StudyDeskApi {
     addWish: (text: string) => Promise<void>
     reportWish: (id: number) => Promise<void>
     deleteWish: (id: number) => Promise<void>
+    listPendingWishes: () => Promise<void>
+    restoreWish: (id: number) => Promise<void>
     onOnline: (cb: (snapshot: StudyRoomOnlineDTO | null) => void) => () => void
     onState: (cb: (state: StudyRoomStateDTO) => void) => () => void
     onRooms: (cb: (rooms: StudyRoomDiscoveredDTO[]) => void) => () => void

@@ -58,6 +58,9 @@ export interface RoomDetail {
   isMember: boolean
   range: LeaderboardRange
   members: RoomMemberView[]
+  record: RoomRecord
+  /** 等主人复核的条数；非主人恒为 0 */
+  pendingCount: number
 }
 
 export interface WishView {
@@ -67,6 +70,20 @@ export interface WishView {
   text: string
   createdAt: number
   mine: boolean
+  /** 被举报隐藏中：只有作者与主人看得到 */
+  hidden: boolean
+  reports: number
+}
+
+/** 一间自习室攒下来的长期战绩 */
+export interface RoomRecord {
+  totalSeconds: number
+  activeDays: number
+  streakDays: number
+  bestStreak: number
+  createdAt: number
+  mySeconds: number
+  myDays: number
 }
 
 export interface OnlineSnapshot {
@@ -79,6 +96,8 @@ export interface OnlineSnapshot {
   browse: RoomBrief[]
   room: RoomDetail | null
   wishes: WishView[]
+  /** 等主人复核的内容，只有主人拿得到 */
+  pendingWishes: WishView[]
 }
 
 export interface OnlineRoomDeps {
@@ -106,6 +125,7 @@ export class OnlineRoomClient {
   private browse: RoomBrief[] = []
   private room: RoomDetail | null = null
   private wishes: WishView[] = []
+  private pendingWishes: WishView[] = []
   private watchingBrowse = false
   private range: LeaderboardRange = 'today'
   /** 断线前所在的房间，重连后自动回去继续今天的学习 */
@@ -128,7 +148,8 @@ export class OnlineRoomClient {
       myRooms: this.myRooms.map((r) => ({ ...r })),
       browse: this.browse.map((r) => ({ ...r })),
       room: this.room ? { ...this.room, members: this.room.members.map((m) => ({ ...m })) } : null,
-      wishes: this.wishes.map((w) => ({ ...w }))
+      wishes: this.wishes.map((w) => ({ ...w })),
+      pendingWishes: this.pendingWishes.map((w) => ({ ...w }))
     }
   }
 
@@ -199,6 +220,7 @@ export class OnlineRoomClient {
     this.status = 'idle'
     this.room = null
     this.wishes = []
+    this.pendingWishes = []
     this.error = ''
     this.deps.onChanged()
   }
@@ -291,6 +313,16 @@ export class OnlineRoomClient {
     this.request({ t: 'wish:delete', id, roomId: this.room?.id ?? '' })
   }
 
+  /** 主人复核：拉取被举报隐藏的内容 */
+  listPendingWishes(): void {
+    if (!this.room) return
+    this.request({ t: 'wish:pending', roomId: this.room.id })
+  }
+
+  restoreWish(id: number): void {
+    this.request({ t: 'wish:restore', id, roomId: this.room?.id ?? '' })
+  }
+
   /* ---------------------------------------------------------------- *
    * 内部
    * ---------------------------------------------------------------- */
@@ -378,6 +410,7 @@ export class OnlineRoomClient {
         this.lastRoomId = ''
         this.room = null
         this.wishes = []
+        this.pendingWishes = []
         this.deps.onChanged()
         return
       }
@@ -385,26 +418,26 @@ export class OnlineRoomClient {
         this.lastRoomId = ''
         this.room = null
         this.wishes = []
+        this.pendingWishes = []
         this.deps.onNotice('closed', '这个自习室已被主人解散')
         this.deps.onChanged()
         return
       }
       case 'wish:list': {
-        this.wishes = Array.isArray(msg.wishes)
-          ? (msg.wishes as WishView[]).map((w) => ({
-              id: Number(w.id) || 0,
-              nickname: sanitizeNickname(w.nickname),
-              catId: sanitizeCatId(w.catId),
-              text: String(w.text ?? ''),
-              createdAt: Number(w.createdAt) || 0,
-              mine: Boolean(w.mine)
-            }))
-          : []
+        this.wishes = toWishes(msg.wishes)
+        this.deps.onChanged()
+        return
+      }
+      case 'wish:pending': {
+        this.pendingWishes = toWishes(msg.wishes)
         this.deps.onChanged()
         return
       }
       case 'wish:changed': {
-        if (this.room) this.write({ t: 'wish:list', roomId: this.room.id })
+        if (!this.room) return
+        this.write({ t: 'wish:list', roomId: this.room.id })
+        // 主人那边的待复核列表也要跟着变，否则处理完还挂着旧条目
+        if (this.room.isOwner) this.write({ t: 'wish:pending', roomId: this.room.id })
         return
       }
       case 'notice': {
@@ -471,6 +504,36 @@ function toBriefs(raw: unknown): RoomBrief[] {
   })
 }
 
+function toWishes(raw: unknown): WishView[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((item) => {
+    const w = (item ?? {}) as Record<string, unknown>
+    return {
+      id: num(w.id),
+      nickname: sanitizeNickname(w.nickname),
+      catId: sanitizeCatId(w.catId),
+      text: String(w.text ?? ''),
+      createdAt: num(w.createdAt),
+      mine: Boolean(w.mine),
+      hidden: Boolean(w.hidden),
+      reports: num(w.reports)
+    }
+  })
+}
+
+function toRecord(raw: unknown): RoomRecord {
+  const r = (raw ?? {}) as Record<string, unknown>
+  return {
+    totalSeconds: num(r.totalSeconds),
+    activeDays: num(r.activeDays),
+    streakDays: num(r.streakDays),
+    bestStreak: num(r.bestStreak),
+    createdAt: num(r.createdAt),
+    mySeconds: num(r.mySeconds),
+    myDays: num(r.myDays)
+  }
+}
+
 function toDetail(msg: Record<string, unknown>): RoomDetail {
   const room = (msg.room ?? {}) as Record<string, unknown>
   const range = msg.range === 'week' || msg.range === 'month' ? msg.range : 'today'
@@ -487,6 +550,8 @@ function toDetail(msg: Record<string, unknown>): RoomDetail {
     isOwner: Boolean(room.isOwner),
     isMember: Boolean(room.isMember),
     range,
+    record: toRecord(msg.record),
+    pendingCount: num(msg.pendingCount),
     members: members.map((item) => {
       const m = (item ?? {}) as Record<string, unknown>
       return {

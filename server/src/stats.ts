@@ -87,7 +87,23 @@ export interface WishRow {
   text: string
   createdAt: number
   reports: number
+  /** 被举报隐藏中，只有作者与主人看得到 */
+  hidden: boolean
   mine: boolean
+}
+
+/** 一间自习室的长期战绩，以及请求者自己在这间屋里的那份 */
+export interface RoomRecordRow {
+  /** 大家在这间自习室里累计专注的秒数 */
+  totalSeconds: number
+  /** 有人来学过的天数 */
+  activeDays: number
+  /** 连续有人来学的天数 */
+  streakDays: number
+  bestStreak: number
+  createdAt: number
+  mySeconds: number
+  myDays: number
 }
 
 export interface TextRejection {
@@ -244,18 +260,36 @@ export class FocusStats {
    * 那张表只保留最近 45 天，直接数的话「连续 100 天」会被截成 45 天。
    */
   private migrate(): void {
-    const columns = new Set(
-      (this.db.pragma('table_info(profiles)') as Array<{ name: string }>).map((c) => c.name)
-    )
-    const additions: Array<[string, string]> = [
+    this.addColumns('profiles', [
       ['streak_days', 'INTEGER NOT NULL DEFAULT 0'],
       ['best_streak', 'INTEGER NOT NULL DEFAULT 0'],
       ['total_days', 'INTEGER NOT NULL DEFAULT 0'],
       ['last_focus_day', "TEXT NOT NULL DEFAULT ''"],
       ['intro', "TEXT NOT NULL DEFAULT ''"]
-    ]
+    ])
+    // 房间战绩同样增量维护：focus_daily 只留 45 天，数出来的「连续 100 天」会被截断
+    this.addColumns('rooms', [
+      ['total_seconds', 'INTEGER NOT NULL DEFAULT 0'],
+      ['active_days', 'INTEGER NOT NULL DEFAULT 0'],
+      ['streak_days', 'INTEGER NOT NULL DEFAULT 0'],
+      ['best_streak', 'INTEGER NOT NULL DEFAULT 0'],
+      ['last_focus_day', "TEXT NOT NULL DEFAULT ''"]
+    ])
+    this.addColumns('room_members', [
+      ['seconds_total', 'INTEGER NOT NULL DEFAULT 0'],
+      ['days_total', 'INTEGER NOT NULL DEFAULT 0'],
+      ['last_focus_day', "TEXT NOT NULL DEFAULT ''"]
+    ])
+    // 主人复核放行过的愿望不再自动隐藏，否则同一批人可以反复把它压下去
+    this.addColumns('wishes', [['reviewed', 'INTEGER NOT NULL DEFAULT 0']])
+  }
+
+  private addColumns(table: string, additions: Array<[string, string]>): void {
+    const columns = new Set(
+      (this.db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((c) => c.name)
+    )
     for (const [name, spec] of additions) {
-      if (!columns.has(name)) this.db.exec(`ALTER TABLE profiles ADD COLUMN ${name} ${spec}`)
+      if (!columns.has(name)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${spec}`)
     }
   }
 
@@ -322,6 +356,92 @@ export class FocusStats {
          VALUES (?, '', 'mikan', ?, ?, ?, 1, ?)`
       )
       .run(deviceId, this.now(), streak, best, today)
+  }
+
+  /**
+   * 记一段发生在某间自习室里的专注。
+   *
+   * 与 addFocus 分开：那张榜算的是这个人到处学的总时长，
+   * 房间战绩要的是「大家在这间屋里一起攒出来的」，两者不能混。
+   */
+  addRoomFocus(roomId: string, deviceId: string, seconds: number): void {
+    const step = Math.floor(seconds)
+    if (!roomId || !deviceId || step <= 0) return
+    const today = dayKey(this.now())
+
+    this.db.transaction(() => {
+      const room = this.db
+        .prepare('SELECT streak_days AS s, best_streak AS b, last_focus_day AS d FROM rooms WHERE id = ?')
+        .get(roomId) as { s: number; b: number; d: string } | undefined
+      if (!room) return
+
+      if (room.d === today) {
+        this.db.prepare('UPDATE rooms SET total_seconds = total_seconds + ? WHERE id = ?').run(step, roomId)
+      } else {
+        const streak = room.d === previousDay(today) ? room.s + 1 : 1
+        this.db
+          .prepare(
+            `UPDATE rooms SET total_seconds = total_seconds + ?, active_days = active_days + 1,
+                              streak_days = ?, best_streak = ?, last_focus_day = ? WHERE id = ?`
+          )
+          .run(step, streak, Math.max(room.b, streak), today, roomId)
+      }
+
+      const member = this.db
+        .prepare('SELECT last_focus_day AS d FROM room_members WHERE room_id = ? AND device_id = ?')
+        .get(roomId, deviceId) as { d: string } | undefined
+      if (!member) return
+      if (member.d === today) {
+        this.db
+          .prepare('UPDATE room_members SET seconds_total = seconds_total + ? WHERE room_id = ? AND device_id = ?')
+          .run(step, roomId, deviceId)
+      } else {
+        this.db
+          .prepare(
+            `UPDATE room_members SET seconds_total = seconds_total + ?, days_total = days_total + 1,
+                                     last_focus_day = ? WHERE room_id = ? AND device_id = ?`
+          )
+          .run(step, today, roomId, deviceId)
+      }
+    })()
+  }
+
+  /** 一间自习室攒下来的长期战绩，以及请求者自己的那份 */
+  roomRecord(roomId: string, deviceId: string): RoomRecordRow {
+    const room = this.db
+      .prepare(
+        `SELECT total_seconds AS totalSeconds, active_days AS activeDays,
+                streak_days AS streakDays, best_streak AS bestStreak,
+                last_focus_day AS lastFocusDay, created_at AS createdAt
+         FROM rooms WHERE id = ?`
+      )
+      .get(roomId) as
+      | {
+          totalSeconds: number
+          activeDays: number
+          streakDays: number
+          bestStreak: number
+          lastFocusDay: string
+          createdAt: number
+        }
+      | undefined
+    const mine = this.db
+      .prepare(
+        'SELECT seconds_total AS seconds, days_total AS days FROM room_members WHERE room_id = ? AND device_id = ?'
+      )
+      .get(roomId, deviceId) as { seconds: number; days: number } | undefined
+
+    const today = dayKey(this.now())
+    return {
+      totalSeconds: room?.totalSeconds ?? 0,
+      activeDays: room?.activeDays ?? 0,
+      // 今天还没人来不算断，与个人连续天数同一套判定
+      streakDays: effectiveStreak(room?.streakDays ?? 0, room?.lastFocusDay ?? '', today),
+      bestStreak: room?.bestStreak ?? 0,
+      createdAt: room?.createdAt ?? 0,
+      mySeconds: mine?.seconds ?? 0,
+      myDays: mine?.days ?? 0
+    }
   }
 
   secondsIn(deviceId: string, range: RangeKey): number {
@@ -731,7 +851,40 @@ export class FocusStats {
     return { ok: true, id: Number(info.lastInsertRowid) }
   }
 
+  /**
+   * 墙上能看到的内容。被举报隐藏的对别人不可见，但作者自己要看得到——
+   * 内容凭空消失、又没人告诉他为什么，比看到「等待复核」难受得多。
+   */
   wishes(roomId: string, selfDeviceId: string, limit = WISH_PAGE_SIZE, before = 0): WishRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT w.id, w.device_id AS deviceId, w.text, w.created_at AS createdAt, w.hidden,
+                COALESCE(p.nickname, '') AS nickname,
+                COALESCE(p.cat_id, '') AS catId,
+                (SELECT COUNT(*) FROM wish_reports r WHERE r.wish_id = w.id) AS reports
+         FROM wishes w
+         LEFT JOIN profiles p ON p.device_id = w.device_id
+         WHERE w.room_id = @roomId AND (w.hidden = 0 OR w.device_id = @self)
+           AND (@before = 0 OR w.created_at < @before)
+         ORDER BY w.created_at DESC
+         LIMIT @limit`
+      )
+      .all({ roomId, self: selfDeviceId, limit, before }) as Array<
+      Omit<WishRow, 'mine' | 'hidden'> & { hidden: number }
+    >
+    return rows.map((r) => ({
+      ...r,
+      nickname: r.nickname || '同学',
+      catId: sanitizeCatId(r.catId),
+      hidden: r.hidden === 1,
+      mine: r.deviceId === selfDeviceId
+    }))
+  }
+
+  /** 等主人复核的内容；只有主人看得到 */
+  pendingWishes(roomId: string, deviceId: string): WishRow[] {
+    const room = this.getRoom(roomId)
+    if (!room || room.ownerDevice !== deviceId) return []
     const rows = this.db
       .prepare(
         `SELECT w.id, w.device_id AS deviceId, w.text, w.created_at AS createdAt,
@@ -740,33 +893,54 @@ export class FocusStats {
                 (SELECT COUNT(*) FROM wish_reports r WHERE r.wish_id = w.id) AS reports
          FROM wishes w
          LEFT JOIN profiles p ON p.device_id = w.device_id
-         WHERE w.room_id = @roomId AND w.hidden = 0
-           AND (@before = 0 OR w.created_at < @before)
+         WHERE w.room_id = ? AND w.hidden = 1
          ORDER BY w.created_at DESC
-         LIMIT @limit`
+         LIMIT ?`
       )
-      .all({ roomId, limit, before }) as Array<Omit<WishRow, 'mine'>>
+      .all(roomId, WISH_PAGE_SIZE) as Array<Omit<WishRow, 'mine' | 'hidden'>>
     return rows.map((r) => ({
       ...r,
       nickname: r.nickname || '同学',
       catId: sanitizeCatId(r.catId),
-      mine: r.deviceId === selfDeviceId
+      hidden: true,
+      mine: r.deviceId === deviceId
     }))
   }
 
-  /** 举报到阈值自动隐藏；作者与房主可直接删 */
+  /**
+   * 举报到阈值自动隐藏；作者与房主可直接删。
+   * 屏蔽词挡不住政治、色情、辱骂，所以举报隐藏 + 主人复核是必须配套的。
+   */
   reportWish(wishId: number, deviceId: string): { hidden: boolean } {
     this.db
       .prepare('INSERT OR IGNORE INTO wish_reports (wish_id, device_id, created_at) VALUES (?, ?, ?)')
       .run(wishId, deviceId, this.now())
-    const row = this.db
-      .prepare('SELECT COUNT(*) AS c FROM wish_reports WHERE wish_id = ?')
-      .get(wishId) as { c: number }
-    if (row.c >= WISH_AUTO_HIDE_REPORTS) {
+    const wish = this.db
+      .prepare(
+        `SELECT reviewed, (SELECT COUNT(*) FROM wish_reports r WHERE r.wish_id = w.id) AS reports
+         FROM wishes w WHERE w.id = ?`
+      )
+      .get(wishId) as { reviewed: number; reports: number } | undefined
+    if (!wish) return { hidden: false }
+    // 主人放行过就不再自动隐藏，否则同一批人可以反复把它压下去
+    if (wish.reviewed === 0 && wish.reports >= WISH_AUTO_HIDE_REPORTS) {
       this.db.prepare('UPDATE wishes SET hidden = 1 WHERE id = ?').run(wishId)
       return { hidden: true }
     }
     return { hidden: false }
+  }
+
+  /** 主人复核放行：重新可见，并标记为已复核 */
+  restoreWish(wishId: number, deviceId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT r.owner_device AS owner FROM wishes w JOIN rooms r ON r.id = w.room_id WHERE w.id = ?`
+      )
+      .get(wishId) as { owner: string } | undefined
+    if (!row || row.owner !== deviceId) return false
+    this.db.prepare('UPDATE wishes SET hidden = 0, reviewed = 1 WHERE id = ?').run(wishId)
+    this.db.prepare('DELETE FROM wish_reports WHERE wish_id = ?').run(wishId)
+    return true
   }
 
   deleteWish(wishId: number, deviceId: string): boolean {
@@ -781,6 +955,11 @@ export class FocusStats {
     this.db.prepare('DELETE FROM wishes WHERE id = ?').run(wishId)
     this.db.prepare('DELETE FROM wish_reports WHERE wish_id = ?').run(wishId)
     return true
+  }
+
+  /** 在线备份：运行中拷贝也能拿到一致快照，不用停服 */
+  backup(destination: string): Promise<unknown> {
+    return this.db.backup(destination)
   }
 
   close(): void {

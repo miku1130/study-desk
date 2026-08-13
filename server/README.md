@@ -10,8 +10,10 @@
 | --- | --- |
 | `src/stats.ts` | SQLite 持久层：档案、每日专注、自习室与成员关系、打卡、许愿墙。不碰 socket，可直接单测 |
 | `src/presence.ts` | 内存态的「此刻谁在房里」。成员关系是持久的，在座与否是临时的，两者必须分开 |
+| `src/backup.ts` | 定时在线备份与保留策略 |
 | `src/index.ts` | WebSocket 接入、消息路由、广播合并、心跳、优雅关闭 |
-| `scripts/smoke.mjs` | 端到端冒烟，起真实连接跑一遍建室 / 进出房 / 打卡 / 许愿 / 解散 |
+| `scripts/smoke.mjs` | 端到端冒烟，起真实连接跑一遍建室 / 进出房 / 打卡 / 许愿 / 举报复核 / 战绩 / 解散 |
+| `scripts/verify-backup.mjs` | 打开最新一份备份，确认表结构与行数都在 |
 
 文本清洗、加油白名单、猫咪白名单直接复用客户端的 `src/main/studyRoom/protocol.ts`，
 两端共用同一份规则，避免出现「客户端说能用、服务端却拒绝」。
@@ -53,8 +55,25 @@ scp dist/server.cjs root@<host>:/opt/study-room/
 ssh root@<host> "cd /opt/study-room && PORT=3100 HOST=127.0.0.1 pm2 start server.cjs --name study-room --time && pm2 save"
 ```
 
-数据落在 `/opt/study-room/data/study-room.db`（可用 `STUDY_ROOM_DB` 改路径）。
-备份直接拷这个文件即可，服务运行中拷贝请先 `pm2 stop study-room`。
+数据落在 `/opt/study-room/data/stats.db`（可用 `DB_PATH` 改路径）。
+
+## 备份
+
+服务自己每 6 小时做一次在线备份到 `data/backups/`，滚动保留 30 份，启动时也会先存一份。
+用的是 SQLite 的 backup API，运行中拷贝也是一致快照，不用停服。
+
+| 环境变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `BACKUP_DIR` | `<DB_PATH 同级>/backups` | 备份目录 |
+| `BACKUP_INTERVAL_MS` | 21600000（6 小时） | 备份间隔 |
+| `BACKUP_KEEP` | 30 | 保留份数，最少 1 |
+
+```bash
+curl -s https://study.lemon21.cn/health          # backups / latestBackup / lastBackupAt
+node verify-backup.mjs /opt/study-room/data/backups   # 打开最新一份确认真的可读
+```
+
+恢复就是停服、把备份文件拷成 `data/stats.db`、再起服务——注意同时删掉遗留的 `-wal` / `-shm`。
 
 代码放 `/opt` 而不是站点目录：nginx 的 `try_files` 会把站点目录下的文件当静态资源直接返回，
 源码放进去等于对外公开。

@@ -3,6 +3,7 @@ import { computed, onMounted, shallowRef } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useStatsStore } from '@/stores/stats'
+import { buildHeatmap } from '@/lib/heatmap'
 import type { FocusSession } from '@/types'
 
 const stats = useStatsStore()
@@ -40,6 +41,17 @@ function duration(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   return rest > 0 ? `${hours} 小时 ${rest} 分` : `${hours} 小时`
+}
+
+/* ---- 热力图 ---- */
+
+const HEAT_WEEKS = 26
+const heatmap = computed(() => buildHeatmap(stats.daily, { weeks: HEAT_WEEKS }))
+const WEEKDAY_LABELS = ['', '一', '', '三', '', '五', '']
+
+function heatTitle(cell: { label: string; minutes: number; pomodoros: number }): string {
+  if (cell.minutes <= 0) return `${cell.label} 没有记录`
+  return `${cell.label} · ${duration(cell.minutes)} · ${cell.pomodoros} 个番茄`
 }
 
 /** 只画有记录的时段，凌晨那一片空白没必要占地方 */
@@ -167,6 +179,37 @@ onMounted(() => stats.load())
               </div>
             </div>
             <span class="bar-label">{{ day.label }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h3>坚持记录</h3>
+            <p class="card-hint">
+              最近半年里学过 {{ heatmap.activeDays }} 天，共 {{ duration(heatmap.totalMinutes) }}。空格是没学的日子。
+            </p>
+          </div>
+          <div class="heat-legend">
+            <span>少</span>
+            <i v-for="level in [0, 1, 2, 3, 4]" :key="level" :class="`heat-cell level-${level}`" />
+            <span>多</span>
+          </div>
+        </div>
+
+        <div class="heat-wrap">
+          <div class="heat-weekdays">
+            <span v-for="(label, index) in WEEKDAY_LABELS" :key="index">{{ label }}</span>
+          </div>
+          <div class="heat-grid">
+            <div v-for="(week, index) in heatmap.weeks" :key="index" class="heat-week">
+              <span class="heat-month">{{ week.month }}</span>
+              <template v-for="(cell, day) in week.days" :key="day">
+                <i v-if="cell" :class="`heat-cell level-${cell.level}`" :title="heatTitle(cell)" />
+                <i v-else class="heat-cell empty" />
+              </template>
+            </div>
           </div>
         </div>
       </section>
@@ -392,6 +435,82 @@ onMounted(() => stats.load())
 .chart.dense .bar-label {
   writing-mode: vertical-rl;
   font-size: 9.5px;
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.heat-wrap {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+/* 星期标签要和格子一一对齐，所以行高与格子同宽 */
+.heat-weekdays {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  padding-top: 15px;
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+}
+
+.heat-weekdays span {
+  height: 12px;
+  line-height: 12px;
+}
+
+.heat-grid {
+  display: flex;
+  gap: 3px;
+}
+
+.heat-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heat-month {
+  height: 12px;
+  font-size: 9.5px;
+  line-height: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.heat-cell {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface-pressed);
+}
+
+.heat-cell.empty {
+  background: transparent;
+}
+
+.heat-cell.level-1 {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.heat-cell.level-2 {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.heat-cell.level-3 {
+  background: color-mix(in srgb, var(--accent) 78%, transparent);
+}
+.heat-cell.level-4 {
+  background: var(--accent-strong);
 }
 
 .two-col {
