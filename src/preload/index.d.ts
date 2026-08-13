@@ -383,6 +383,7 @@ export interface StudyDeskApi {
   }
   system: {
     onReload: (cb: () => void) => () => void
+    onSettingsChanged: (cb: () => void) => () => void
   }
 }
 

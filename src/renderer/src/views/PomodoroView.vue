@@ -48,7 +48,7 @@ function setTab(tab: FocusSpaceTab): void {
 }
 
 const showUrl = ref(false)
-type UrlTarget = 'wallpaper' | 'sound' | 'cardBg'
+type UrlTarget = 'wallpaper' | 'sound' | 'cardBg' | 'widgetBg'
 const urlTarget = ref<UrlTarget>('wallpaper')
 
 function toggleClockWidget(): void {
@@ -172,33 +172,38 @@ const cardScrimStyle = computed(() => {
   return { '--card-scrim': String(0.2 + p.cardBgOpacity * 0.45) }
 })
 
-async function pickCardBg(): Promise<void> {
+/** 卡片与时钟浮窗各有一张背景图，选图流程一样，只是存到不同字段 */
+type BgTarget = 'cardBg' | 'widgetBg'
+
+async function pickBg(target: BgTarget): Promise<void> {
   const p = await window.api.dialog.openFile([
     { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }
   ])
-  if (p) saveCardBg(p)
+  if (p) saveBg(target, p)
 }
 
-async function pickCardBgOnline(): Promise<void> {
-  const p = await window.api.media.download(`https://picsum.photos/1200/1600?random=${Date.now()}`)
-  if (p) saveCardBg(p)
+async function pickBgOnline(target: BgTarget): Promise<void> {
+  const size = target === 'widgetBg' ? '800/600' : '1200/1600'
+  const p = await window.api.media.download(`https://picsum.photos/${size}?random=${Date.now()}`)
+  if (p) saveBg(target, p)
 }
 
-function useFocusWallpaper(): void {
-  if (settings.s.pomodoro.wallpaper) saveCardBg(settings.s.pomodoro.wallpaper)
-}
-
-function saveCardBg(path: string): void {
-  settings.s.pomodoro.cardBg = path
+function saveBg(target: BgTarget, path: string): void {
+  settings.s.pomodoro[target] = path
   settings.save()
 }
 
-function clearCardBg(): void {
-  settings.s.pomodoro.cardBg = ''
+function clearBg(target: BgTarget): void {
+  settings.s.pomodoro[target] = ''
   settings.save()
 }
 
-function onCardBgOpacity(): void {
+function copyBgFrom(target: BgTarget, source: 'wallpaper' | 'cardBg'): void {
+  const path = settings.s.pomodoro[source]
+  if (path) saveBg(target, path)
+}
+
+function onBgOpacity(): void {
   settings.save()
 }
 async function pickWallpaper(): Promise<void> {
@@ -238,20 +243,18 @@ async function onUrlConfirm(url: string): Promise<void> {
   const p = await window.api.media.download(url)
   showUrl.value = false
   if (!p) return
-  if (urlTarget.value === 'wallpaper') settings.s.pomodoro.wallpaper = p
-  else if (urlTarget.value === 'cardBg') settings.s.pomodoro.cardBg = p
-  else settings.s.pomodoro.sound = p
+  if (urlTarget.value === 'sound') settings.s.pomodoro.sound = p
+  else settings.s.pomodoro[urlTarget.value] = p
   settings.save()
 }
 
-const urlPrompt = computed(() =>
-  urlTarget.value === 'sound'
-    ? { title: '在线提示音链接', placeholder: '音频直链 (mp3/ogg/wav)…' }
-    : {
-        title: urlTarget.value === 'cardBg' ? '卡片背景链接' : '在线壁纸链接',
-        placeholder: '图片直链 (jpg/png/webp)…'
-      }
-)
+const URL_PROMPTS: Record<UrlTarget, { title: string; placeholder: string }> = {
+  sound: { title: '在线提示音链接', placeholder: '音频直链 (mp3/ogg/wav)…' },
+  wallpaper: { title: '在线壁纸链接', placeholder: '图片直链 (jpg/png/webp)…' },
+  cardBg: { title: '卡片背景链接', placeholder: '图片直链 (jpg/png/webp)…' },
+  widgetBg: { title: '浮窗背景链接', placeholder: '图片直链 (jpg/png/webp)…' }
+}
+const urlPrompt = computed(() => URL_PROMPTS[urlTarget.value])
 
 function soundLabel(v: string): string {
   if (v.startsWith('chime:')) {
@@ -580,22 +583,22 @@ function testSound(): void {
           <p class="s-sub">{{ fileName(settings.s.pomodoro.cardBg) }}</p>
         </div>
         <div class="row wrap">
-          <button class="btn btn-secondary btn-sm" @click="pickCardBgOnline">随机在线</button>
+          <button class="btn btn-secondary btn-sm" @click="pickBgOnline('cardBg')">随机在线</button>
           <button
             v-if="settings.s.pomodoro.wallpaper"
             class="btn btn-secondary btn-sm"
-            @click="useFocusWallpaper"
+            @click="copyBgFrom('cardBg', 'wallpaper')"
           >
             用专注壁纸
           </button>
           <button class="btn btn-secondary btn-sm" @click="openUrl('cardBg')">从链接</button>
-          <button class="btn btn-secondary btn-sm" @click="pickCardBg">本地</button>
-          <button class="btn btn-secondary btn-sm" @click="clearCardBg">清除</button>
+          <button class="btn btn-secondary btn-sm" @click="pickBg('cardBg')">本地</button>
+          <button class="btn btn-secondary btn-sm" @click="clearBg('cardBg')">清除</button>
         </div>
       </div>
       <div v-if="settings.s.pomodoro.cardBg" class="setting-row">
         <div>
-          <p class="s-title">背景浓度</p>
+          <p class="s-title">卡片背景浓度</p>
           <p class="s-sub">
             {{ Math.round(settings.s.pomodoro.cardBgOpacity * 100) }}% · 太浓会盖住计时数字
           </p>
@@ -606,7 +609,44 @@ function testSound(): void {
           min="0.05"
           max="1"
           step="0.05"
-          @change="onCardBgOpacity"
+          @change="onBgOpacity"
+        />
+      </div>
+      <div class="setting-row">
+        <div>
+          <p class="s-title">时钟浮窗背景</p>
+          <p class="s-sub">{{ fileName(settings.s.pomodoro.widgetBg) }}</p>
+        </div>
+        <div class="row wrap">
+          <button class="btn btn-secondary btn-sm" @click="pickBgOnline('widgetBg')">
+            随机在线
+          </button>
+          <button
+            v-if="settings.s.pomodoro.cardBg"
+            class="btn btn-secondary btn-sm"
+            @click="copyBgFrom('widgetBg', 'cardBg')"
+          >
+            用卡片背景
+          </button>
+          <button class="btn btn-secondary btn-sm" @click="openUrl('widgetBg')">从链接</button>
+          <button class="btn btn-secondary btn-sm" @click="pickBg('widgetBg')">本地</button>
+          <button class="btn btn-secondary btn-sm" @click="clearBg('widgetBg')">清除</button>
+        </div>
+      </div>
+      <div v-if="settings.s.pomodoro.widgetBg" class="setting-row">
+        <div>
+          <p class="s-title">浮窗背景浓度</p>
+          <p class="s-sub">
+            {{ Math.round(settings.s.pomodoro.widgetBgOpacity * 100) }}% · 浮窗上的字是白的，太亮会看不清
+          </p>
+        </div>
+        <input
+          v-model.number="settings.s.pomodoro.widgetBgOpacity"
+          type="range"
+          min="0.05"
+          max="1"
+          step="0.05"
+          @change="onBgOpacity"
         />
       </div>
       <div class="setting-row">

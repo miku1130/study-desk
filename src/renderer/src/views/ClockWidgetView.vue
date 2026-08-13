@@ -30,6 +30,24 @@ const mmss = computed(() => face.value.clock || face.value.label)
 const digits = computed(() => face.value.digits)
 const style = computed(() => settings.s.pomodoro.lockStyle || 'minimal')
 
+/**
+ * 背景图单独一层：浮窗上的字是白的，图片太亮就看不清，
+ * 所以图片可调浓度，上面再压一层跟着浓度加厚的黑纱。
+ */
+const bgStyle = computed(() => {
+  const p = settings.s.pomodoro
+  if (!p.widgetBg) return null
+  return {
+    backgroundImage: `url("${window.api.media.url(p.widgetBg)}")`,
+    opacity: p.widgetBgOpacity
+  }
+})
+const scrimStyle = computed(() => {
+  const p = settings.s.pomodoro
+  if (!p.widgetBg) return undefined
+  return { '--cw-scrim': String(0.15 + p.widgetBgOpacity * 0.5) }
+})
+
 onMounted(() => pomodoro.init())
 
 function openMain(): void {
@@ -41,7 +59,8 @@ function close(): void {
 </script>
 
 <template>
-  <div class="cw" :class="'st-' + style">
+  <div class="cw" :class="['st-' + style, { 'has-bg': !!bgStyle }]" :style="scrimStyle">
+    <span v-if="bgStyle" class="cw-bg" :style="bgStyle" />
     <div class="cw-top">
       <span class="cw-phase">{{ pomodoro.phaseLabel }}</span>
       <div class="cw-actions">
@@ -79,6 +98,7 @@ function close(): void {
 
 <style scoped>
 .cw {
+  position: relative;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -90,6 +110,25 @@ function close(): void {
   overflow: hidden;
   -webkit-app-region: drag;
   user-select: none;
+}
+.cw-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+/* 浮窗只有巴掌大，字全靠深色底衬着；图片越亮，这层黑纱越要厚 */
+.cw.has-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 12, var(--cw-scrim, 0.35));
+  pointer-events: none;
+}
+.cw > *:not(.cw-bg) {
+  position: relative;
+  z-index: 1;
 }
 .cw-top {
   display: flex;

@@ -30,6 +30,9 @@ export interface PomodoroConfig {
   cardBg: string
   /** 卡片背景的浓度：太浓会盖住计时数字，所以默认压得很低 */
   cardBgOpacity: number
+  /** 时钟小浮窗的背景图 */
+  widgetBg: string
+  widgetBgOpacity: number
 }
 
 export interface NoiseConfig {
@@ -110,7 +113,9 @@ export const defaultSettings: AppSettings = {
     lastMinutes: 25,
     noise: { scene: '', volume: 0.5, duringBreak: false },
     cardBg: '',
-    cardBgOpacity: 0.3
+    cardBgOpacity: 0.3,
+    widgetBg: '',
+    widgetBgOpacity: 0.45
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },

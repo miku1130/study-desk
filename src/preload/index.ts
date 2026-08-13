@@ -199,7 +199,9 @@ const api = {
     import: (): Promise<unknown> => ipcRenderer.invoke('backup:import')
   },
   system: {
-    onReload: (cb: () => void): (() => void) => on('data:reloaded', () => cb())
+    onReload: (cb: () => void): (() => void) => on('data:reloaded', () => cb()),
+    /** 别的窗口改了设置；改动窗口自己不会收到 */
+    onSettingsChanged: (cb: () => void): (() => void) => on('settings:changed', () => cb())
   }
 }
 

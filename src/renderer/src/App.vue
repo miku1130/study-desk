@@ -129,6 +129,7 @@ async function loadAll(): Promise<void> {
 onMounted(() => {
   void loadAll()
   window.api.system.onReload(() => void loadAll())
+  window.api.system.onSettingsChanged(() => void settings.load())
   window.api.todos.onChanged(() => void todos.load())
   if (!isLock.value && !isWidget.value && !isDesktopWidget.value) {
     window.addEventListener('keydown', (e) => {

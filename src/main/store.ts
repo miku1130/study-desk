@@ -120,7 +120,9 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     lastMinutes: 25,
     noise: { scene: '', volume: 0.5, duringBreak: false },
     cardBg: '',
-    cardBgOpacity: 0.3
+    cardBgOpacity: 0.3,
+    widgetBg: '',
+    widgetBgOpacity: 0.45
   },
   water: { enabled: false, intervalMin: 60, goalCups: 8 },
   health: { sitEnabled: false, sitIntervalMin: 45, eyeEnabled: false, eyeIntervalMin: 30 },

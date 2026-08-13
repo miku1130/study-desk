@@ -8,9 +8,11 @@ const theme = process.env.SHOT_THEME === 'dark' ? 'dark' : 'light'
 const route = process.env.SHOT_ROUTE || ''
 const compactPetWidget = route === '/pet-widget'
 const compactDesktopWidget = route.startsWith('/desktop-widget/')
+// 时钟浮窗真实只有 240×150，用默认的 760×600 截出来看不出小尺寸下挤不挤
+const compactClockWidget = route === '/clockwidget'
 const transparentWidget = compactPetWidget || compactDesktopWidget
-const minimumWidth = compactPetWidget ? 230 : compactDesktopWidget ? 340 : 760
-const minimumHeight = compactPetWidget ? 238 : compactDesktopWidget ? 218 : 600
+const minimumWidth = compactPetWidget ? 230 : compactDesktopWidget ? 340 : compactClockWidget ? 240 : 760
+const minimumHeight = compactPetWidget ? 238 : compactDesktopWidget ? 218 : compactClockWidget ? 150 : 600
 const width = Math.max(minimumWidth, Number(process.env.SHOT_WIDTH) || 1180)
 const height = Math.max(minimumHeight, Number(process.env.SHOT_HEIGHT) || 760)
 
@@ -45,7 +47,9 @@ const sample = {
       sound: '',
       volume: 0.8,
       cardBg: process.env.SHOT_CARD_BG ? join(__dirname, '../src/renderer/src/assets/pet/room-sunroom.png') : '',
-      cardBgOpacity: Number(process.env.SHOT_CARD_BG) || 0.3
+      cardBgOpacity: Number(process.env.SHOT_CARD_BG) || 0.3,
+      widgetBg: process.env.SHOT_WIDGET_BG ? join(__dirname, '../src/renderer/src/assets/pet/room-moonlit.png') : '',
+      widgetBgOpacity: Number(process.env.SHOT_WIDGET_BG) || 0.45
     },
     autostart: false,
     hotkeys: { toggleTimer: 'CommandOrControl+Alt+P', toggleWindow: 'CommandOrControl+Alt+S' }

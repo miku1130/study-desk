@@ -377,11 +377,16 @@ function registerIpc(): void {
   ipcMain.handle('pet-widget:hide', () => hidePetWidget())
 
   ipcMain.handle('store:get', (_e, name: keyof AppStores) => stores[name]?.all)
-  ipcMain.handle('store:set', (_e, name: keyof AppStores, value: Record<string, unknown>) => {
+  ipcMain.handle('store:set', (e, name: keyof AppStores, value: Record<string, unknown>) => {
     const s = stores[name]
     if (!s) return false
     s.replace(value)
     if (name === 'settings') {
+      // 浮窗是常驻窗口，不通知它就会一直用旧设置；
+      // 发起方自己不发，免得输入过程中被回灌打断
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (win.webContents.id !== e.sender.id) win.webContents.send('settings:changed')
+      }
       nativeTheme.themeSource = (value.theme as 'system' | 'light' | 'dark') ?? 'system'
       scheduler.reload()
       waterReminder.reload()
