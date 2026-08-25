@@ -71,7 +71,11 @@ function setPointerPassthrough(win: BrowserWindow, passthrough: boolean): void {
   win.setOpacity(1)
 }
 
-function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfig): void {
+function applyDesktopWidgetConfig(
+  win: BrowserWindow,
+  config: DesktopWidgetConfig,
+  resizeToConfiguredSize = true
+): void {
   const locked = Boolean(config.locked)
   win.setMovable(!locked)
   win.setResizable(!locked)
@@ -79,7 +83,7 @@ function applyDesktopWidgetConfig(win: BrowserWindow, config: DesktopWidgetConfi
   win.setAlwaysOnTop(false)
   setPointerPassthrough(win, locked)
   const bounds = win.getBounds()
-  const size = widgetDimensions(config)
+  const size = resizeToConfiguredSize ? widgetDimensions(config) : { width: bounds.width, height: bounds.height }
   const next = fitToDisplay({ ...bounds, ...size })
   if (
     bounds.x !== next.x ||
@@ -199,7 +203,6 @@ export function syncDesktopWidgets(
 ): void {
   if (boundsHandler) onDesktopWidgetBounds = boundsHandler
   const enabled = new Map(configs.filter((item) => item.enabled !== false).map((item) => [item.id, item]))
-  for (const [id, config] of enabled) desktopWidgetConfigs.set(id, config)
 
   for (const [id, win] of desktopWidgetWins) {
     const config = enabled.get(id)
@@ -207,7 +210,10 @@ export function syncDesktopWidgets(
       win.close()
       continue
     }
-    applyDesktopWidgetConfig(win, config)
+    const previous = desktopWidgetConfigs.get(id)
+    // 原生窗口边缘拖拽产生的宽高优先保留；只有用户切换 size 档位才重新套用档位尺寸。
+    applyDesktopWidgetConfig(win, config, previous?.size !== config.size)
+    desktopWidgetConfigs.set(id, config)
     win.webContents.send('desktop-widget:config-changed')
     enabled.delete(id)
   }
