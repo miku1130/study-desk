@@ -6,6 +6,7 @@ import WindowControls from '@/components/WindowControls.vue'
 import SearchPalette from '@/components/SearchPalette.vue'
 import UiFeedbackHost from '@/components/UiFeedbackHost.vue'
 import UpdatePromptModal from '@/components/UpdatePromptModal.vue'
+import StartupAnnouncementModal from '@/components/StartupAnnouncementModal.vue'
 import LockView from '@/views/LockView.vue'
 import WidgetView from '@/views/WidgetView.vue'
 import ClockWidgetView from '@/views/ClockWidgetView.vue'
@@ -13,6 +14,7 @@ import DesktopWidgetView from '@/views/DesktopWidgetView.vue'
 import PetWidgetView from '@/views/PetWidgetView.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
+import { useSchedulesStore } from '@/stores/schedules'
 import { useTodoStore } from '@/stores/todos'
 import { useStatsStore } from '@/stores/stats'
 import { useMusicStore } from '@/stores/music'
@@ -37,6 +39,7 @@ const isDashboard = computed(() => route.name === 'dashboard' || route.path === 
 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
+const schedules = useSchedulesStore()
 const todos = useTodoStore()
 const stats = useStatsStore()
 const music = useMusicStore()
@@ -108,6 +111,7 @@ async function loadAll(): Promise<void> {
   // 用 allSettled 而不是 all：任何一项失败都不该把其余已加载好的数据一起丢掉
   const results = await Promise.allSettled([
     timetable.load(),
+    schedules.load(),
     todos.load(),
     stats.load(),
     music.load(),
@@ -183,4 +187,5 @@ onMounted(() => {
   <SearchPalette v-if="showSearch" @close="showSearch = false" />
   <UiFeedbackHost v-if="!isLock && !isWidget && !isClockWidget && !isDesktopWidget" />
   <UpdatePromptModal v-if="!isLock && !isWidget && !isClockWidget && !isDesktopWidget" />
+  <StartupAnnouncementModal v-if="!isLock && !isWidget && !isClockWidget && !isDesktopWidget && !isPetWidget" />
 </template>

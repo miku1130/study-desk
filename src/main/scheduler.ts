@@ -64,12 +64,15 @@ export class BellScheduler {
     const weekday = now.getDay() === 0 ? 7 : now.getDay()
 
     for (const p of periods) {
+      // 铃声属于具体课程，不是单纯的作息提示。当天没有这节课时不触发上下课铃，
+      // 因而周日或其它无课日都不会按空作息表误响。
+      const lesson = lessons.find((l) => l.day === weekday && l.periodId === p.id)
+      if (!lesson) continue
       if (p.start === hm) {
         const key = `${dayKey}:${p.id}:start`
         if (!this.fired.has(key)) {
           this.fired.add(key)
           if (bell?.enabled) this.broadcast('bell:ring', 'on')
-          const lesson = lessons.find((l) => l.day === weekday && l.periodId === p.id)
           if (lesson) {
             this.broadcast('class:start', lesson)
             this.notify('上课提醒', `${lesson.name}${lesson.location ? ' · ' + lesson.location : ''}`)

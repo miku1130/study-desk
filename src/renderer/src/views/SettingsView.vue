@@ -69,7 +69,7 @@ async function checkUpdate(): Promise<void> {
   updateState.value = 'checking'
   updatePercent.value = 0
   updateText.value = '正在检查更新…'
-  const r = (await window.api.update.check()) as { state?: string; message?: string }
+  const r = (await window.api.update.check('manual')) as { state?: string; message?: string }
   if (r?.state === 'dev') {
     checking.value = false
     updateState.value = 'dev'

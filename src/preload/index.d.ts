@@ -366,14 +366,22 @@ export interface StudyDeskApi {
     export: () => Promise<boolean>
     import: () => Promise<unknown>
   }
+  schedules: {
+    export: () => Promise<boolean>
+    import: () => Promise<unknown>
+  }
   app: {
     getVersion: () => Promise<string>
+    openProject: () => Promise<void>
+  }
+  announcement: {
+    get: () => Promise<unknown>
   }
   notify: {
     show: (title: string, body: string) => Promise<void>
   }
   update: {
-    check: () => Promise<unknown>
+    check: (mode?: 'automatic' | 'manual') => Promise<unknown>
     install: () => Promise<void>
     onStatus: (cb: (status: unknown) => void) => () => void
   }

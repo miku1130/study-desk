@@ -136,6 +136,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
 export interface AppStores {
   settings: JsonStore<Record<string, unknown>>
   timetable: JsonStore<Record<string, unknown>>
+  schedules: JsonStore<Record<string, unknown>>
   todos: JsonStore<Record<string, unknown>>
   stats: JsonStore<Record<string, unknown>>
   music: JsonStore<Record<string, unknown>>
@@ -153,6 +154,7 @@ export function createStores(): AppStores {
   return {
     settings: new JsonStore('settings.json', DEFAULT_SETTINGS),
     timetable: new JsonStore('timetable.json', { periods: DEFAULT_PERIODS, lessons: [] }),
+    schedules: new JsonStore('schedules.json', { items: [] }),
     todos: new JsonStore('todos.json', { items: [], activeId: '' }),
     stats: new JsonStore('stats.json', { days: {} }),
     music: new JsonStore('music.json', { tracks: [], volume: 0.6, loop: 'all' }),

@@ -125,16 +125,16 @@ function submitMemo(): void {
         {{ config.kind === 'countdown' ? '倒数日' : config.kind === 'timetable' ? '今日课表' : '备忘录' }}
       </span>
       <div v-if="!preview" class="widget-actions">
-        <button v-if="config.kind === 'countdown'" class="widget-action" title="切换倒数日" @click="$emit('cycle-countdown')">
+        <button v-if="config.kind === 'countdown'" class="widget-action" title="切换倒数日" aria-label="切换倒数日" @click="$emit('cycle-countdown')">
           <AppIcon name="rotate-ccw" :size="13" />
         </button>
-        <button v-if="config.kind === 'memo' && !config.locked" class="widget-action" title="快捷记录" @click="openMemoInput">
+        <button v-if="config.kind === 'memo' && !config.locked" class="widget-action" title="快捷记录" aria-label="快捷记录" @click="openMemoInput">
           <AppIcon name="plus" :size="14" />
         </button>
-        <button class="widget-action widget-lock-toggle" :title="config.locked ? '解锁摆件' : '锁定摆件'" @click="$emit('toggle-lock')">
+        <button class="widget-action widget-lock-toggle" :title="config.locked ? '解锁摆件' : '锁定摆件'" :aria-label="config.locked ? '解锁摆件' : '锁定摆件'" @click="$emit('toggle-lock')">
           <AppIcon :name="config.locked ? 'lock' : 'unlock'" :size="13" />
         </button>
-        <button v-if="!config.locked" class="widget-action" title="关闭摆件" @click="$emit('close')">
+        <button v-if="!config.locked" class="widget-action" title="关闭摆件" aria-label="关闭摆件" @click="$emit('close')">
           <AppIcon name="x" :size="14" />
         </button>
       </div>

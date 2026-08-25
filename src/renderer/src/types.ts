@@ -148,6 +148,34 @@ export interface TimetableData {
   lessons: Lesson[]
 }
 
+export interface ScheduleItem {
+  id: string
+  date: string
+  start: string
+  end: string
+  title: string
+  location: string
+  note: string
+  color: string
+  allDay: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SchedulesData {
+  items: ScheduleItem[]
+}
+
+export interface StartupAnnouncement {
+  enabled: boolean
+  id?: string
+  title: string
+  content: string
+  publishedAt?: string
+  actionText?: string
+  actionUrl?: string
+}
+
 export interface MusicTrack {
   id: string
   name: string

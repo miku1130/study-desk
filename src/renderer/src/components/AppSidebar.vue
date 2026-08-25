@@ -54,6 +54,11 @@ const groups: NavGroup[] = [
         icon: svg('<rect x="3" y="4" width="18" height="18" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/>')
       },
       {
+        to: '/schedules',
+        label: '日程管理',
+        icon: svg('<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 18h2"/>')
+      },
+      {
         to: '/countdown',
         label: '倒数日',
         icon: svg(

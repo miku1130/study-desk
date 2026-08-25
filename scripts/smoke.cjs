@@ -133,6 +133,8 @@ ipcMain.handle('shell:openPath', () => '')
 ipcMain.handle('dialog:openFiles', () => [])
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
 ipcMain.handle('app:getVersion', () => '0.1.0')
+ipcMain.handle('announcement:get', () => null)
+ipcMain.handle('app:openProject', () => undefined)
 ipcMain.handle('autostart:get', () => false)
 // 故意报一个占用失败，验证设置页真的会把热键冲突显示出来
 ipcMain.handle('shortcuts:status', () => [
@@ -245,6 +247,7 @@ const CAT_ANIMATION_PROBE = `(async (scope) => {
 const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
+  { hash: '/schedules', name: '日程管理', sel: ['.schedule-page', '.month-grid', '.agenda-panel'] },
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
   { hash: '/todo', name: '备忘录中心', sel: ['.memo-tabs', '.quick-card'] },

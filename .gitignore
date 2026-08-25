@@ -14,6 +14,9 @@ smoke-out.txt
 server/.tmp-smoke.db*
 server/data
 
+# 本地公告管理工具（不进入项目仓库）
+scripts/publish-announcement.mjs
+
 # 与本项目无关的本地目录，切勿入库
 napcat-qq-login
 

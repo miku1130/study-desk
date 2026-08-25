@@ -146,10 +146,17 @@ function handlePointerGone(): void {
   applyPointerInteractive(false)
 }
 
+// 失焦时主动清掉系统级鼠标捕获。全屏应用切换不会保证触发 DOM mouseleave，
+// 只依赖 mouseleave 会让“解锁摆件”提示残留在其他应用上方。
+function handleVisibilityChange(): void {
+  if (document.hidden) handlePointerGone()
+}
+
 document.documentElement.classList.add('desktop-widget-window')
 document.addEventListener('mousemove', handleMouseMove)
 document.addEventListener('mouseleave', handlePointerGone)
 window.addEventListener('blur', handlePointerGone)
+document.addEventListener('visibilitychange', handleVisibilityChange)
 watch(() => config.value?.locked, handlePointerGone)
 onBeforeUnmount(() => {
   if (moveFrame) cancelAnimationFrame(moveFrame)
@@ -157,6 +164,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseleave', handlePointerGone)
   window.removeEventListener('blur', handlePointerGone)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

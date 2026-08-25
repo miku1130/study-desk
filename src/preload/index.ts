@@ -182,15 +182,24 @@ const api = {
     export: (): Promise<boolean> => ipcRenderer.invoke('timetable:export'),
     import: (): Promise<unknown> => ipcRenderer.invoke('timetable:import')
   },
+  schedules: {
+    export: (): Promise<boolean> => ipcRenderer.invoke('schedules:export'),
+    import: (): Promise<unknown> => ipcRenderer.invoke('schedules:import')
+  },
   app: {
-    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+    openProject: (): Promise<void> => ipcRenderer.invoke('app:openProject')
+  },
+  announcement: {
+    get: (): Promise<unknown> => ipcRenderer.invoke('announcement:get')
   },
   notify: {
     show: (title: string, body: string): Promise<void> =>
       ipcRenderer.invoke('notify:show', title, body)
   },
   update: {
-    check: (): Promise<unknown> => ipcRenderer.invoke('update:check'),
+    check: (mode: 'automatic' | 'manual' = 'manual'): Promise<unknown> =>
+      ipcRenderer.invoke('update:check', mode),
     install: (): Promise<void> => ipcRenderer.invoke('update:install'),
     onStatus: (cb: (status: unknown) => void): (() => void) => on('update:status', (s) => cb(s))
   },

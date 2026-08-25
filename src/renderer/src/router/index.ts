@@ -14,6 +14,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '课表' }
   },
   {
+    path: '/schedules',
+    name: 'schedules',
+    component: () => import('@/views/SchedulesView.vue'),
+    meta: { title: '日程管理' }
+  },
+  {
     path: '/pomodoro',
     name: 'pomodoro',
     component: () => import('@/views/PomodoroView.vue'),

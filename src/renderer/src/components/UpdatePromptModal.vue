@@ -7,12 +7,16 @@ interface UpdateStatus {
   state: string
   version?: string
   percent?: number
+  releaseNotes?: string
+  mode?: 'automatic' | 'manual'
 }
 
 const visible = ref(false)
 const stage = ref<Stage>('available')
 const version = ref('')
 const percent = ref(0)
+const releaseNotes = ref('')
+const mode = ref<'automatic' | 'manual'>('automatic')
 // 每个阶段被手动关闭后本次会话不再重复弹；进入 downloaded 阶段会作为新提醒再弹一次
 const dismissedAvailable = ref(false)
 const dismissedDownloaded = ref(false)
@@ -24,6 +28,8 @@ onMounted(() => {
     if (st.state === 'available') {
       stage.value = 'available'
       version.value = st.version ?? ''
+      releaseNotes.value = st.releaseNotes ?? ''
+      mode.value = st.mode ?? 'automatic'
       percent.value = 0
       if (!dismissedAvailable.value) visible.value = true
     } else if (st.state === 'downloading') {
@@ -32,6 +38,8 @@ onMounted(() => {
     } else if (st.state === 'downloaded') {
       stage.value = 'downloaded'
       version.value = st.version ?? version.value
+      releaseNotes.value = st.releaseNotes ?? releaseNotes.value
+      mode.value = st.mode ?? 'automatic'
       percent.value = 100
       if (!dismissedDownloaded.value) visible.value = true
     }
@@ -47,6 +55,7 @@ const body = computed(() =>
     ? `新版本 ${version.value ? 'v' + version.value : ''} 已下载完成，重启应用即可完成安装，数据不会丢失。`
     : `发现新版本 ${version.value ? 'v' + version.value : ''}，正在后台自动下载，完成后会再次提醒你安装。`
 )
+const manual = computed(() => !ready.value && mode.value === 'manual')
 
 function dismiss(): void {
   if (ready.value) dismissedDownloaded.value = true
@@ -56,6 +65,11 @@ function dismiss(): void {
 
 function install(): void {
   window.api.update.install()
+}
+
+function openProject(): void {
+  window.api.app.openProject()
+  visible.value = false
 }
 </script>
 
@@ -76,6 +90,10 @@ function install(): void {
           </div>
           <h3>{{ title }}</h3>
           <p>{{ body }}</p>
+          <div v-if="releaseNotes" class="release-notes">
+            <strong>Release 更新内容</strong>
+            <p>{{ releaseNotes }}</p>
+          </div>
           <div v-if="!ready" class="update-bar">
             <div class="update-fill" :style="{ width: percent + '%' }" />
           </div>
@@ -83,6 +101,7 @@ function install(): void {
           <div class="update-actions">
             <button class="btn btn-secondary btn-sm" @click="dismiss">稍后再说</button>
             <button v-if="ready" class="btn btn-sm" @click="install">立即重启更新</button>
+            <button v-else-if="manual" class="btn btn-sm" @click="openProject">查看项目更新</button>
             <button v-else class="btn btn-sm" @click="dismiss">知道了</button>
           </div>
         </div>
@@ -141,6 +160,7 @@ function install(): void {
   font-size: 13px;
   line-height: 1.6;
 }
+.release-notes { max-height:170px; overflow:auto; margin-top:14px; padding:11px 12px; border:1px solid var(--separator); border-radius:7px; background:var(--surface-muted); text-align:left; }.release-notes strong { color:var(--text-primary); font-size:12px; }.release-notes p { margin-top:6px; white-space:pre-wrap; font-size:12px; line-height:1.65; }
 .update-bar {
   height: 6px;
   margin-top: 14px;

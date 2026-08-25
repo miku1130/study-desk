@@ -55,6 +55,12 @@ protocol.registerSchemesAsPrivileged([
 
 // 默认歌单解析聚合接口（Meting-API 格式）；可在「设置 → 音乐接口」替换为自建地址以提升稳定性
 const DEFAULT_MUSIC_API = 'https://metingapi.nanorocky.top'
+const PROJECT_RELEASES_URL = 'https://github.com/miku1130/study-desk/releases/latest'
+const ANNOUNCEMENT_URL = process.env['ANNOUNCEMENT_URL'] || 'https://study.lemon21.cn/announcement'
+
+// 同一用户会话只允许一个主进程；第二次启动只负责把已有窗口带到前台。
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) app.quit()
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
@@ -66,6 +72,7 @@ let waterReminder: WaterReminder
 let healthReminder: HealthReminder
 let todoReminder: TodoReminder
 let studyRoom: StudyRoomService
+let updateMode: 'automatic' | 'manual' = 'automatic'
 
 function setAutostart(openAtLogin: boolean): void {
   // Development runs use Electron's executable directly. Registering it without
@@ -349,15 +356,35 @@ function studyRoomFocus(): StudyRoomFocusReport {
 
 function setupUpdater(): void {
   autoUpdater.on('checking-for-update', () => sendToAll('update:status', { state: 'checking' }))
-  autoUpdater.on('update-available', (i) =>
-    sendToAll('update:status', { state: 'available', version: i.version })
-  )
+  autoUpdater.on('update-available', (i) => {
+    const releaseNotes = Array.isArray(i.releaseNotes)
+      ? i.releaseNotes.map((entry) => entry.note).filter(Boolean).join('\n\n')
+      : String(i.releaseNotes ?? '')
+    sendToAll('update:status', {
+      state: 'available',
+      version: i.version,
+      releaseNotes,
+      mode: updateMode
+    })
+  })
   autoUpdater.on('update-not-available', () => sendToAll('update:status', { state: 'none' }))
   autoUpdater.on('download-progress', (p) =>
-    sendToAll('update:status', { state: 'downloading', percent: Math.round(p.percent) })
+    sendToAll('update:status', {
+      state: 'downloading',
+      percent: Math.round(p.percent),
+      mode: updateMode
+    })
   )
   autoUpdater.on('update-downloaded', (i) => {
-    sendToAll('update:status', { state: 'downloaded', version: i.version })
+    const releaseNotes = Array.isArray(i.releaseNotes)
+      ? i.releaseNotes.map((entry) => entry.note).filter(Boolean).join('\n\n')
+      : String(i.releaseNotes ?? '')
+    sendToAll('update:status', {
+      state: 'downloaded',
+      version: i.version,
+      releaseNotes,
+      mode: 'automatic'
+    })
     notify('更新已就绪', `新版本 ${i.version} 已下载完成，请在「设置 → 检查更新」点击「立即重启更新」完成安装`)
   })
   autoUpdater.on('error', (e) => sendToAll('update:status', { state: 'error', message: String(e) }))
@@ -380,6 +407,27 @@ function registerIpc(): void {
   ipcMain.handle('store:set', (e, name: keyof AppStores, value: Record<string, unknown>) => {
     const s = stores[name]
     if (!s) return false
+    if (name === 'desktopWidgets' && Array.isArray(value.items)) {
+      // 渲染层保存的是上次加载的配置，窗口实际调整后的 bounds 只在主进程里实时更新。
+      // 合并几何字段，避免点击锁定时旧配置把用户刚调好的宽高覆盖成默认值。
+      const current = desktopWidgetItems()
+      const currentById = new Map(current.map((item) => [item.id, item]))
+      value = {
+        ...value,
+        items: value.items.map((item) => {
+          const incoming = item as DesktopWidgetConfig
+          const previous = currentById.get(incoming.id)
+          if (!previous || incoming.size !== previous.size) return item
+          return {
+            ...item,
+            x: previous.x,
+            y: previous.y,
+            width: previous.width,
+            height: previous.height
+          }
+        })
+      }
+    }
     s.replace(value)
     if (name === 'settings') {
       // 浮窗是常驻窗口，不通知它就会一直用旧设置；
@@ -408,7 +456,8 @@ function registerIpc(): void {
       name === 'desktopWidgets' ||
       name === 'countdowns' ||
       name === 'timetable' ||
-      name === 'todos'
+      name === 'todos' ||
+      name === 'schedules'
     ) {
       sendToAll('data:reloaded')
     }
@@ -650,6 +699,30 @@ function registerIpc(): void {
   ipcMain.handle('shortcuts:update', () => registerShortcuts())
   ipcMain.handle('shortcuts:status', () => hotkeyFailures)
   ipcMain.handle('app:getVersion', () => app.getVersion())
+  ipcMain.handle('app:openProject', () => shell.openExternal(PROJECT_RELEASES_URL))
+  ipcMain.handle('announcement:get', async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    try {
+      const response = await net.fetch(ANNOUNCEMENT_URL, { signal: controller.signal })
+      if (!response.ok) return null
+      const value = (await response.json()) as Record<string, unknown>
+      if (value.enabled !== true || typeof value.title !== 'string' || typeof value.content !== 'string') return null
+      return {
+        enabled: true,
+        id: typeof value.id === 'string' ? value.id : undefined,
+        title: value.title,
+        content: value.content,
+        publishedAt: typeof value.publishedAt === 'string' ? value.publishedAt : undefined,
+        actionText: typeof value.actionText === 'string' ? value.actionText : undefined,
+        actionUrl: typeof value.actionUrl === 'string' ? value.actionUrl : undefined
+      }
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timeout)
+    }
+  })
   ipcMain.handle('notify:show', (_e, title: string, body: string) => notify(title, body))
   ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
   ipcMain.handle('fs:exists', (_e, p: string) => {
@@ -710,9 +783,11 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('update:check', async () => {
+  ipcMain.handle('update:check', async (_event, mode: 'automatic' | 'manual' = 'manual') => {
     if (!app.isPackaged) return { state: 'dev' }
     try {
+      updateMode = mode === 'automatic' ? 'automatic' : 'manual'
+      autoUpdater.autoDownload = updateMode === 'automatic'
       await autoUpdater.checkForUpdates()
       return { state: 'checking' }
     } catch (e) {
@@ -754,9 +829,62 @@ function registerIpc(): void {
       return null
     }
   })
+  ipcMain.handle('schedules:export', async () => {
+    const res = await dialog.showSaveDialog({
+      defaultPath: 'schedules-template.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (res.canceled || !res.filePath) return false
+    writeFileSync(
+      res.filePath,
+      JSON.stringify(
+        {
+          version: 1,
+          type: 'studydesk-schedule-template',
+          description: '批量日程模板。保留 items 数组并按字段说明填写即可导入。',
+          fields: {
+            date: '日期，必填，格式 YYYY-MM-DD，例如 2026-09-01',
+            start: '开始时间，非全天日程必填，格式 HH:mm，例如 09:00',
+            end: '结束时间，非全天日程必填，格式 HH:mm，例如 10:30',
+            title: '主题，必填，例如 项目评审',
+            location: '地点，可留空',
+            note: '备注，可留空',
+            color: '颜色，可选十六进制颜色，例如 #4f8fd8',
+            allDay: '是否全天，填写 true 或 false'
+          },
+          example: {
+            date: '2026-09-01', start: '09:00', end: '10:30', title: '项目评审',
+            location: '会议室 A', note: '准备周报和数据', color: '#4f8fd8', allDay: false
+          },
+          items: stores.schedules.all.items ?? []
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    )
+    return true
+  })
+  ipcMain.handle('schedules:import', async () => {
+    const res = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    try {
+      const data = JSON.parse(readFileSync(res.filePaths[0], 'utf-8')) as { items?: unknown }
+      if (!data || !Array.isArray(data.items)) return null
+      stores.schedules.replace({ items: data.items } as Record<string, unknown>)
+      sendToAll('data:reloaded')
+      return { items: data.items }
+    } catch {
+      return null
+    }
+  })
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return
   stores = createStores()
   nativeTheme.themeSource = (stores.settings.get('theme') as 'system' | 'light' | 'dark') ?? 'system'
 
@@ -815,12 +943,27 @@ app.whenReady().then(() => {
   syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
 
   setupUpdater()
-  if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify().catch(() => undefined)
+  if (app.isPackaged) {
+    updateMode = 'automatic'
+    autoUpdater.autoDownload = true
+    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+if (hasSingleInstanceLock) {
+  app.on('second-instance', () => {
+    if (!mainWindow) createWindow()
+    else {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+}
 
 app.on('before-quit', () => {
   isQuitting = true

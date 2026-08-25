@@ -36,7 +36,10 @@ describe('BellScheduler', () => {
     vi.useFakeTimers()
     vi.setSystemTime(MONDAY_0800)
     const calls: unknown[][] = []
-    const { settings, timetable } = makeStores([period], [], true)
+    const lesson: Lesson = {
+      id: 'bell-lesson', day: 1, periodId: 'p1', name: '测试课程', teacher: '', location: '', color: '#fff'
+    }
+    const { settings, timetable } = makeStores([period], [lesson], true)
     const s = new BellScheduler(settings as never, timetable as never, (c, ...a) => calls.push([c, ...a]), () => {})
     s.start()
     expect(calls.filter(([c, k]) => c === 'bell:ring' && k === 'on').length).toBe(1)
@@ -78,5 +81,15 @@ describe('BellScheduler', () => {
     s.start()
     expect(calls.some(([c]) => c === 'class:start')).toBe(true)
     expect(notes.length).toBe(1)
+  })
+
+  it('does not ring on Sunday when there is no Sunday lesson', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 11, 8, 0, 0))
+    const calls: unknown[][] = []
+    const { settings, timetable } = makeStores([period], [], true)
+    const s = new BellScheduler(settings as never, timetable as never, (c, ...a) => calls.push([c, ...a]), () => {})
+    s.start()
+    expect(calls.filter(([c]) => c === 'bell:ring')).toHaveLength(0)
   })
 })

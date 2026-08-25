@@ -10,8 +10,10 @@
  */
 
 import { createServer } from 'http'
-import { randomUUID } from 'crypto'
+import { randomUUID, timingSafeEqual } from 'crypto'
 import { dirname, join } from 'path'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import type { IncomingMessage, ServerResponse } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { Presence, type FocusReport } from './presence'
 import { FocusStats, WISH_PAGE_SIZE, type RangeKey } from './stats'
@@ -31,6 +33,8 @@ const BACKUP_DIR = process.env.BACKUP_DIR ?? join(dirname(DB_PATH), 'backups')
 /** 六小时一份，留一周多一点：够覆盖「周末才发现数据不对」的场景 */
 const BACKUP_INTERVAL_MS = Number(process.env.BACKUP_INTERVAL_MS ?? 6 * 60 * 60 * 1000)
 const BACKUP_KEEP = Number(process.env.BACKUP_KEEP ?? 30)
+const ANNOUNCEMENT_PATH = process.env.ANNOUNCEMENT_PATH ?? join(dirname(DB_PATH), 'announcement.json')
+const ANNOUNCEMENT_ADMIN_TOKEN = process.env.ANNOUNCEMENT_ADMIN_TOKEN ?? ''
 /** 同一瞬间的多次变化合并成一次广播，避免大房间产生 N² 条消息 */
 const BROADCAST_WINDOW_MS = 150
 const HEARTBEAT_MS = 30_000
@@ -71,6 +75,60 @@ const backups = startBackups({
   onError: (err) => console.error('[study-room] 备份失败', err)
 })
 const clients = new Map<string, Client>()
+
+interface AnnouncementPayload {
+  enabled: boolean
+  id?: string
+  title: string
+  content: string
+  publishedAt?: string
+  actionText?: string
+  actionUrl?: string
+}
+
+function emptyAnnouncement(): AnnouncementPayload {
+  return { enabled: false, title: '', content: '' }
+}
+
+function readAnnouncement(): AnnouncementPayload {
+  try {
+    const value = JSON.parse(readFileSync(ANNOUNCEMENT_PATH, 'utf8')) as Partial<AnnouncementPayload>
+    if (value.enabled !== true || typeof value.title !== 'string' || typeof value.content !== 'string') return emptyAnnouncement()
+    return {
+      enabled: true,
+      id: typeof value.id === 'string' ? value.id.slice(0, 80) : undefined,
+      title: value.title.slice(0, 160),
+      content: value.content.slice(0, 12000),
+      publishedAt: typeof value.publishedAt === 'string' ? value.publishedAt.slice(0, 40) : undefined,
+      actionText: typeof value.actionText === 'string' ? value.actionText.slice(0, 40) : undefined,
+      actionUrl: typeof value.actionUrl === 'string' && /^https?:\/\//i.test(value.actionUrl) ? value.actionUrl.slice(0, 500) : undefined
+    }
+  } catch {
+    return emptyAnnouncement()
+  }
+}
+
+function writeAnnouncement(value: AnnouncementPayload): void {
+  const dir = dirname(ANNOUNCEMENT_PATH)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  const temp = `${ANNOUNCEMENT_PATH}.tmp`
+  writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8')
+  renameSync(temp, ANNOUNCEMENT_PATH)
+}
+
+function isAnnouncementAdmin(req: IncomingMessage): boolean {
+  if (!ANNOUNCEMENT_ADMIN_TOKEN) return false
+  const auth = String(req.headers.authorization ?? '')
+  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  const expected = Buffer.from(ANNOUNCEMENT_ADMIN_TOKEN)
+  const actual = Buffer.from(provided)
+  return expected.length === actual.length && timingSafeEqual(expected, actual)
+}
+
+function sendJson(res: ServerResponse, status: number, value: unknown): void {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify(value))
+}
 
 /* ------------------------------------------------------------------ *
  * 发送
@@ -565,6 +623,54 @@ function clientIp(headers: Record<string, string | string[] | undefined>, fallba
 }
 
 const httpServer = createServer((req, res) => {
+  if (req.url === '/announcement' && req.method === 'GET') {
+    sendJson(res, 200, readAnnouncement())
+    return
+  }
+  if (req.url === '/announcement' && (req.method === 'POST' || req.method === 'DELETE')) {
+    if (!isAnnouncementAdmin(req)) {
+      sendJson(res, 401, { ok: false, error: 'announcement admin token required' })
+      return
+    }
+    if (req.method === 'DELETE') {
+      writeAnnouncement(emptyAnnouncement())
+      sendJson(res, 200, { ok: true, enabled: false })
+      return
+    }
+    let raw = ''
+    req.setEncoding('utf8')
+    req.on('data', (chunk: string) => {
+      raw += chunk
+      if (raw.length > 256_000) req.destroy()
+    })
+    req.on('end', () => {
+      try {
+        const input = JSON.parse(raw) as Partial<AnnouncementPayload>
+        if (input.enabled !== true || typeof input.title !== 'string' || !input.title.trim() || typeof input.content !== 'string' || !input.content.trim()) {
+          sendJson(res, 400, { ok: false, error: 'enabled=true, title and content are required' })
+          return
+        }
+        const announcement: AnnouncementPayload = {
+          enabled: true,
+          id: typeof input.id === 'string' && input.id ? input.id : randomUUID(),
+          title: input.title.trim(),
+          content: input.content.trim(),
+          publishedAt: typeof input.publishedAt === 'string' && input.publishedAt ? input.publishedAt : new Date().toISOString(),
+          actionText: typeof input.actionText === 'string' ? input.actionText : undefined,
+          actionUrl: typeof input.actionUrl === 'string' ? input.actionUrl : undefined
+        }
+        if (announcement.actionUrl && !/^https?:\/\//i.test(announcement.actionUrl)) {
+          sendJson(res, 400, { ok: false, error: 'actionUrl must use http or https' })
+          return
+        }
+        writeAnnouncement(announcement)
+        sendJson(res, 200, { ok: true, announcement: readAnnouncement() })
+      } catch {
+        sendJson(res, 400, { ok: false, error: 'invalid JSON body' })
+      }
+    })
+    return
+  }
   if (req.url === '/health') {
     const snapshot = backupSummary(BACKUP_DIR)
     res.writeHead(200, { 'content-type': 'application/json' })
