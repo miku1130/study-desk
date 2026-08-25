@@ -231,6 +231,13 @@ export function setDesktopWidgetPointerInteractive(id: string, interactive: bool
   return true
 }
 
+/** 读取原生窗口的实时尺寸，避免渲染层旧配置覆盖用户刚完成的调整。 */
+export function getDesktopWidgetBounds(id: string): { x: number; y: number; width: number; height: number } | null {
+  const win = desktopWidgetWins.get(id)
+  if (!win || win.isDestroyed()) return null
+  return win.getBounds()
+}
+
 function movableDesktopWidget(id: string, senderId: number): BrowserWindow | null {
   const win = desktopWidgetWins.get(id)
   const config = desktopWidgetConfigs.get(id)

@@ -39,6 +39,7 @@ import {
   beginDesktopWidgetDrag,
   moveDesktopWidget,
   endDesktopWidgetDrag,
+  getDesktopWidgetBounds,
   type DesktopWidgetConfig
 } from './widget'
 import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
@@ -418,12 +419,13 @@ function registerIpc(): void {
           const incoming = item as DesktopWidgetConfig
           const previous = currentById.get(incoming.id)
           if (!previous || incoming.size !== previous.size) return item
+          const liveBounds = getDesktopWidgetBounds(incoming.id)
           return {
             ...item,
-            x: previous.x,
-            y: previous.y,
-            width: previous.width,
-            height: previous.height
+            x: liveBounds?.x ?? previous.x,
+            y: liveBounds?.y ?? previous.y,
+            width: liveBounds?.width ?? previous.width,
+            height: liveBounds?.height ?? previous.height
           }
         })
       }
