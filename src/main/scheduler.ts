@@ -18,9 +18,19 @@ interface Lesson {
   color: string
 }
 
+interface ScheduleItem {
+  id: string
+  date: string
+  start: string
+  end: string
+  title: string
+  location?: string
+  allDay?: boolean
+}
+
 /**
- * 上下课铃声 + 上课提醒调度器：每 10 秒比对当前 HH:mm 与作息节次，
- * 命中节次起止时间则触发铃声 / 通知，每个时刻当天仅触发一次。
+ * 上下课铃声 + 日程提醒调度器：每 10 秒比对当前 HH:mm，
+ * 命中课程或日程起止时间则触发铃声 / 通知，每个时刻当天仅触发一次。
  */
 export class BellScheduler {
   private timer: NodeJS.Timeout | null = null
@@ -30,6 +40,7 @@ export class BellScheduler {
   constructor(
     private readonly settings: JsonStore<Record<string, unknown>>,
     private readonly timetable: JsonStore<Record<string, unknown>>,
+    private readonly schedules: JsonStore<Record<string, unknown>>,
     private readonly broadcast: (channel: string, ...args: unknown[]) => void,
     private readonly notify: (title: string, body: string) => void
   ) {}
@@ -87,6 +98,31 @@ export class BellScheduler {
         }
       }
     }
+
+    const schedules = (this.schedules.get('items') as ScheduleItem[]) || []
+    for (const item of schedules) {
+      if (
+        item.allDay ||
+        item.date !== dayKey ||
+        typeof item.id !== 'string' ||
+        typeof item.title !== 'string' ||
+        !/^\d{2}:\d{2}$/.test(item.start) ||
+        !/^\d{2}:\d{2}$/.test(item.end)
+      ) continue
+      if (item.start === hm) this.fireSchedule(item, 'start', dayKey)
+      if (item.end === hm) this.fireSchedule(item, 'end', dayKey)
+    }
+  }
+
+  private fireSchedule(item: ScheduleItem, kind: 'start' | 'end', dayKey: string): void {
+    const key = `${dayKey}:schedule:${item.id}:${kind}`
+    if (this.fired.has(key)) return
+    this.fired.add(key)
+    if ((this.settings.get('bell') as { enabled?: boolean } | undefined)?.enabled) {
+      this.broadcast('bell:ring', kind === 'start' ? 'on' : 'off')
+    }
+    const label = item.location ? `${item.title} · ${item.location}` : item.title
+    this.notify(kind === 'start' ? '日程开始提醒' : '日程结束提醒', label)
   }
 
   private clear(): void {

@@ -450,7 +450,7 @@ function registerIpc(): void {
       syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
       syncAutostart()
     }
-    if (name === 'timetable') scheduler.reload()
+    if (name === 'timetable' || name === 'schedules') scheduler.reload()
     if (name === 'todos') todoReminder.check()
     if (
       name === 'desktopWidgets' ||
@@ -922,7 +922,7 @@ app.whenReady().then(() => {
     getFocus: studyRoomFocus
   })
 
-  scheduler = new BellScheduler(stores.settings, stores.timetable, sendToAll, notify)
+  scheduler = new BellScheduler(stores.settings, stores.timetable, stores.schedules, sendToAll, notify)
   scheduler.start()
 
   waterReminder = new WaterReminder(stores.settings, notify, sendToAll)

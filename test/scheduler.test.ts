@@ -17,12 +17,22 @@ interface Lesson {
   color: string
 }
 
-function makeStores(periods: Period[], lessons: Lesson[], bellEnabled = true) {
+interface ScheduleItem {
+  id: string
+  date: string
+  start: string
+  end: string
+  title: string
+  allDay?: boolean
+}
+
+function makeStores(periods: Period[], lessons: Lesson[], schedules: ScheduleItem[] = [], bellEnabled = true) {
   const settings = { get: (k: string) => (k === 'bell' ? { enabled: bellEnabled } : undefined) }
   const timetable = {
     get: (k: string) => (k === 'periods' ? periods : k === 'lessons' ? lessons : undefined)
   }
-  return { settings, timetable }
+  const scheduleStore = { get: (k: string) => (k === 'items' ? schedules : undefined) }
+  return { settings, timetable, scheduleStore }
 }
 
 const period: Period = { id: 'p1', name: '第 1 节', start: '08:00', end: '08:45' }
@@ -39,8 +49,8 @@ describe('BellScheduler', () => {
     const lesson: Lesson = {
       id: 'bell-lesson', day: 1, periodId: 'p1', name: '测试课程', teacher: '', location: '', color: '#fff'
     }
-    const { settings, timetable } = makeStores([period], [lesson], true)
-    const s = new BellScheduler(settings as never, timetable as never, (c, ...a) => calls.push([c, ...a]), () => {})
+    const { settings, timetable, scheduleStore } = makeStores([period], [lesson], [], true)
+    const s = new BellScheduler(settings as never, timetable as never, scheduleStore as never, (c, ...a) => calls.push([c, ...a]), () => {})
     s.start()
     expect(calls.filter(([c, k]) => c === 'bell:ring' && k === 'on').length).toBe(1)
     vi.advanceTimersByTime(10000)
@@ -51,8 +61,8 @@ describe('BellScheduler', () => {
     vi.useFakeTimers()
     vi.setSystemTime(MONDAY_0800)
     const calls: unknown[][] = []
-    const { settings, timetable } = makeStores([period], [], false)
-    const s = new BellScheduler(settings as never, timetable as never, (c, ...a) => calls.push([c, ...a]), () => {})
+    const { settings, timetable, scheduleStore } = makeStores([period], [], [], false)
+    const s = new BellScheduler(settings as never, timetable as never, scheduleStore as never, (c, ...a) => calls.push([c, ...a]), () => {})
     s.start()
     expect(calls.filter(([c]) => c === 'bell:ring').length).toBe(0)
   })
@@ -71,10 +81,11 @@ describe('BellScheduler', () => {
       location: 'A101',
       color: '#0a84ff'
     }
-    const { settings, timetable } = makeStores([period], [lesson], true)
+    const { settings, timetable, scheduleStore } = makeStores([period], [lesson], [], true)
     const s = new BellScheduler(
       settings as never,
       timetable as never,
+      scheduleStore as never,
       (c, ...a) => calls.push([c, ...a]),
       (t, b) => notes.push([t, b])
     )
@@ -87,8 +98,36 @@ describe('BellScheduler', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 0, 11, 8, 0, 0))
     const calls: unknown[][] = []
-    const { settings, timetable } = makeStores([period], [], true)
-    const s = new BellScheduler(settings as never, timetable as never, (c, ...a) => calls.push([c, ...a]), () => {})
+    const { settings, timetable, scheduleStore } = makeStores([period], [], [], true)
+    const s = new BellScheduler(settings as never, timetable as never, scheduleStore as never, (c, ...a) => calls.push([c, ...a]), () => {})
+    s.start()
+    expect(calls.filter(([c]) => c === 'bell:ring')).toHaveLength(0)
+  })
+
+  it('rings and notifies at schedule start and end', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(MONDAY_0800)
+    const calls: unknown[][] = []
+    const notes: unknown[][] = []
+    const schedule: ScheduleItem = { id: 's1', date: '2026-01-05', start: '08:00', end: '08:45', title: '项目评审' }
+    const { settings, timetable, scheduleStore } = makeStores([], [], [schedule], true)
+    const s = new BellScheduler(settings as never, timetable as never, scheduleStore as never, (c, ...a) => calls.push([c, ...a]), (t, b) => notes.push([t, b]))
+    s.start()
+    expect(calls).toContainEqual(['bell:ring', 'on'])
+    expect(notes).toContainEqual(['日程开始提醒', '项目评审'])
+    vi.setSystemTime(new Date(2026, 0, 5, 8, 45, 0))
+    vi.advanceTimersByTime(10000)
+    expect(calls).toContainEqual(['bell:ring', 'off'])
+    expect(notes).toContainEqual(['日程结束提醒', '项目评审'])
+  })
+
+  it('does not ring for all-day schedules', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(MONDAY_0800)
+    const calls: unknown[][] = []
+    const schedule: ScheduleItem = { id: 's2', date: '2026-01-05', start: '08:00', end: '08:45', title: '全天事项', allDay: true }
+    const { settings, timetable, scheduleStore } = makeStores([], [], [schedule], true)
+    const s = new BellScheduler(settings as never, timetable as never, scheduleStore as never, (c, ...a) => calls.push([c, ...a]), () => {})
     s.start()
     expect(calls.filter(([c]) => c === 'bell:ring')).toHaveLength(0)
   })
