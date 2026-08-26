@@ -46,6 +46,7 @@ import { setupTray, setupTrayFromDataUrl, type TrayHandlers } from './tray'
 import { StudyRoomService } from './studyRoom/service'
 import type { StudyRoomFocusReport } from './studyRoom/protocol'
 import { autoUpdater } from 'electron-updater'
+import { buildSchedulePdfHtml, getDaySchedules, isValidDateKey } from './schedulePdf'
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -866,6 +867,40 @@ function registerIpc(): void {
       'utf-8'
     )
     return true
+  })
+  ipcMain.handle('schedules:export-day-pdf', async (_event, date: string) => {
+    if (!isValidDateKey(date)) return false
+    const res = await dialog.showSaveDialog({
+      defaultPath: `studydesk-plan-${date}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (res.canceled || !res.filePath) return false
+
+    let printWindow: BrowserWindow | null = null
+    try {
+      const rawItems = stores.schedules.get('items')
+      const items = getDaySchedules(rawItems, date)
+      const html = buildSchedulePdfHtml(date, items)
+      printWindow = new BrowserWindow({
+        show: false,
+        width: 794,
+        height: 1123,
+        webPreferences: { sandbox: true }
+      })
+      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      const pdf = await printWindow.webContents.printToPDF({
+        pageSize: 'A4',
+        printBackground: true,
+        margins: { marginType: 'custom', top: 0, right: 0, bottom: 0, left: 0 }
+      })
+      writeFileSync(res.filePath, pdf)
+      return true
+    } catch (err) {
+      console.error('[schedules] 写入当天计划表 PDF 失败', err)
+      return false
+    } finally {
+      if (printWindow && !printWindow.isDestroyed()) printWindow.destroy()
+    }
   })
   ipcMain.handle('schedules:import', async () => {
     const res = await dialog.showOpenDialog({

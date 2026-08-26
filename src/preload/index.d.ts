@@ -368,6 +368,7 @@ export interface StudyDeskApi {
   }
   schedules: {
     export: () => Promise<boolean>
+    exportDayPdf: (date: string) => Promise<boolean>
     import: () => Promise<unknown>
   }
   app: {

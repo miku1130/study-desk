@@ -3,13 +3,16 @@ import { computed, reactive, shallowRef } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppModal from '@/components/AppModal.vue'
 import { useSchedulesStore } from '@/stores/schedules'
+import { useUiStore } from '@/stores/ui'
 import { uid, type ScheduleItem } from '@/types'
 
 const schedules = useSchedulesStore()
+const ui = useUiStore()
 const cursor = shallowRef(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const selectedDate = shallowRef(formatDate(new Date()))
 const showEditor = shallowRef(false)
 const editingId = shallowRef('')
+const exportingPdf = shallowRef(false)
 const draft = reactive<ScheduleItem>(emptyDraft(selectedDate.value))
 
 function pad(value: number): string { return String(value).padStart(2, '0') }
@@ -55,13 +58,26 @@ function save(): void {
 function remove(): void { if (editingId.value) schedules.remove(editingId.value); showEditor.value = false }
 async function importTemplate(): Promise<void> { const data = await window.api.schedules.import(); if (data) schedules.replaceAll(data as { items: ScheduleItem[] }) }
 async function exportTemplate(): Promise<void> { await window.api.schedules.export() }
+async function exportDayPdf(): Promise<void> {
+  if (exportingPdf.value) return
+  exportingPdf.value = true
+  try {
+    const saved = await window.api.schedules.exportDayPdf(selectedDate.value)
+    if (saved) ui.success('当天计划表 PDF 已保存')
+  } catch (error) {
+    console.error('[schedules] 导出当天计划表失败', error)
+    ui.error('PDF 导出失败，请稍后重试')
+  } finally {
+    exportingPdf.value = false
+  }
+}
 </script>
 
 <template>
   <div class="page schedule-page">
     <header class="schedule-head">
       <div><p class="eyebrow">日程管理</p><h2>把每天要做的事放进时间轴</h2><p>按日期安排课程、会议和专注时段，也可以批量导入模板。</p></div>
-      <div class="schedule-actions"><button class="btn btn-secondary btn-sm" @click="importTemplate"><AppIcon name="download" :size="14" />导入模板</button><button class="btn btn-secondary btn-sm" @click="exportTemplate"><AppIcon name="upload" :size="14" />导出模板</button><button class="btn btn-sm" @click="openCreate()"><AppIcon name="plus" :size="14" />新建日程</button></div>
+      <div class="schedule-actions"><button class="btn btn-secondary btn-sm" @click="importTemplate"><AppIcon name="download" :size="14" />导入模板</button><button class="btn btn-secondary btn-sm" @click="exportTemplate"><AppIcon name="upload" :size="14" />导出模板</button><button class="btn btn-secondary btn-sm" :disabled="exportingPdf" @click="exportDayPdf"><AppIcon name="download" :size="14" />{{ exportingPdf ? '生成中...' : '导出当天 PDF' }}</button><button class="btn btn-sm" @click="openCreate()"><AppIcon name="plus" :size="14" />新建日程</button></div>
     </header>
     <details class="template-guide"><summary>模板字段怎么填</summary><div class="guide-grid"><span><strong>date</strong> 日期，YYYY-MM-DD</span><span><strong>start / end</strong> 时间，HH:mm</span><span><strong>title</strong> 主题，必填</span><span><strong>location</strong> 地点，可留空</span><span><strong>note</strong> 备注，可留空</span><span><strong>color</strong> 十六进制颜色</span><span><strong>allDay</strong> 全天填写 true/false</span></div><code>{ "items": [{ "date": "2026-09-01", "start": "09:00", "end": "10:30", "title": "项目评审", "location": "会议室 A", "note": "", "color": "#4f8fd8", "allDay": false }] }</code></details>
     <div class="schedule-layout">

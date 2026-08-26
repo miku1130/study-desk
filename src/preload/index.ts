@@ -184,6 +184,7 @@ const api = {
   },
   schedules: {
     export: (): Promise<boolean> => ipcRenderer.invoke('schedules:export'),
+    exportDayPdf: (date: string): Promise<boolean> => ipcRenderer.invoke('schedules:export-day-pdf', date),
     import: (): Promise<unknown> => ipcRenderer.invoke('schedules:import')
   },
   app: {
