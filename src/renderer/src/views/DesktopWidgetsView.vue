@@ -7,17 +7,22 @@ import EmptyState from '@/components/EmptyState.vue'
 import DesktopWidgetCard, { type WidgetLessonItem } from '@/components/widgets/DesktopWidgetCard.vue'
 import WidgetAppearanceEditor from '@/components/widgets/WidgetAppearanceEditor.vue'
 import { useTimetableStatus } from '@/composables/useTimetableStatus'
+import { useTimetableStore } from '@/stores/timetable'
 import { clone } from '@/lib/persist'
 import { useCountdownStore } from '@/stores/countdowns'
+import { useSchedulesStore } from '@/stores/schedules'
 import { useDesktopWidgetsStore } from '@/stores/desktopWidgets'
 import { useTodoStore } from '@/stores/todos'
 import { useUiStore } from '@/stores/ui'
 import { useSettingsStore } from '@/stores/settings'
 import { PET_CATS, usePetCompanionStore } from '@/stores/petCompanion'
+import { buildTimetableWidgetWeekRows } from '@/lib/timetableWidget'
 import type { DesktopWidgetConfig, DesktopWidgetKind } from '@/types'
 
 const widgets = useDesktopWidgetsStore()
 const countdowns = useCountdownStore()
+const schedules = useSchedulesStore()
+const timetable = useTimetableStore()
 const todos = useTodoStore()
 const ui = useUiStore()
 const settings = useSettingsStore()
@@ -39,12 +44,14 @@ const todayLessons = computed<WidgetLessonItem[]>(() => {
     end: lesson.period.end
   }))
 })
+const timetableWeekRows = computed(() => buildTimetableWidgetWeekRows(timetable.periods, timetable.lessons))
+const currentWeekday = computed(() => new Date().getDay() || 7)
 
 function countdownFor(config: DesktopWidgetConfig) {
   return countdowns.items.find((item) => item.id === config.sourceId) ?? null
 }
 function kindLabel(kind: DesktopWidgetKind): string {
-  return kind === 'countdown' ? '倒数日' : kind === 'timetable' ? '今日课表' : '备忘录'
+  return kind === 'countdown' ? '倒数日' : kind === 'timetable' ? '课表' : kind === 'schedules' ? '日程管理' : '备忘录'
 }
 function sizeLabel(size: DesktopWidgetConfig['size']): string {
   return size === 'small' ? '小尺寸' : size === 'large' ? '大尺寸' : '中尺寸'
@@ -117,6 +124,7 @@ function chooseCat(id: string): void {
       <div v-if="section === 'widgets'" class="create-actions">
         <button class="btn btn-secondary btn-sm" @click="openCreate('countdown')"><AppIcon name="hourglass" :size="14" />倒数日</button>
         <button class="btn btn-secondary btn-sm" @click="openCreate('timetable')"><AppIcon name="calendar" :size="14" />课表</button>
+        <button class="btn btn-secondary btn-sm" @click="openCreate('schedules')"><AppIcon name="calendar" :size="14" />日程</button>
         <button class="btn btn-secondary btn-sm" @click="openCreate('memo')"><AppIcon name="note" :size="14" />备忘录</button>
       </div>
     </header>
@@ -134,11 +142,11 @@ function chooseCat(id: string): void {
     <div v-if="widgets.items.length" class="widget-list">
       <article v-for="config in widgets.items" :key="config.id" class="widget-row">
         <div class="preview-wrap" :class="`preview-${config.size}`">
-          <DesktopWidgetCard :config="config" :countdown="countdownFor(config)" :lessons="todayLessons" :memos="memoOptions" preview />
+          <DesktopWidgetCard :config="config" :countdown="countdownFor(config)" :lessons="todayLessons" :timetable-week-rows="timetableWeekRows" :schedule-items="schedules.items" :weekday="currentWeekday" :memos="memoOptions" preview />
         </div>
         <div class="widget-info">
           <span class="kind-label">{{ kindLabel(config.kind) }}</span>
-          <h3>{{ config.title || countdownFor(config)?.title || (config.kind === 'timetable' ? '今天的课程' : config.kind === 'memo' ? '备忘与灵感' : '未命名摆件') }}</h3>
+          <h3>{{ config.title || countdownFor(config)?.title || (config.kind === 'timetable' ? '今天的课程' : config.kind === 'schedules' ? '日程管理' : config.kind === 'memo' ? '备忘与灵感' : '未命名摆件') }}</h3>
           <p>{{ sizeLabel(config.size) }} · {{ config.locked ? '已锁定并穿透鼠标' : '可拖动' }} · 桌面普通层级</p>
           <div class="state-line">
             <span :class="{ on: config.enabled }">{{ config.enabled ? '正在显示' : '已隐藏' }}</span>
@@ -217,11 +225,13 @@ function chooseCat(id: string): void {
     <AppModal v-if="showCreate" title="新建桌面摆件" @close="showCreate = false">
       <div class="create-form">
         <div class="kind-segment">
-          <button v-for="kind in (['countdown', 'timetable', 'memo'] as DesktopWidgetKind[])" :key="kind" :class="{ active: creating.kind === kind }" @click="openCreate(kind)">{{ kindLabel(kind) }}</button>
+          <button v-for="kind in (['countdown', 'timetable', 'schedules', 'memo'] as DesktopWidgetKind[])" :key="kind" :class="{ active: creating.kind === kind }" @click="openCreate(kind)">{{ kindLabel(kind) }}</button>
         </div>
         <label v-if="creating.kind === 'countdown'" class="field"><span>选择倒数日</span><select v-model="creating.sourceId" class="input select"><option value="" disabled>请选择</option><option v-for="item in countdowns.items" :key="item.id" :value="item.id">{{ item.title }} · {{ item.date }}</option></select></label>
         <p v-else-if="creating.kind === 'memo'" class="create-tip">备忘录摆件会展示全部未完成的备忘与灵感，并支持在桌面直接快捷记录。</p>
-        <p v-else class="create-tip">课表摆件会自动显示当天课程，并随课表内容更新。</p>
+        <p v-else-if="creating.kind === 'timetable'" class="create-tip">课表摆件会自动显示今日课程或整周课程，并随课表内容更新。</p>
+        <p v-else-if="creating.kind === 'schedules'" class="create-tip">日程摆件会显示月、周或日视图，并随日程管理内容更新。</p>
+        <p v-else class="create-tip">备忘录摆件会展示全部未完成的备忘与灵感。</p>
         <p v-if="creating.kind === 'countdown' && !countdowns.items.length" class="create-tip">请先在倒数日页面添加一个目标日期。</p>
       </div>
       <template #footer><button class="btn btn-secondary btn-sm" @click="showCreate = false">取消</button><button class="btn btn-sm" :disabled="creating.kind === 'countdown' && !creating.sourceId" @click="create">创建并显示</button></template>
@@ -229,7 +239,7 @@ function chooseCat(id: string): void {
 
     <AppModal v-if="showEdit && editing" title="摆件外观与行为" @close="cancelEdit">
       <div class="editor-layout">
-        <div class="editor-preview"><DesktopWidgetCard :config="editing" :countdown="countdownFor(editing)" :lessons="todayLessons" :memos="memoOptions" preview /></div>
+        <div class="editor-preview"><DesktopWidgetCard :config="editing" :countdown="countdownFor(editing)" :lessons="todayLessons" :timetable-week-rows="timetableWeekRows" :schedule-items="schedules.items" :weekday="currentWeekday" :memos="memoOptions" preview /></div>
         <WidgetAppearanceEditor :model-value="editing" :memos="memoOptions" @update:model-value="updateEditing" />
       </div>
       <template #footer><button class="btn btn-secondary btn-sm" @click="cancelEdit">取消</button><button class="btn btn-sm" @click="saveEdit">完成</button></template>
@@ -265,7 +275,7 @@ function chooseCat(id: string): void {
 .icon-action.danger:hover { color: var(--status-danger); border-color: var(--status-danger); }
 .empty-band { min-height: 440px; display: grid; place-items: center; }
 .create-form { display: flex; flex-direction: column; gap: 16px; }
-.kind-segment { display: grid; grid-template-columns: repeat(3, 1fr); padding: 3px; border-radius: 7px; background: var(--surface-muted); }
+.kind-segment { display: grid; grid-template-columns: repeat(4, 1fr); padding: 3px; border-radius: 7px; background: var(--surface-muted); }
 .kind-segment button { min-height: 34px; border: 0; border-radius: 5px; background: transparent; color: var(--text-secondary); }
 .kind-segment button.active { background: var(--surface-raised); color: var(--accent-strong); box-shadow: 0 1px 5px rgba(20, 28, 24, 0.1); }
 .field { display: flex; flex-direction: column; gap: 7px; }

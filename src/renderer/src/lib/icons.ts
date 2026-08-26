@@ -59,6 +59,7 @@ export const ICON_PATHS: Record<string, string> = {
   back: '<path d="M15 5l-7 7 7 7"/>',
   'chevron-left': '<path d="m15 5-7 7 7 7"/>',
   'chevron-right': '<path d="m9 5 7 7-7 7"/>',
+  expand: '<path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>',
   download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
   upload: '<path d="M12 15V3M7 8l5-5 5 5M4 21h16"/>',
   trash: '<path d="M4 7h16"/><path d="M10 4h4"/><path d="M6.5 7l.8 12.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7"/><path d="M10.5 11v6M13.5 11v6"/>',

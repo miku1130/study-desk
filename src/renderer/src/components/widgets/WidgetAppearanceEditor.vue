@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DesktopWidgetConfig, DesktopWidgetFont, DesktopWidgetSize, TodoItem } from '@/types'
+import type { DesktopWidgetConfig, DesktopWidgetFont, DesktopWidgetScheduleMode, DesktopWidgetSize, DesktopWidgetTimetableMode, TodoItem } from '@/types'
 
 const props = defineProps<{ modelValue: DesktopWidgetConfig; memos?: TodoItem[] }>()
 const emit = defineEmits<{ 'update:modelValue': [value: DesktopWidgetConfig] }>()
@@ -18,6 +18,15 @@ const fonts: Array<{ value: DesktopWidgetFont; label: string }> = [
   { value: 'handwriting', label: '马善政手写体' },
   { value: 'literary', label: '站酷小薇体' },
   { value: 'display', label: '站酷庆科黄油体' }
+]
+const timetableModes: Array<{ value: DesktopWidgetTimetableMode; label: string }> = [
+  { value: 'day', label: '日模式' },
+  { value: 'week', label: '周模式' }
+]
+const scheduleModes: Array<{ value: DesktopWidgetScheduleMode; label: string }> = [
+  { value: 'month', label: '月模式' },
+  { value: 'week', label: '周模式' },
+  { value: 'day', label: '日模式' }
 ]
 
 const memoImages = computed(() =>
@@ -82,6 +91,20 @@ function useImageMode(): void {
       </div>
     </div>
 
+    <div v-if="modelValue.kind === 'timetable'" class="field">
+      <span>课表显示</span>
+      <div class="segmented timetable-mode-segmented">
+        <button v-for="item in timetableModes" :key="item.value" :class="{ active: modelValue.timetableMode === item.value }" @click="patch({ timetableMode: item.value })">{{ item.label }}</button>
+      </div>
+    </div>
+
+    <div v-if="modelValue.kind === 'schedules'" class="field">
+      <span>日程显示</span>
+      <div class="segmented schedule-mode-segmented">
+        <button v-for="item in scheduleModes" :key="item.value" :class="{ active: modelValue.scheduleMode === item.value }" @click="patch({ scheduleMode: item.value })">{{ item.label }}</button>
+      </div>
+    </div>
+
     <div v-if="modelValue.kind === 'memo' && modelValue.memoDisplayMode === 'image' && memoImages.length" class="field">
       <span>桌面图片</span>
       <div class="memo-image-picker">
@@ -105,6 +128,11 @@ function useImageMode(): void {
       </select>
     </label>
 
+    <label class="field range-field">
+      <span>字号 <strong>{{ Math.round(modelValue.fontScale * 100) }}%</strong></span>
+      <input aria-label="摆件字号" type="range" min="0.8" max="1.6" step="0.05" :value="modelValue.fontScale" @input="patch({ fontScale: Number(($event.target as HTMLInputElement).value) })" />
+    </label>
+
     <div class="color-grid">
       <label class="field"><span>底色</span><input type="color" :value="modelValue.backgroundColor" @input="patch({ backgroundColor: ($event.target as HTMLInputElement).value })" /></label>
       <label class="field"><span>文字</span><input type="color" :value="modelValue.fontColor" @input="patch({ fontColor: ($event.target as HTMLInputElement).value })" /></label>
@@ -121,7 +149,7 @@ function useImageMode(): void {
 
     <label class="field range-field">
       <span>卡片不透明度 <strong>{{ Math.round(modelValue.surfaceOpacity * 100) }}%</strong></span>
-      <input type="range" min="0.1" max="1" step="0.01" :value="modelValue.surfaceOpacity" @input="patch({ surfaceOpacity: Number(($event.target as HTMLInputElement).value) })" />
+      <input aria-label="卡片不透明度" type="range" min="0.1" max="1" step="0.01" :value="modelValue.surfaceOpacity" @input="patch({ surfaceOpacity: Number(($event.target as HTMLInputElement).value) })" />
     </label>
     <label v-if="modelValue.background" class="field range-field">
       <span>图片遮罩 <strong>{{ Math.round(modelValue.overlayOpacity * 100) }}%</strong></span>
@@ -146,6 +174,8 @@ function useImageMode(): void {
 .segmented button.active { background: var(--surface-raised); color: var(--accent-strong); box-shadow: 0 1px 5px rgba(20, 28, 24, 0.1); }
 .segmented button:disabled { opacity: 0.42; cursor: not-allowed; }
 .memo-mode-segmented { grid-template-columns: repeat(2, 1fr); }
+.timetable-mode-segmented { grid-template-columns: repeat(2, 1fr); }
+.schedule-mode-segmented { grid-template-columns: repeat(3, 1fr); }
 .memo-image-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .memo-image-picker button { min-width: 0; overflow: hidden; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-muted); color: var(--text-secondary); text-align: left; }
 .memo-image-picker button.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

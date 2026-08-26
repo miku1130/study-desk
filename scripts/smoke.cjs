@@ -69,6 +69,10 @@ const sample = {
     { id: 'c1', title: '期末考试', date: dkey(-30), color: '#ff453a', bg: '' },
     { id: 'c2', title: '英语六级', date: dkey(-60), color: '#77b5e8', bg: '' }
   ] },
+  schedules: { items: [
+    { id: 's1', date: dkey(0), start: '09:00', end: '10:30', title: '项目评审', location: '会议室 A', note: '', color: '#4f8fd8', allDay: false, createdAt: Date.now(), updatedAt: Date.now() },
+    { id: 's2', date: dkey(0), start: '14:00', end: '15:00', title: '专注阅读', location: '', note: '', color: '#e1b36a', allDay: false, createdAt: Date.now(), updatedAt: Date.now() }
+  ] },
   desktopWidgets: {
     items: [
       {
@@ -102,6 +106,30 @@ const sample = {
         backgroundColor: '#3a3428', overlayOpacity: 0.4, surfaceOpacity: 1,
         font: 'system', fontColor: '#ffffff', accentColor: '#e4bd68',
         memoDisplayMode: 'image', memoImageAttachmentId: 'a-image'
+      },
+      {
+        id: 'w4', kind: 'timetable', sourceId: '', title: '', enabled: true,
+        launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'large', timetableMode: 'week',
+        background: '', backgroundColor: '#25343b', overlayOpacity: 0.4, surfaceOpacity: 1,
+        font: 'system', fontColor: '#ffffff', accentColor: '#77bdd4'
+      },
+      {
+        id: 'w5', kind: 'schedules', sourceId: '', title: '', enabled: true,
+        launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'large', scheduleMode: 'month',
+        background: '', backgroundColor: '#2d3b36', overlayOpacity: 0.4, surfaceOpacity: 1,
+        font: 'system', fontColor: '#ffffff', accentColor: '#e1b36a'
+      },
+      {
+        id: 'w6', kind: 'schedules', sourceId: '', title: '', enabled: true,
+        launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'large', scheduleMode: 'week',
+        background: '', backgroundColor: '#2d3b36', overlayOpacity: 0.4, surfaceOpacity: 1,
+        font: 'system', fontColor: '#ffffff', accentColor: '#e1b36a'
+      },
+      {
+        id: 'w7', kind: 'schedules', sourceId: '', title: '', enabled: true,
+        launchOnStartup: false, locked: false, alwaysOnTop: false, size: 'large', scheduleMode: 'day',
+        background: '', backgroundColor: '#2d3b36', overlayOpacity: 0.4, surfaceOpacity: 1,
+        font: 'system', fontColor: '#ffffff', accentColor: '#e1b36a'
       }
     ]
   },
@@ -149,6 +177,9 @@ ipcMain.handle('window:isMaximized', () => false)
 ipcMain.handle('pet-widget:sync', () => undefined)
 ipcMain.handle('pet-widget:hide', () => undefined)
 ipcMain.handle('desktop-widget:close', () => true)
+ipcMain.handle('desktop-widget:begin-drag', () => ({ x: 10, y: 10, width: 340, height: 218 }))
+ipcMain.handle('desktop-widget:end-drag', () => true)
+ipcMain.on('desktop-widget:resize', () => undefined)
 ipcMain.handle('desktop-widget:set-pointer-interactive', () => true)
 ipcMain.handle('study-room:get-state', () => ({
   status: 'idle', selfId: '', nickname: '小桌', room: null, members: [], error: ''
@@ -343,18 +374,41 @@ async function checkRoute(route) {
   }
 
   if (route.hash === '/widgets' && domOk) {
+    const modeResult = await win.webContents.executeJavaScript(`(() => {
+      if (!document.querySelector('.timetable-week')) return '课表周模式未渲染'
+      if (!document.querySelector('.schedule-month')) return '日程月模式未渲染'
+      if (!document.querySelector('.schedule-week')) return '日程周模式未渲染'
+      if (!document.querySelector('.schedule-day')) return '日程日模式未渲染'
+      const create = [...document.querySelectorAll('.create-actions button')].find((button) => button.textContent?.includes('日程'))
+      if (!create) return '缺少日程摆件创建入口'
+      create.click()
+      return new Promise((resolve) => setTimeout(() => {
+        const scheduleOption = document.querySelector('.kind-segment button:nth-child(3)')
+        document.querySelector('.modal-foot .btn-secondary')?.click()
+        resolve(scheduleOption?.textContent?.includes('日程') ? '' : '创建弹窗缺少日程选项')
+      }, 80))
+    })()`)
+    if (modeResult) errors.push(modeResult)
+
     const editorResult = await win.webContents.executeJavaScript(`(async () => {
       const edit = document.querySelector('button[title="编辑外观"]')
       if (!edit) return '缺少编辑按钮'
       edit.click()
       await new Promise((resolve) => setTimeout(resolve, 80))
-      const slider = document.querySelector('.range-field input[type="range"]')
+      const slider = document.querySelector('input[aria-label="卡片不透明度"]')
       const surface = document.querySelector('.editor-preview .widget-surface')
       if (!slider || !surface) return '编辑弹窗未打开'
       slider.value = '0.37'
       slider.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise((resolve) => setTimeout(resolve, 80))
-      return getComputedStyle(surface).opacity === '0.37' ? '' : '属性未实时预览'
+      const fontSlider = document.querySelector('input[aria-label="摆件字号"]')
+      if (!fontSlider) return '缺少摆件字号调节'
+      fontSlider.value = '1.25'
+      fontSlider.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const card = document.querySelector('.editor-preview .desktop-widget-card')
+      const scale = card ? getComputedStyle(card).getPropertyValue('--widget-font-scale').trim() : ''
+      return getComputedStyle(surface).opacity === '0.37' && scale === '1.25' ? '' : '外观设置未实时预览'
     })()`)
     if (editorResult) errors.push(editorResult)
 
@@ -426,13 +480,15 @@ async function checkRoute(route) {
     const interactionResult = await win.webContents.executeJavaScript(`(async () => {
       const cycle = document.querySelector('button[title="切换倒数日"]')
       const lock = document.querySelector('.widget-lock-toggle')
-      if (!cycle || !lock) return '缺少倒数切换或锁定按钮'
+      const resize = document.querySelector('.widget-resize-handle')
+      if (!cycle || !lock || !resize) return '缺少倒数切换、锁定按钮或缩放手柄'
       cycle.click()
       await new Promise((resolve) => setTimeout(resolve, 60))
       if (!document.querySelector('.widget-title')?.textContent?.includes('英语六级')) return '倒数日未切换'
       lock.click()
       await new Promise((resolve) => setTimeout(resolve, 60))
-      return document.querySelector('.widget-lock-toggle')?.getAttribute('title') === '解锁摆件' ? '' : '锁定状态未更新'
+      if (document.querySelector('.widget-lock-toggle')?.getAttribute('title') !== '解锁摆件') return '锁定状态未更新'
+      return document.querySelector('.widget-resize-handle') ? '锁定后缩放手柄仍可用' : ''
     })()`)
     if (interactionResult) errors.push(interactionResult)
   }

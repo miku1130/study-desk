@@ -39,6 +39,8 @@ const api = {
       ipcRenderer.invoke('desktop-widget:begin-drag', id),
     move: (id: string, x: number, y: number): void =>
       ipcRenderer.send('desktop-widget:move', id, x, y),
+    resize: (id: string, width: number, height: number): void =>
+      ipcRenderer.send('desktop-widget:resize', id, width, height),
     endDrag: (id: string, x: number, y: number): Promise<boolean> =>
       ipcRenderer.invoke('desktop-widget:end-drag', id, x, y),
     setPointerInteractive: (id: string, interactive: boolean): Promise<boolean> =>

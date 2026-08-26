@@ -14,6 +14,9 @@ const DEFAULTS: Omit<DesktopWidgetConfig, 'id' | 'kind' | 'sourceId' | 'title'> 
   locked: false,
   alwaysOnTop: false,
   size: 'medium',
+  timetableMode: 'day',
+  scheduleMode: 'month',
+  fontScale: 1,
   background: '',
   backgroundColor: '#24312c',
   overlayOpacity: 0.42,
@@ -27,7 +30,7 @@ const DEFAULTS: Omit<DesktopWidgetConfig, 'id' | 'kind' | 'sourceId' | 'title'> 
 
 function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWidgetConfig {
   const kind: DesktopWidgetKind =
-    raw.kind === 'timetable' || raw.kind === 'memo' ? raw.kind : 'countdown'
+    raw.kind === 'timetable' || raw.kind === 'schedules' || raw.kind === 'memo' ? raw.kind : 'countdown'
   const size = raw.size === 'small' || raw.size === 'large' ? raw.size : 'medium'
   const font =
     raw.font === 'serif' ||
@@ -42,6 +45,10 @@ function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWid
     const number = Number(value)
     return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : fallback
   }
+  const fontScaleValue = Number(raw.fontScale)
+  const fontScale = Number.isFinite(fontScaleValue)
+    ? Math.max(0.8, Math.min(1.6, fontScaleValue))
+    : DEFAULTS.fontScale
   return {
     ...DEFAULTS,
     ...raw,
@@ -50,6 +57,9 @@ function normalize(raw: Partial<DesktopWidgetConfig>, index: number): DesktopWid
     sourceId: typeof raw.sourceId === 'string' ? raw.sourceId : '',
     title: typeof raw.title === 'string' ? raw.title : '',
     size,
+    timetableMode: raw.timetableMode === 'week' ? 'week' : 'day',
+    scheduleMode: raw.scheduleMode === 'week' || raw.scheduleMode === 'day' ? raw.scheduleMode : 'month',
+    fontScale,
     font,
     memoDisplayMode: raw.memoDisplayMode === 'image' ? 'image' : 'list',
     memoImageAttachmentId:
@@ -84,6 +94,11 @@ export const useDesktopWidgetsStore = defineStore('desktopWidgets', () => {
     if (kind === 'timetable') {
       item.backgroundColor = '#25343b'
       item.accentColor = '#77bdd4'
+      item.size = 'large'
+    }
+    if (kind === 'schedules') {
+      item.backgroundColor = '#2d3b36'
+      item.accentColor = '#e1b36a'
       item.size = 'large'
     }
     if (kind === 'memo') {

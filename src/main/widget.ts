@@ -78,7 +78,8 @@ function applyDesktopWidgetConfig(
 ): void {
   const locked = Boolean(config.locked)
   win.setMovable(!locked)
-  win.setResizable(!locked)
+  // 透明摆件只允许通过渲染层右下角手柄调整尺寸，避免系统边缘缩放触发持续放大。
+  win.setResizable(false)
   // 摆件位于 Explorer 桌面层，不需要置顶，也不会遮挡其他应用。
   win.setAlwaysOnTop(false)
   setPointerPassthrough(win, locked)
@@ -155,7 +156,9 @@ function createDesktopWidget(config: DesktopWidgetConfig, index: number): Browse
     transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
-    resizable: !config.locked,
+    // 透明无边框窗口在部分 Windows 桌面层环境中会出现原生边缘缩放持续增长。
+    // 尺寸改由渲染层的受控手柄驱动，主进程统一限幅并持久化。
+    resizable: false,
     movable: !config.locked,
     minimizable: false,
     maximizable: false,
@@ -234,6 +237,21 @@ export function setDesktopWidgetPointerInteractive(id: string, interactive: bool
   const win = desktopWidgetWins.get(id)
   if (!win || win.isDestroyed()) return false
   setPointerPassthrough(win, !interactive)
+  return true
+}
+
+export function resizeDesktopWidget(id: string, senderId: number, width: number, height: number): boolean {
+  const win = movableDesktopWidget(id, senderId)
+  if (!win || !Number.isFinite(width) || !Number.isFinite(height)) return false
+  const bounds = win.getBounds()
+  const next = fitToDisplay({
+    ...bounds,
+    width: Math.max(220, Math.min(800, Math.round(width))),
+    height: Math.max(150, Math.min(600, Math.round(height)))
+  })
+  if (bounds.width === next.width && bounds.height === next.height) return true
+  win.setBounds(next)
+  onDesktopWidgetBounds?.(id, win.getBounds())
   return true
 }
 

@@ -336,9 +336,11 @@ export interface CountdownData {
   items: Countdown[]
 }
 
-export type DesktopWidgetKind = 'countdown' | 'timetable' | 'memo'
+export type DesktopWidgetKind = 'countdown' | 'timetable' | 'schedules' | 'memo'
 export type DesktopWidgetSize = 'small' | 'medium' | 'large'
 export type DesktopWidgetMemoMode = 'list' | 'image'
+export type DesktopWidgetTimetableMode = 'day' | 'week'
+export type DesktopWidgetScheduleMode = 'month' | 'week' | 'day'
 export type DesktopWidgetFont =
   | 'system'
   | 'serif'
@@ -358,6 +360,9 @@ export interface DesktopWidgetConfig {
   locked: boolean
   alwaysOnTop: boolean
   size: DesktopWidgetSize
+  timetableMode: DesktopWidgetTimetableMode
+  scheduleMode: DesktopWidgetScheduleMode
+  fontScale: number
   background: string
   backgroundColor: string
   overlayOpacity: number

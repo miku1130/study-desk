@@ -39,6 +39,7 @@ import {
   beginDesktopWidgetDrag,
   moveDesktopWidget,
   endDesktopWidgetDrag,
+  resizeDesktopWidget,
   getDesktopWidgetBounds,
   type DesktopWidgetConfig
 } from './widget'
@@ -58,6 +59,11 @@ protocol.registerSchemesAsPrivileged([
 // 默认歌单解析聚合接口（Meting-API 格式）；可在「设置 → 音乐接口」替换为自建地址以提升稳定性
 const DEFAULT_MUSIC_API = 'https://metingapi.nanorocky.top'
 const PROJECT_RELEASES_URL = 'https://github.com/miku1130/study-desk/releases/latest'
+// 国内网络优先使用可直接代理 GitHub Release 元数据和安装包的镜像，官方源作为最终回退。
+const UPDATE_MIRROR_FEEDS = [
+  'https://ghfast.top/https://github.com/miku1130/study-desk/releases/latest/download/',
+  'https://ghproxy.net/https://github.com/miku1130/study-desk/releases/latest/download/'
+] as const
 const ANNOUNCEMENT_URL = process.env['ANNOUNCEMENT_URL'] || 'https://study.lemon21.cn/announcement'
 
 // 同一用户会话只允许一个主进程；第二次启动只负责把已有窗口带到前台。
@@ -75,6 +81,9 @@ let healthReminder: HealthReminder
 let todoReminder: TodoReminder
 let studyRoom: StudyRoomService
 let updateMode: 'automatic' | 'manual' = 'automatic'
+let updateFeedIndex = 0
+let updateCheckInFlight = false
+let updateRetryInProgress = false
 
 function setAutostart(openAtLogin: boolean): void {
   // Development runs use Electron's executable directly. Registering it without
@@ -130,6 +139,23 @@ function guessExt(url: string, contentType: string): string {
   return '.bin'
 }
 
+async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
+  let lastResponse: Response | null = null
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await net.fetch(url)
+      if (response.ok || (response.status >= 400 && response.status < 500)) return response
+      lastResponse = response
+    } catch {
+      // 网络抖动时短暂等待后重试，最终仍由调用方处理失败。
+    }
+    if (attempt < attempts - 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 450 * (attempt + 1)))
+    }
+  }
+  return lastResponse ?? new Response(null, { status: 599, statusText: 'network retry exhausted' })
+}
+
 /** 从任意文本/链接中识别歌单来源与 ID（网易云 / QQ 音乐） */
 function detectPlaylist(s: string): { server: string; id: string } | null {
   if (!s) return null
@@ -154,7 +180,7 @@ async function resolvePlaylist(input: string): Promise<{ server: string; id: str
   if (r) return r
   if (/^https?:\/\//.test(url)) {
     try {
-      const res = await net.fetch(url)
+      const res = await fetchWithRetry(url)
       r = detectPlaylist(res.url)
       if (!r) r = detectPlaylist(await res.text())
       if (r) return r
@@ -389,7 +415,59 @@ function setupUpdater(): void {
     })
     notify('更新已就绪', `新版本 ${i.version} 已下载完成，请在「设置 → 检查更新」点击「立即重启更新」完成安装`)
   })
-  autoUpdater.on('error', (e) => sendToAll('update:status', { state: 'error', message: String(e) }))
+  autoUpdater.on('error', (e) => {
+    if (updateCheckInFlight) return
+    if (app.isPackaged && updateFeedIndex < UPDATE_MIRROR_FEEDS.length && !updateRetryInProgress) {
+      updateRetryInProgress = true
+      void checkForUpdatesWithFallback(updateMode, updateFeedIndex + 1)
+        .then((result) => {
+          if (result.state === 'error') sendToAll('update:status', result)
+        })
+        .finally(() => {
+          updateRetryInProgress = false
+        })
+      return
+    }
+    sendToAll('update:status', { state: 'error', message: String(e) })
+  })
+}
+
+function configureUpdateFeed(index: number): void {
+  if (index < UPDATE_MIRROR_FEEDS.length) {
+    autoUpdater.setFeedURL({ provider: 'generic', url: UPDATE_MIRROR_FEEDS[index] })
+    return
+  }
+  autoUpdater.setFeedURL({ provider: 'github', owner: 'miku1130', repo: 'study-desk' })
+}
+
+async function checkForUpdatesWithFallback(
+  mode: 'automatic' | 'manual',
+  startIndex = 0
+): Promise<{ state: string; message?: string }> {
+  if (!app.isPackaged) return { state: 'dev' }
+  updateMode = mode === 'automatic' ? 'automatic' : 'manual'
+  // 手动检查也直接下载更新，用户确认后再安装，避免只提示发现版本却没有下载动作。
+  autoUpdater.autoDownload = true
+  updateCheckInFlight = true
+  let lastError: unknown = null
+  try {
+    for (let index = startIndex; index <= UPDATE_MIRROR_FEEDS.length; index += 1) {
+      updateFeedIndex = index
+      configureUpdateFeed(index)
+      try {
+        await autoUpdater.checkForUpdates()
+        return { state: 'checking' }
+      } catch (error) {
+        lastError = error
+        if (index < UPDATE_MIRROR_FEEDS.length) {
+          sendToAll('update:status', { state: 'checking', source: 'mirror' })
+        }
+      }
+    }
+  } finally {
+    updateCheckInFlight = false
+  }
+  return { state: 'error', message: String(lastError ?? 'update source unavailable') }
 }
 
 function registerIpc(): void {
@@ -685,6 +763,9 @@ function registerIpc(): void {
   ipcMain.on('desktop-widget:move', (event, id: string, x: number, y: number) => {
     moveDesktopWidget(id, event.sender.id, Number(x), Number(y))
   })
+  ipcMain.on('desktop-widget:resize', (event, id: string, width: number, height: number) => {
+    resizeDesktopWidget(id, event.sender.id, Number(width), Number(height))
+  })
   ipcMain.handle('desktop-widget:end-drag', (event, id: string, x: number, y: number) =>
     endDesktopWidgetDrag(id, event.sender.id, Number(x), Number(y))
   )
@@ -787,15 +868,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('update:check', async (_event, mode: 'automatic' | 'manual' = 'manual') => {
-    if (!app.isPackaged) return { state: 'dev' }
-    try {
-      updateMode = mode === 'automatic' ? 'automatic' : 'manual'
-      autoUpdater.autoDownload = updateMode === 'automatic'
-      await autoUpdater.checkForUpdates()
-      return { state: 'checking' }
-    } catch (e) {
-      return { state: 'error', message: String(e) }
-    }
+    return checkForUpdatesWithFallback(mode)
   })
   ipcMain.handle('update:install', () => {
     if (app.isPackaged) {
@@ -981,9 +1054,7 @@ app.whenReady().then(() => {
 
   setupUpdater()
   if (app.isPackaged) {
-    updateMode = 'automatic'
-    autoUpdater.autoDownload = true
-    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined)
+    void checkForUpdatesWithFallback('automatic').catch(() => undefined)
   }
 
   app.on('activate', () => {
