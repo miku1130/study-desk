@@ -488,6 +488,7 @@ async function checkRoute(route) {
       lock.click()
       await new Promise((resolve) => setTimeout(resolve, 60))
       if (document.querySelector('.widget-lock-toggle')?.getAttribute('title') !== '解锁摆件') return '锁定状态未更新'
+      if (document.querySelector('.widget-loading')) return '锁定后错误显示加载占位层'
       return document.querySelector('.widget-resize-handle') ? '锁定后缩放手柄仍可用' : ''
     })()`)
     if (interactionResult) errors.push(interactionResult)

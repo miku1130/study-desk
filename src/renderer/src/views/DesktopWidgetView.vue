@@ -262,7 +262,7 @@ onBeforeUnmount(() => {
       @pointerup="endResize"
       @pointercancel="endResize"
     ><AppIcon name="expand" :size="12" /></button>
-    <div v-else class="widget-loading">正在载入摆件</div>
+    <div v-if="!config" class="widget-loading">正在载入摆件</div>
   </main>
 </template>
 
