@@ -90,6 +90,25 @@ describe('PomodoroEngine', () => {
     expect(engine.getState().phase).toBe('long')
   })
 
+  it('emits a completion event when a break ends and work resumes', () => {
+    const { settings, stats } = makeStores({
+      workMin: 1,
+      shortBreakMin: 1,
+      autoStart: true
+    })
+    const events: unknown[][] = []
+    const engine = new PomodoroEngine(settings as never, stats as never, (channel, ...args) =>
+      events.push([channel, ...args])
+    )
+
+    engine.start()
+    vi.advanceTimersByTime(60 * 1000)
+    vi.advanceTimersByTime(60 * 1000)
+
+    expect(events).toContainEqual(['pomodoro:event', 'breakComplete'])
+    expect(engine.getState().phase).toBe('work')
+  })
+
   it('pause freezes the countdown and reset returns to idle', () => {
     const { settings, stats } = makeStores()
     const engine = new PomodoroEngine(settings as never, stats as never, () => {})

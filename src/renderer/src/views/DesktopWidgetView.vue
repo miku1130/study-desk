@@ -271,7 +271,8 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100vw;
   height: 100vh;
-  padding: 6px;
+  /* 透明原生窗口的留白在锁定鼠标穿透时会被 Windows 合成成底部横条。 */
+  padding: 0;
   overflow: hidden;
   background: transparent;
 }

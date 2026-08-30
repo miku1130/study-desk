@@ -57,6 +57,32 @@ describe('BellScheduler', () => {
     expect(calls.filter(([c, k]) => c === 'bell:ring' && k === 'on').length).toBe(1)
   })
 
+  it('catches a bell when a polling interval spans across its minute', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 5, 7, 59, 56))
+    const calls: unknown[][] = []
+    const lesson: Lesson = {
+      id: 'bell-catch-up', day: 1, periodId: 'p1', name: '测试课程', teacher: '', location: '', color: '#fff'
+    }
+    const { settings, timetable, scheduleStore } = makeStores([period], [lesson], [], true)
+    const scheduler = new BellScheduler(
+      settings as never,
+      timetable as never,
+      scheduleStore as never,
+      (channel, ...args) => calls.push([channel, ...args]),
+      () => {}
+    )
+
+    scheduler.start()
+    expect(calls.filter(([channel]) => channel === 'bell:ring')).toHaveLength(0)
+
+    vi.advanceTimersByTime(10_000)
+    expect(calls.filter(([channel, kind]) => channel === 'bell:ring' && kind === 'on')).toHaveLength(1)
+
+    vi.advanceTimersByTime(10_000)
+    expect(calls.filter(([channel, kind]) => channel === 'bell:ring' && kind === 'on')).toHaveLength(1)
+  })
+
   it('does not ring when the bell is disabled', () => {
     vi.useFakeTimers()
     vi.setSystemTime(MONDAY_0800)

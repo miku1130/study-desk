@@ -29,6 +29,12 @@ interface ScheduleItem {
 }
 
 /**
+ * 正常轮询间隔是 10 秒。主进程偶发被系统任务短暂阻塞时，补偿刚跨过的整分钟，
+ * 既避免漏铃，也不会在电脑恢复很久后补播过期提醒。
+ */
+const BELL_CATCH_UP_WINDOW_MS = 90_000
+
+/**
  * 上下课铃声 + 日程提醒调度器：每 10 秒比对当前 HH:mm，
  * 命中课程或日程起止时间则触发铃声 / 通知，每个时刻当天仅触发一次。
  */
@@ -36,6 +42,7 @@ export class BellScheduler {
   private timer: NodeJS.Timeout | null = null
   private fired = new Set<string>()
   private lastDay = ''
+  private lastCheckAt: number | null = null
 
   constructor(
     private readonly settings: JsonStore<Record<string, unknown>>,
@@ -53,6 +60,7 @@ export class BellScheduler {
 
   reload(): void {
     this.fired.clear()
+    this.lastCheckAt = null
   }
 
   /** 退出时停掉轮询；与其它常驻模块保持同名接口 */
@@ -79,7 +87,7 @@ export class BellScheduler {
       // 因而周日或其它无课日都不会按空作息表误响。
       const lesson = lessons.find((l) => l.day === weekday && l.periodId === p.id)
       if (!lesson) continue
-      if (p.start === hm) {
+      if (this.shouldFireAt(p.start, hm, now)) {
         const key = `${dayKey}:${p.id}:start`
         if (!this.fired.has(key)) {
           this.fired.add(key)
@@ -90,7 +98,7 @@ export class BellScheduler {
           }
         }
       }
-      if (p.end === hm) {
+      if (this.shouldFireAt(p.end, hm, now)) {
         const key = `${dayKey}:${p.id}:end`
         if (!this.fired.has(key)) {
           this.fired.add(key)
@@ -109,9 +117,25 @@ export class BellScheduler {
         !/^\d{2}:\d{2}$/.test(item.start) ||
         !/^\d{2}:\d{2}$/.test(item.end)
       ) continue
-      if (item.start === hm) this.fireSchedule(item, 'start', dayKey)
-      if (item.end === hm) this.fireSchedule(item, 'end', dayKey)
+      if (this.shouldFireAt(item.start, hm, now)) this.fireSchedule(item, 'start', dayKey)
+      if (this.shouldFireAt(item.end, hm, now)) this.fireSchedule(item, 'end', dayKey)
     }
+
+    this.lastCheckAt = now.getTime()
+  }
+
+  private shouldFireAt(time: string, currentTime: string, now: Date): boolean {
+    if (time === currentTime) return true
+    if (!/^\d{2}:\d{2}$/.test(time) || this.lastCheckAt === null) return false
+
+    const nowAt = now.getTime()
+    if (nowAt <= this.lastCheckAt || nowAt - this.lastCheckAt > BELL_CATCH_UP_WINDOW_MS) return false
+
+    const [hour, minute] = time.split(':').map(Number)
+    const target = new Date(now)
+    target.setHours(hour, minute, 0, 0)
+    const targetAt = target.getTime()
+    return targetAt > this.lastCheckAt && targetAt <= nowAt
   }
 
   private fireSchedule(item: ScheduleItem, kind: 'start' | 'end', dayKey: string): void {

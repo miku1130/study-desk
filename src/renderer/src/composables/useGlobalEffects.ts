@@ -52,8 +52,11 @@ export function useGlobalEffects(): void {
     )
     cleanups.push(
       window.api.pomodoro.onEvent((type) => {
-        if (type === 'workComplete') {
+        // 专注结束与休息结束都是阶段切换；两端都要有提示音，避免只在进入休息时响铃。
+        if (type === 'workComplete' || type === 'breakComplete') {
           playSound(settings.s.pomodoro.sound, settings.s.pomodoro.volume)
+        }
+        if (type === 'workComplete') {
           garden.reward(settings.s.pomodoro.workMin)
           todos.addPomodoroToActive()
           const petReward = pet.completeSession('pomodoro')
