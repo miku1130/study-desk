@@ -123,10 +123,47 @@ export function isReviewDue(item: ReviewItem, today: string): boolean {
   )
 }
 
+/** 某天是否有复习到期（含逾期） */
+export function isReviewOverdue(item: ReviewItem, today: string): boolean {
+  return (
+    !item.archived &&
+    Boolean(item.nextReviewDate) &&
+    compareDateKeys(item.nextReviewDate, today) < 0
+  )
+}
+
 export function daysOverdue(item: ReviewItem, today: string): number {
   if (!isReviewDue(item, today)) return 0
   const due = parseDateKey(item.nextReviewDate)
   const current = parseDateKey(today)
   if (!due || !current) return 0
   return Math.max(0, Math.round((current.getTime() - due.getTime()) / 86_400_000))
+}
+
+/**
+ * 日历按原计划日期归档。逾期任务仍留在到期日，点击旧日期就能重新找回。
+ * 选中今天时则汇入所有逾期项，方便一次清理。
+ */
+export function reviewsForDate(
+  items: ReviewItem[],
+  selectedDate: string,
+  today: string
+): ReviewItem[] {
+  const active = items.filter((item) => !item.archived && item.nextReviewDate)
+  if (selectedDate === today) {
+    return active
+      .filter((item) => isReviewDue(item, today))
+      .sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate))
+  }
+  return active
+    .filter((item) => item.nextReviewDate === selectedDate)
+    .sort((a, b) => a.round - b.round)
+}
+
+export function reviewCountsByDate(items: ReviewItem[]): Record<string, number> {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    if (item.archived || !item.nextReviewDate) return counts
+    counts[item.nextReviewDate] = (counts[item.nextReviewDate] ?? 0) + 1
+    return counts
+  }, {})
 }

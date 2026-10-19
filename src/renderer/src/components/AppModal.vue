@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ title?: string }>()
+defineProps<{ title?: string; wide?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 </script>
 
@@ -7,7 +7,7 @@ const emit = defineEmits<{ close: [] }>()
   <Teleport to="body">
     <Transition name="modal" appear>
       <div class="modal-mask" @click.self="emit('close')">
-        <div class="modal-card">
+        <div class="modal-card" :class="{ wide }">
           <div class="modal-head">
             <h3>{{ title }}</h3>
             <button class="modal-x" aria-label="关闭" @click="emit('close')">✕</button>
@@ -44,6 +44,9 @@ const emit = defineEmits<{ close: [] }>()
   border: 1px solid var(--separator);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-pop);
+}
+.modal-card.wide {
+  width: 620px;
 }
 .modal-head {
   display: flex;

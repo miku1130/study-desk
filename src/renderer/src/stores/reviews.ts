@@ -137,6 +137,18 @@ export const useReviewsStore = defineStore('reviews', () => {
     return item
   }
 
+  function addMany(titles: string[], learnedOn: string = dateKey()): ReviewItem[] {
+    const cleanTitles = titles.map((title) => title.trim()).filter(Boolean)
+    if (!cleanTitles.length) return []
+    const now = new Date()
+    const additions = cleanTitles.map((title) =>
+      createReviewItem({ title, learnedOn }, now)
+    )
+    items.value.push(...additions)
+    void save()
+    return additions
+  }
+
   function update(
     id: string,
     input: { title: string; subject: string; note: string; learnedOn: string }
@@ -190,6 +202,7 @@ export const useReviewsStore = defineStore('reviews', () => {
     load,
     save,
     add,
+    addMany,
     update,
     complete,
     remove,

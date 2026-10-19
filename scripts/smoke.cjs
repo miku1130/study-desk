@@ -97,7 +97,7 @@ const sample = {
         id: 'rv2', title: '英语 · 虚拟语气', subject: '英语语法',
         note: '', learnedOn: dkey(5), createdAt: Date.now() - 432000000,
         updatedAt: Date.now() - 172800000, round: 1, totalRounds: 6,
-        nextReviewDate: dkey(-2), lastReviewedOn: '',
+        nextReviewDate: dkey(1), lastReviewedOn: '',
         reviewLog: [{ round: 1, dueDate: dkey(4), completedOn: dkey(3) }], archived: false
       },
       {
@@ -318,7 +318,7 @@ const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
   { hash: '/schedules', name: '日程管理', sel: ['.schedule-page', '.month-grid', '.agenda-panel'] },
-  { hash: '/review', name: '记忆曲线', sel: ['.reviews-page', '.month-grid', '.review-side', '.ledger-panel'] },
+  { hash: '/review', name: '记忆曲线', sel: ['.reviews-page', '.month-grid', '.review-side', '.library-panel'] },
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
   { hash: '/todo', name: '备忘录中心', sel: ['.memo-tabs', '.quick-card'] },
@@ -510,30 +510,42 @@ async function checkRoute(route) {
 
   if (route.hash === '/review' && domOk) {
     const reviewResult = await win.webContents.executeJavaScript(`(async () => {
-      const today = new Date()
-      const pad = (value) => String(value).padStart(2, '0')
-      const todayKey = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate())
-      const create = [...document.querySelectorAll('.reviews-head button')].find((button) => button.textContent?.includes('记录今日所学'))
-      if (!create) return '缺少记录今日所学入口'
+      const overdueCount = document.querySelector('.day-cell.overdue .day-count')
+      if (!overdueCount) return '日历没有显示逾期未复习数量'
+      const dueBefore = document.querySelectorAll('.review-check').length
+      const completedBefore = document.querySelectorAll('.completed-row').length
+      if (dueBefore > 0) {
+        document.querySelector('.review-check')?.click()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+        if (document.querySelectorAll('.completed-row').length <= completedBefore) {
+          return '勾选后复习行没有完成归档'
+        }
+      }
+      const create = [...document.querySelectorAll('.reviews-head button')].find((button) => button.textContent?.includes('记下今天'))
+      if (!create) return '缺少今日记录入口'
       create.click()
       await new Promise((resolve) => setTimeout(resolve, 80))
-      const form = document.querySelector('.review-form')
-      const date = form?.querySelector('input[type="date"]')
-      if (!form || !date) return '记录弹窗未打开'
-      if (date.value !== todayKey) return '学习日期没有默认今天'
-      const title = form.querySelector('input.input')
-      title.value = '冒烟测试 · 记忆曲线'
-      title.dispatchEvent(new Event('input', { bubbles: true }))
+      const sheet = document.querySelector('.record-sheet')
+      const inputs = [...(sheet?.querySelectorAll('.record-table input') ?? [])]
+      if (!sheet || inputs.length < 5) return '多行记录表格未打开'
+      const first = inputs[0]
+      const second = inputs[1]
+      first.value = '冒烟测试 · 记忆曲线'
+      second.value = '冒烟测试 · 第二条'
+      first.dispatchEvent(new Event('input', { bubbles: true }))
+      second.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise((resolve) => setTimeout(resolve, 60))
-      const preview = form.querySelectorAll('.preview-grid > span')
-      if (preview.length !== 6) return '复习排期预览不是 6 轮'
-      const save = [...document.querySelectorAll('.modal-foot button')].find((button) => button.textContent?.includes('加入复习计划'))
+      const save = [...document.querySelectorAll('.modal-foot button')].find((button) => button.textContent?.includes('保存'))
       if (!save) return '缺少保存按钮'
       save.click()
       await new Promise((resolve) => setTimeout(resolve, 120))
-      if (document.querySelector('.review-form')) return '保存后弹窗未关闭'
-      const rows = [...document.querySelectorAll('.ledger-row')]
-      return rows.some((row) => row.textContent?.includes('冒烟测试 · 记忆曲线')) ? '' : '新增知识未进入档案'
+      if (document.querySelector('.record-sheet')) return '保存后弹窗未关闭'
+      const rows = [...document.querySelectorAll('.library-row')]
+      const added = rows.filter((row) => row.textContent?.includes('冒烟测试')).length
+      return added === 2
+        ? ''
+        : '批量记录没有全部进入记录列表: ' + added + ' / ' +
+          rows.map((row) => row.textContent?.trim()).join(' | ')
     })()`)
     if (reviewResult) errors.push(reviewResult)
   }
@@ -645,7 +657,11 @@ app.whenReady().then(async () => {
     })
     nativeTheme.themeSource = 'light'
     const results = []
-    for (const r of routes) {
+    const selectedRoute = process.env.SMOKE_ROUTE
+    const routesToCheck = selectedRoute
+      ? routes.filter((route) => route.hash === selectedRoute)
+      : routes
+    for (const r of routesToCheck) {
       results.push(await checkRoute(r))
     }
 

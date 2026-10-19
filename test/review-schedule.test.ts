@@ -5,6 +5,9 @@ import {
   completeReview,
   createReviewItem,
   daysOverdue,
+  isReviewOverdue,
+  reviewCountsByDate,
+  reviewsForDate,
   scheduledReviewDates
 } from '../src/renderer/src/lib/reviewSchedule'
 
@@ -65,5 +68,33 @@ describe('review schedule', () => {
       nextReviewDate: '2026-03-02'
     }
     expect(daysOverdue(item, '2026-03-05')).toBe(3)
+    expect(isReviewOverdue(item, '2026-03-05')).toBe(true)
+  })
+
+  it('keeps overdue work on its original calendar date', () => {
+    const first = {
+      ...createReviewItem({ title: '极限', learnedOn: '2026-03-01' }),
+      nextReviewDate: '2026-03-02'
+    }
+    const second = {
+      ...createReviewItem({ title: '矩阵', learnedOn: '2026-03-03' }),
+      nextReviewDate: '2026-03-04'
+    }
+    const archived = {
+      ...createReviewItem({ title: '已归档', learnedOn: '2026-02-01' }),
+      archived: true
+    }
+
+    expect(reviewsForDate([first, second, archived], '2026-03-02', '2026-03-05')).toEqual([
+      first
+    ])
+    expect(reviewsForDate([first, second], '2026-03-05', '2026-03-05')).toEqual([
+      first,
+      second
+    ])
+    expect(reviewCountsByDate([first, second, archived])).toEqual({
+      '2026-03-02': 1,
+      '2026-03-04': 1
+    })
   })
 })

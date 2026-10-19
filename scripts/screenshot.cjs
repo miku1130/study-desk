@@ -119,7 +119,7 @@ const sample = {
         id: 'rv4', title: '线性代数 · 特征值与特征向量', subject: '线性代数',
         note: '', learnedOn: dkey(2), createdAt: Date.now() - 172800000,
         updatedAt: Date.now() - 172800000, round: 0, totalRounds: 6,
-        nextReviewDate: dkey(-1), lastReviewedOn: '', reviewLog: [], archived: false
+        nextReviewDate: dkey(1), lastReviewedOn: '', reviewLog: [], archived: false
       }
     ]
   },
