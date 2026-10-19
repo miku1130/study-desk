@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { StartupAnnouncement } from '@/types'
+import {
+  dismissAnnouncement,
+  isAnnouncementDismissed
+} from '@/lib/announcementState'
 
 const announcement = ref<StartupAnnouncement | null>(null)
 const visible = ref(false)
@@ -10,15 +14,23 @@ onMounted(async () => {
     const value = (await window.api.announcement.get()) as StartupAnnouncement | null
     if (value?.enabled && value.title && value.content) {
       announcement.value = value
-      visible.value = true
+      visible.value = !isAnnouncementDismissed(window.localStorage, value)
     }
   } catch {
     // 公告属于增强能力，网络不可用时不影响主界面启动。
   }
 })
 
+function dismiss(): void {
+  if (announcement.value) {
+    dismissAnnouncement(window.localStorage, announcement.value)
+  }
+  visible.value = false
+}
+
 function openAction(): void {
   const url = announcement.value?.actionUrl
+  dismiss()
   if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 </script>
@@ -26,14 +38,14 @@ function openAction(): void {
 <template>
   <Teleport to="body">
     <Transition name="announcement">
-      <div v-if="visible && announcement" class="announcement-mask" @click.self="visible = false">
+      <div v-if="visible && announcement" class="announcement-mask" @click.self="dismiss">
         <section class="announcement-card" role="dialog" aria-modal="true" aria-labelledby="announcement-title">
           <div class="announcement-kicker">学习桌面公告</div>
           <h2 id="announcement-title">{{ announcement.title }}</h2>
           <time v-if="announcement.publishedAt">{{ announcement.publishedAt }}</time>
           <p class="announcement-content">{{ announcement.content }}</p>
           <div class="announcement-actions">
-            <button class="btn btn-secondary btn-sm" @click="visible = false">知道了</button>
+            <button class="btn btn-secondary btn-sm" @click="dismiss">不再提醒</button>
             <button v-if="announcement.actionUrl" class="btn btn-sm" @click="openAction">
               {{ announcement.actionText || '查看详情' }}
             </button>

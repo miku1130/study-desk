@@ -10,6 +10,16 @@ protocol.registerSchemesAsPrivileged([
 
 const smokeImage = join(__dirname, '../src/renderer/src/assets/pet/cat-attentive.png')
 const smokeFile = join(__dirname, '../package.json')
+const smokeAnnouncement =
+  process.env.SMOKE_ANNOUNCEMENT === '1'
+    ? {
+        enabled: true,
+        id: 'smoke-announcement',
+        title: '公告已读持久化测试',
+        content: '关闭后重新加载页面，这条公告不应再次出现。',
+        publishedAt: '2026-10-19'
+      }
+    : null
 
 function dkey(offset) {
   const d = new Date()
@@ -190,7 +200,7 @@ ipcMain.handle('shell:openPath', () => '')
 ipcMain.handle('dialog:openFiles', () => [])
 ipcMain.handle('pomodoro:getState', () => ({ phase: 'work', remaining: 1124, total: 1500, running: true, completed: 2 }))
 ipcMain.handle('app:getVersion', () => '0.1.0')
-ipcMain.handle('announcement:get', () => null)
+ipcMain.handle('announcement:get', () => smokeAnnouncement)
 ipcMain.handle('app:openProject', () => undefined)
 ipcMain.handle('autostart:get', () => false)
 // 故意报一个占用失败，验证设置页真的会把热键冲突显示出来
@@ -526,6 +536,34 @@ async function checkRoute(route) {
       return rows.some((row) => row.textContent?.includes('冒烟测试 · 记忆曲线')) ? '' : '新增知识未进入档案'
     })()`)
     if (reviewResult) errors.push(reviewResult)
+  }
+
+  if (route.hash === '' && domOk && smokeAnnouncement) {
+    await win.webContents.executeJavaScript(
+      `localStorage.removeItem('studydesk.announcement.dismissed-id')`
+    )
+    win.webContents.reload()
+    await wait(1300)
+
+    const firstView = await win.webContents.executeJavaScript(`(async () => {
+      const modal = document.querySelector('.announcement-card')
+      const dismiss = [...document.querySelectorAll('.announcement-actions button')]
+        .find((button) => button.textContent?.includes('不再提醒'))
+      if (!modal || !dismiss) return '公告未显示或缺少不再提醒按钮'
+      dismiss.click()
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      return localStorage.getItem('studydesk.announcement.dismissed-id')
+    })()`)
+    if (firstView !== 'smoke-announcement') {
+      errors.push(`公告已读状态未保存: ${String(firstView)}`)
+    }
+
+    win.webContents.reload()
+    await wait(1300)
+    const secondView = await win.webContents.executeJavaScript(
+      `Boolean(document.querySelector('.announcement-card'))`
+    )
+    if (secondView) errors.push('已读公告重新加载后仍然弹出')
   }
 
   if ((route.hash === '/lock' || route.hash === '/pet-widget') && domOk) {
