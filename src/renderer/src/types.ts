@@ -166,6 +166,44 @@ export interface SchedulesData {
   items: ScheduleItem[]
 }
 
+export interface ReviewLogEntry {
+  /** 第几轮复习，从 1 开始 */
+  round: number
+  /** 原计划复习日期 */
+  dueDate: string
+  /** 实际完成日期 */
+  completedOn: string
+}
+
+export interface ReviewItem {
+  id: string
+  title: string
+  subject: string
+  note: string
+  learnedOn: string
+  createdAt: number
+  updatedAt: number
+  /** 已完成轮次；下一轮为 round + 1 */
+  round: number
+  totalRounds: number
+  /** 当前这一次应复习的日期；全部完成后为空 */
+  nextReviewDate: string
+  lastReviewedOn: string
+  reviewLog: ReviewLogEntry[]
+  archived: boolean
+}
+
+export interface ReviewReminderConfig {
+  enabled: boolean
+  /** 每天开始弹复习系统通知的时间，HH:mm */
+  time: string
+}
+
+export interface ReviewsData {
+  items: ReviewItem[]
+  reminder: ReviewReminderConfig
+}
+
 export interface StartupAnnouncement {
   enabled: boolean
   id?: string

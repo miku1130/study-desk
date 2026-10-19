@@ -11,6 +11,8 @@ import { useWaterStore } from '@/stores/water'
 import { useSettingsStore } from '@/stores/settings'
 import { useGardenStore } from '@/stores/garden'
 import { useCountdownStore, daysLeft } from '@/stores/countdowns'
+import { useReviewsStore } from '@/stores/reviews'
+import { isReviewDue } from '@/lib/reviewSchedule'
 import { WEEKDAYS } from '@/types'
 
 const router = useRouter()
@@ -24,6 +26,7 @@ const water = useWaterStore()
 const settings = useSettingsStore()
 const garden = useGardenStore()
 const cd = useCountdownStore()
+const reviews = useReviewsStore()
 
 const waterGoal = computed(() => settings.s.water.goalCups || 8)
 const waterPct = computed(() => Math.min(100, Math.round((water.cupsToday / waterGoal.value) * 100)))
@@ -50,6 +53,9 @@ const todayKey = computed(() => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 })
 const todayStat = computed(() => stats.daily[todayKey.value] ?? { pomodoros: 0, focusMinutes: 0 })
+const reviewDueToday = computed(() =>
+  reviews.active.filter((item) => isReviewDue(item, todayKey.value))
+)
 
 const previewTodos = computed(() =>
   todos.items
@@ -167,6 +173,10 @@ function go(path: string): void {
       <span v-if="cd.nearest" class="foot-cd" @click="go('/countdown')">
         <AppIcon name="hourglass" :size="13" />
         距 {{ cd.nearest.title }} 还有 {{ daysLeft(cd.nearest.date) }} 天
+      </span>
+      <span v-if="reviewDueToday.length" class="foot-review" @click="go('/review')">
+        <AppIcon name="brain" :size="13" />
+        今日复习 {{ reviewDueToday.length }} 条
       </span>
       <span class="foot-music" @click="go('/music')">
         <AppIcon :name="music.current && !music.playing ? 'pause' : 'music'" :size="13" />
@@ -572,6 +582,15 @@ function go(path: string): void {
   cursor: pointer;
   white-space: nowrap;
 }
+.foot-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand-peach);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
 .foot-music {
   display: inline-flex;
   align-items: center;
@@ -581,7 +600,7 @@ function go(path: string): void {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
+  max-width: 250px;
 }
 .foot-music:hover {
   color: var(--accent-strong);

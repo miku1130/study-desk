@@ -20,6 +20,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '日程管理' }
   },
   {
+    path: '/review',
+    name: 'reviews',
+    component: () => import('@/views/ReviewsView.vue'),
+    meta: { title: '记忆曲线' }
+  },
+  {
     path: '/pomodoro',
     name: 'pomodoro',
     component: () => import('@/views/PomodoroView.vue'),

@@ -5,6 +5,7 @@ import { useTimetableStore } from '@/stores/timetable'
 import { useTodoStore } from '@/stores/todos'
 import { useBooksStore } from '@/stores/books'
 import { useCountdownStore } from '@/stores/countdowns'
+import { useReviewsStore } from '@/stores/reviews'
 
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -12,6 +13,7 @@ const tt = useTimetableStore()
 const todos = useTodoStore()
 const books = useBooksStore()
 const cd = useCountdownStore()
+const reviews = useReviewsStore()
 
 const q = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
@@ -36,6 +38,7 @@ const pages: Item[] = (
   [
     ['仪表盘', '/'],
     ['课表', '/timetable'],
+    ['记忆曲线', '/review'],
     ['番茄钟', '/pomodoro'],
     ['背景音乐', '/music'],
     ['备忘录中心', '/todo'],
@@ -52,6 +55,7 @@ const results = computed<Item[]>(() => {
   if (!k) return pages
   const all: Item[] = [...pages]
   for (const l of tt.lessons) all.push({ label: l.name, sub: `课表 · ${l.location || ''}`, action: () => go('/timetable') })
+  for (const r of reviews.items) all.push({ label: r.title, sub: `记忆曲线 · ${r.archived ? '已完成' : `第 ${r.round + 1} 轮`}`, action: () => go('/review') })
   for (const t of todos.items) all.push({ label: t.text, sub: `${t.kind === 'task' ? '任务' : '备忘录'} · ${t.tags.join(' ')}`, action: () => go('/todo') })
   for (const b of books.items) all.push({ label: b.name, sub: `资料库 · ${b.category}`, action: () => openBook(b.path) })
   for (const c of cd.items) all.push({ label: c.title, sub: '倒数日', action: () => go('/countdown') })

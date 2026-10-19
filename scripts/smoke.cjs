@@ -73,6 +73,35 @@ const sample = {
     { id: 's1', date: dkey(0), start: '09:00', end: '10:30', title: '项目评审', location: '会议室 A', note: '', color: '#4f8fd8', allDay: false, createdAt: Date.now(), updatedAt: Date.now() },
     { id: 's2', date: dkey(0), start: '14:00', end: '15:00', title: '专注阅读', location: '', note: '', color: '#e1b36a', allDay: false, createdAt: Date.now(), updatedAt: Date.now() }
   ] },
+  reviews: {
+    reminder: { enabled: true, time: '09:00' },
+    items: [
+      {
+        id: 'rv1', title: '高等数学 · 导数与微分', subject: '高等数学 · 第三章',
+        note: '导数描述瞬时变化率，微分关注线性近似。', learnedOn: dkey(1),
+        createdAt: Date.now() - 86400000, updatedAt: Date.now() - 86400000,
+        round: 0, totalRounds: 6, nextReviewDate: dkey(0), lastReviewedOn: '',
+        reviewLog: [], archived: false
+      },
+      {
+        id: 'rv2', title: '英语 · 虚拟语气', subject: '英语语法',
+        note: '', learnedOn: dkey(5), createdAt: Date.now() - 432000000,
+        updatedAt: Date.now() - 172800000, round: 1, totalRounds: 6,
+        nextReviewDate: dkey(-2), lastReviewedOn: '',
+        reviewLog: [{ round: 1, dueDate: dkey(4), completedOn: dkey(3) }], archived: false
+      },
+      {
+        id: 'rv3', title: '数据结构 · 二叉搜索树', subject: '数据结构',
+        note: '', learnedOn: dkey(40), createdAt: Date.now() - 3456000000,
+        updatedAt: Date.now() - 86400000, round: 6, totalRounds: 6,
+        nextReviewDate: '', lastReviewedOn: dkey(1),
+        reviewLog: [1, 2, 3, 4, 5, 6].map((round) => ({
+          round, dueDate: dkey(40 - round), completedOn: dkey(39 - round)
+        })),
+        archived: true
+      }
+    ]
+  },
   desktopWidgets: {
     items: [
       {
@@ -279,6 +308,7 @@ const routes = [
   { hash: '', name: '仪表盘', sel: ['.app-shell', '.sidebar', '.hero'] },
   { hash: '/timetable', name: '课表', sel: ['.tt-grid'] },
   { hash: '/schedules', name: '日程管理', sel: ['.schedule-page', '.month-grid', '.agenda-panel'] },
+  { hash: '/review', name: '记忆曲线', sel: ['.reviews-page', '.month-grid', '.review-side', '.ledger-panel'] },
   { hash: '/pomodoro', name: '番茄钟', sel: ['.ring', '.timer-card'] },
   { hash: '/music', name: '背景音乐', sel: ['.player'] },
   { hash: '/todo', name: '备忘录中心', sel: ['.memo-tabs', '.quick-card'] },
@@ -466,6 +496,36 @@ async function checkRoute(route) {
       return ''
     })()`)
     if (attachmentResult) errors.push(attachmentResult)
+  }
+
+  if (route.hash === '/review' && domOk) {
+    const reviewResult = await win.webContents.executeJavaScript(`(async () => {
+      const today = new Date()
+      const pad = (value) => String(value).padStart(2, '0')
+      const todayKey = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate())
+      const create = [...document.querySelectorAll('.reviews-head button')].find((button) => button.textContent?.includes('记录今日所学'))
+      if (!create) return '缺少记录今日所学入口'
+      create.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      const form = document.querySelector('.review-form')
+      const date = form?.querySelector('input[type="date"]')
+      if (!form || !date) return '记录弹窗未打开'
+      if (date.value !== todayKey) return '学习日期没有默认今天'
+      const title = form.querySelector('input.input')
+      title.value = '冒烟测试 · 记忆曲线'
+      title.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      const preview = form.querySelectorAll('.preview-grid > span')
+      if (preview.length !== 6) return '复习排期预览不是 6 轮'
+      const save = [...document.querySelectorAll('.modal-foot button')].find((button) => button.textContent?.includes('加入复习计划'))
+      if (!save) return '缺少保存按钮'
+      save.click()
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      if (document.querySelector('.review-form')) return '保存后弹窗未关闭'
+      const rows = [...document.querySelectorAll('.ledger-row')]
+      return rows.some((row) => row.textContent?.includes('冒烟测试 · 记忆曲线')) ? '' : '新增知识未进入档案'
+    })()`)
+    if (reviewResult) errors.push(reviewResult)
   }
 
   if ((route.hash === '/lock' || route.hash === '/pet-widget') && domOk) {

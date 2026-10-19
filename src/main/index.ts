@@ -24,6 +24,7 @@ import { BellScheduler } from './scheduler'
 import { WaterReminder } from './water'
 import { HealthReminder } from './health'
 import { TodoReminder } from './reminders'
+import { ReviewReminder } from './reviewReminder'
 import { localDateKey } from './time'
 import { openLock, closeLock } from './lockscreen'
 import { resolveWindowBounds } from './windowBounds'
@@ -79,6 +80,7 @@ let scheduler: BellScheduler
 let waterReminder: WaterReminder
 let healthReminder: HealthReminder
 let todoReminder: TodoReminder
+let reviewReminder: ReviewReminder
 let studyRoom: StudyRoomService
 let updateMode: 'automatic' | 'manual' = 'automatic'
 let updateFeedIndex = 0
@@ -533,12 +535,14 @@ function registerIpc(): void {
     }
     if (name === 'timetable' || name === 'schedules') scheduler.reload()
     if (name === 'todos') todoReminder.check()
+    if (name === 'reviews') reviewReminder.check()
     if (
       name === 'desktopWidgets' ||
       name === 'countdowns' ||
       name === 'timetable' ||
       name === 'todos' ||
-      name === 'schedules'
+      name === 'schedules' ||
+      name === 'reviews'
     ) {
       sendToAll('data:reloaded')
     }
@@ -826,7 +830,10 @@ function registerIpc(): void {
     if (!res.filePath) return { ok: false, error: '没有选择保存位置' }
     try {
       const all: Record<string, unknown> = {}
-      for (const k of Object.keys(stores) as (keyof AppStores)[]) all[k] = stores[k].all
+      for (const k of Object.keys(stores) as (keyof AppStores)[]) {
+        // 通知去重游标属于运行状态，不该跟着备份搬到另一台设备后压掉当天提醒
+        if (k !== 'reviewReminderState') all[k] = stores[k].all
+      }
       // 备份是用户面对数据损坏时唯一的自救手段，写盘失败必须让他知道
       writeFileSync(res.filePath, JSON.stringify(all, null, 2), 'utf-8')
       return { ok: true, canceled: false }
@@ -851,11 +858,13 @@ function registerIpc(): void {
       for (const k of known) {
         stores[k].replace(data[k] as Record<string, unknown>)
       }
+      stores.reviewReminderState.replace({ notified: [] })
       const s = stores.settings.all
       nativeTheme.themeSource = (s.theme as 'system' | 'light' | 'dark') ?? 'system'
       scheduler.reload()
       waterReminder.reload()
       healthReminder.reload()
+      reviewReminder.check()
       registerShortcuts()
       syncAutostart()
       syncDesktopWidgets(desktopWidgetItems(), persistDesktopWidgetBounds)
@@ -1044,6 +1053,14 @@ app.whenReady().then(() => {
   todoReminder = new TodoReminder(stores.todos, notify, sendToAll)
   todoReminder.start()
 
+  reviewReminder = new ReviewReminder(
+    stores.reviews,
+    stores.reviewReminderState,
+    notify,
+    sendToAll
+  )
+  reviewReminder.start()
+
   registerIpc()
   registerShortcuts()
   syncAutostart()
@@ -1087,6 +1104,7 @@ app.on('before-quit', () => {
   waterReminder?.stop()
   healthReminder?.stop()
   todoReminder?.stop()
+  reviewReminder?.stop()
   engine?.dispose()
   closeDesktopWidgets()
   closePetWidget()

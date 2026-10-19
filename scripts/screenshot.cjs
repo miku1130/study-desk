@@ -88,6 +88,41 @@ const sample = {
       }
     ]
   },
+  reviews: {
+    reminder: { enabled: true, time: '09:00' },
+    items: [
+      {
+        id: 'rv1', title: '高等数学 · 导数与微分', subject: '高等数学 · 第三章',
+        note: '导数描述瞬时变化率，微分关注线性近似。', learnedOn: dkey(1),
+        createdAt: Date.now() - 86400000, updatedAt: Date.now() - 86400000,
+        round: 0, totalRounds: 6, nextReviewDate: dkey(0), lastReviewedOn: '',
+        reviewLog: [], archived: false
+      },
+      {
+        id: 'rv2', title: '英语 · 虚拟语气', subject: '英语语法',
+        note: '重点区分与现在、过去、将来事实相反的三种结构。', learnedOn: dkey(5),
+        createdAt: Date.now() - 432000000, updatedAt: Date.now() - 172800000,
+        round: 1, totalRounds: 6, nextReviewDate: dkey(0), lastReviewedOn: dkey(3),
+        reviewLog: [{ round: 1, dueDate: dkey(4), completedOn: dkey(3) }], archived: false
+      },
+      {
+        id: 'rv3', title: '数据结构 · 二叉搜索树', subject: '数据结构',
+        note: '', learnedOn: dkey(40), createdAt: Date.now() - 3456000000,
+        updatedAt: Date.now() - 86400000, round: 6, totalRounds: 6,
+        nextReviewDate: '', lastReviewedOn: dkey(1),
+        reviewLog: [1, 2, 3, 4, 5, 6].map((round) => ({
+          round, dueDate: dkey(40 - round), completedOn: dkey(39 - round)
+        })),
+        archived: true
+      },
+      {
+        id: 'rv4', title: '线性代数 · 特征值与特征向量', subject: '线性代数',
+        note: '', learnedOn: dkey(2), createdAt: Date.now() - 172800000,
+        updatedAt: Date.now() - 172800000, round: 0, totalRounds: 6,
+        nextReviewDate: dkey(-1), lastReviewedOn: '', reviewLog: [], archived: false
+      }
+    ]
+  },
   stats: {
     // 半年的样本数据：热力图要看得出「哪几周断了」，光有一周撑不起来
     days: (() => {

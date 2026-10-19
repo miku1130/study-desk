@@ -15,6 +15,7 @@ import PetWidgetView from '@/views/PetWidgetView.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimetableStore } from '@/stores/timetable'
 import { useSchedulesStore } from '@/stores/schedules'
+import { useReviewsStore } from '@/stores/reviews'
 import { useTodoStore } from '@/stores/todos'
 import { useStatsStore } from '@/stores/stats'
 import { useMusicStore } from '@/stores/music'
@@ -40,6 +41,7 @@ const isDashboard = computed(() => route.name === 'dashboard' || route.path === 
 const settings = useSettingsStore()
 const timetable = useTimetableStore()
 const schedules = useSchedulesStore()
+const reviews = useReviewsStore()
 const todos = useTodoStore()
 const stats = useStatsStore()
 const music = useMusicStore()
@@ -112,6 +114,7 @@ async function loadAll(): Promise<void> {
   const results = await Promise.allSettled([
     timetable.load(),
     schedules.load(),
+    reviews.load(),
     todos.load(),
     stats.load(),
     music.load(),
