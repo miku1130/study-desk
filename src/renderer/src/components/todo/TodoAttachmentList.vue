@@ -8,8 +8,10 @@ const props = withDefaults(
     attachments: TodoAttachment[]
     editable?: boolean
     mode?: 'list' | 'editor' | 'widget'
+    /** 桌面摆件锁定后依赖转发的鼠标移动感知悬停，原生 title 会卡在其他窗口上方，因此允许关闭 */
+    tooltips?: boolean
   }>(),
-  { editable: false, mode: 'list' }
+  { editable: false, mode: 'list', tooltips: true }
 )
 
 const emit = defineEmits<{
@@ -37,7 +39,7 @@ async function openAttachment(attachment: TodoAttachment): Promise<void> {
         <button
           type="button"
           class="todo-attachment-open image-open"
-          :title="`打开 ${attachment.name}`"
+          :title="tooltips ? `打开 ${attachment.name}` : undefined"
           @click="openAttachment(attachment)"
         >
           <img :src="imageUrl(attachment.path)" :alt="attachment.name" />
@@ -46,7 +48,7 @@ async function openAttachment(attachment: TodoAttachment): Promise<void> {
           v-if="editable"
           type="button"
           class="attachment-remove"
-          :title="`移除 ${attachment.name}`"
+          :title="tooltips ? `移除 ${attachment.name}` : undefined"
           @click="emit('remove', attachment.id)"
         >
           <AppIcon name="x" :size="12" />
@@ -58,7 +60,7 @@ async function openAttachment(attachment: TodoAttachment): Promise<void> {
         <button
           type="button"
           class="todo-attachment-open file-open"
-          :title="`用系统应用打开 ${attachment.name}`"
+          :title="tooltips ? `用系统应用打开 ${attachment.name}` : undefined"
           @click="openAttachment(attachment)"
         >
           <AppIcon name="file" :size="14" />
@@ -68,7 +70,7 @@ async function openAttachment(attachment: TodoAttachment): Promise<void> {
           v-if="editable"
           type="button"
           class="attachment-remove file-remove"
-          :title="`移除 ${attachment.name}`"
+          :title="tooltips ? `移除 ${attachment.name}` : undefined"
           @click="emit('remove', attachment.id)"
         >
           <AppIcon name="x" :size="12" />

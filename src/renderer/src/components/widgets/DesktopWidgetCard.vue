@@ -5,6 +5,7 @@ import TodoAttachmentList from '@/components/todo/TodoAttachmentList.vue'
 import { daysLeft } from '@/stores/countdowns'
 import { WEEKDAYS, type Countdown, type DesktopWidgetConfig, type ScheduleItem, type TodoItem } from '@/types'
 import type { TimetableWidgetWeekRow } from '@/lib/timetableWidget'
+import { widgetTooltipText } from '@/lib/widgetPointer'
 
 export interface WidgetLessonItem {
   id: string
@@ -37,6 +38,12 @@ const emit = defineEmits<{
 const showMemoInput = ref(false)
 const memoDraft = ref('')
 const memoInput = ref<HTMLInputElement | null>(null)
+
+// 锁定后窗口处于「鼠标穿透 + 转发悬停」状态，原生 title 提示会被转发事件误触发并卡住，
+// 具体原因见 widgetTooltipText；锁定时统一去掉 title，只保留 aria-label。
+function tooltip(text: string): string | undefined {
+  return widgetTooltipText(Boolean(props.config.locked), text)
+}
 
 function pad(value: number): string { return String(value).padStart(2, '0') }
 function dateKey(date: Date): string { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -173,16 +180,16 @@ function submitMemo(): void {
         {{ config.kind === 'countdown' ? '倒数日' : config.kind === 'timetable' ? (config.timetableMode === 'week' ? '本周课表' : '今日课表') : config.kind === 'schedules' ? '日程管理' : '备忘录' }}
       </span>
       <div v-if="!preview" class="widget-actions">
-        <button v-if="config.kind === 'countdown'" class="widget-action" title="切换倒数日" aria-label="切换倒数日" @click="$emit('cycle-countdown')">
+        <button v-if="config.kind === 'countdown'" class="widget-action" :title="tooltip('切换倒数日')" aria-label="切换倒数日" @click="$emit('cycle-countdown')">
           <AppIcon name="rotate-ccw" :size="13" />
         </button>
-        <button v-if="config.kind === 'memo' && !config.locked" class="widget-action" title="快捷记录" aria-label="快捷记录" @click="openMemoInput">
+        <button v-if="config.kind === 'memo' && !config.locked" class="widget-action" :title="tooltip('快捷记录')" aria-label="快捷记录" @click="openMemoInput">
           <AppIcon name="plus" :size="14" />
         </button>
-        <button class="widget-action widget-lock-toggle" :title="config.locked ? '解锁摆件' : '锁定摆件'" :aria-label="config.locked ? '解锁摆件' : '锁定摆件'" @click="$emit('toggle-lock')">
+        <button class="widget-action widget-lock-toggle" :title="tooltip(config.locked ? '解锁摆件' : '锁定摆件')" :aria-label="config.locked ? '解锁摆件' : '锁定摆件'" @click="$emit('toggle-lock')">
           <AppIcon :name="config.locked ? 'lock' : 'unlock'" :size="13" />
         </button>
-        <button v-if="!config.locked" class="widget-action" title="关闭摆件" aria-label="关闭摆件" @click="$emit('close')">
+        <button v-if="!config.locked" class="widget-action" :title="tooltip('关闭摆件')" aria-label="关闭摆件" @click="$emit('close')">
           <AppIcon name="x" :size="14" />
         </button>
       </div>
@@ -252,6 +259,7 @@ function submitMemo(): void {
             class="widget-memo-attachments"
             :attachments="item.attachments"
             mode="widget"
+            :tooltips="!config.locked"
           />
         </article>
       </div>

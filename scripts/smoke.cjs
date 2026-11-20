@@ -597,7 +597,10 @@ async function checkRoute(route) {
       if (!document.querySelector('.widget-title')?.textContent?.includes('英语六级')) return '倒数日未切换'
       lock.click()
       await new Promise((resolve) => setTimeout(resolve, 60))
-      if (document.querySelector('.widget-lock-toggle')?.getAttribute('title') !== '解锁摆件') return '锁定状态未更新'
+      const lockedToggle = document.querySelector('.widget-lock-toggle')
+      if (lockedToggle?.getAttribute('aria-label') !== '解锁摆件') return '锁定状态未更新'
+      // 锁定后窗口靠转发悬停，原生 title 在摆件被遮挡时会卡在其他窗口上方，必须移除
+      if (document.querySelector('[title]')) return '锁定后仍保留原生 title 提示'
       if (document.querySelector('.widget-loading')) return '锁定后错误显示加载占位层'
       const rootBounds = document.querySelector('.desktop-widget-root')?.getBoundingClientRect()
       const cardBounds = document.querySelector('.desktop-widget-card')?.getBoundingClientRect()
@@ -625,7 +628,11 @@ async function checkRoute(route) {
       const file = document.querySelector('.widget-memo-attachments .file-open')
       if (!image || !file) return '桌面备忘录附件未适配'
       if (!image.complete) await new Promise((resolve) => image.addEventListener('load', resolve, { once: true }))
-      return image.naturalWidth ? '' : '桌面备忘录图片未加载'
+      if (!image.naturalWidth) return '桌面备忘录图片未加载'
+      // 附件按钮同样会在锁定后被转发悬停误触发提示条
+      document.querySelector('.widget-lock-toggle')?.click()
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      return document.querySelector('[title]') ? '锁定后附件按钮仍保留原生 title 提示' : ''
     })()`)
     if (memoResult) errors.push(memoResult)
   }

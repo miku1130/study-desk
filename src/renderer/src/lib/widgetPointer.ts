@@ -21,3 +21,13 @@ export function resolvePointerInteractive(
   if (!locked) return { interactive: false, send: false }
   return { interactive: overInteractive, send: overInteractive !== current }
 }
+
+/**
+ * 锁定后的摆件只能靠主进程转发的鼠标移动来判断指针是否落在小锁上。
+ * 摆件被其他窗口遮住时，转发出来的悬停同样会触发 Chromium 原生的 title 提示条，
+ * 而窗口收不到真实的离开事件，提示条便会一直浮在其他应用上方无法关闭。
+ * 因此锁定态一律不输出原生提示文本，按钮语义交给 aria-label。
+ */
+export function widgetTooltipText(locked: boolean, text: string): string | undefined {
+  return locked ? undefined : text
+}

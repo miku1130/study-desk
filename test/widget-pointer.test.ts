@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePointerInteractive } from '../src/renderer/src/lib/widgetPointer'
+import { resolvePointerInteractive, widgetTooltipText } from '../src/renderer/src/lib/widgetPointer'
 
 describe('锁定摆件的鼠标穿透状态', () => {
   it('指针移到小锁上时让窗口接收鼠标', () => {
@@ -29,5 +29,17 @@ describe('锁定摆件的鼠标穿透状态', () => {
   it('解锁后只清除本地标记，不下发穿透', () => {
     expect(resolvePointerInteractive(false, false, true)).toEqual({ interactive: false, send: false })
     expect(resolvePointerInteractive(false, true, true)).toEqual({ interactive: false, send: false })
+  })
+})
+
+describe('锁定摆件的原生提示条', () => {
+  // 摆件被其他窗口遮住时，转发的悬停会让 Chromium 为 title 弹提示条，
+  // 而窗口收不到真实的离开事件，提示条会一直浮在其他应用上方
+  it('锁定后不输出 title，避免提示条卡住', () => {
+    expect(widgetTooltipText(true, '解锁摆件')).toBeUndefined()
+  })
+
+  it('未锁定时保留原生提示', () => {
+    expect(widgetTooltipText(false, '锁定摆件')).toBe('锁定摆件')
   })
 })
